@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "sign-lang-glove"
+version = "0.1.0"
+description = "Sign Language Glove - Gesture recognition with LSTM"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "torch",
+    "matplotlib",
+    "seaborn",
+    "pyserial",
+    "keyboard",
+    "llama-cpp-python",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "torchviz"]
+
+[tool.setuptools.packages.find]
+where = ["python_modules"]
+
+[tool.pytest.ini_options]
+testpaths = ["python_modules/tests"]
+pythonpath = ["python_modules"]

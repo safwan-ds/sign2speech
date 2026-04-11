@@ -1,0 +1,9 @@
+.pio
+.idea
+.venv
+.vscode
+models
+__pycache__
+data
+graphs
+logs
