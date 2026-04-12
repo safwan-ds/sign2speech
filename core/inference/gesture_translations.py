@@ -1,15 +1,10 @@
 import os
-import sys
 import logging
-
-sys.path.insert(
-    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
 from config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
-GESTURES_PATH = os.path.join(BASE_DIR, "gestures.txt")
+GESTURES_PATH = os.path.join(BASE_DIR, "config", "gestures.txt")
 
 
 def load_gesture_translations(path: str = GESTURES_PATH):

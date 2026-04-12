@@ -1,14 +1,13 @@
-"""
-Serial communication utilities for Sign Language Glove project
-"""
+"""Serial communication utilities for Sign Language Glove project."""
 
-import os
-import sys
+from __future__ import annotations
+
+import time
+
 import serial
 import serial.tools.list_ports
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import EXPECTED_SENSOR_COUNT
+from config import BAUD_RATE, EXPECTED_SENSOR_COUNT
 
 
 def parse_sensor_data(line: str) -> dict[str, float] | None:
@@ -80,6 +79,42 @@ def select_serial_port(preferred_port: str | None = None):
             return port.device
 
     return ports[0].device
+
+
+def detect_glove_ports(
+    baud_rate: int = BAUD_RATE,
+    timeout: float = 0.12,
+    read_attempts: int = 3,
+    settle_delay: float = 0.15,
+) -> list[str]:
+    """Return ports that emit valid glove sensor packets.
+
+    The probe keeps the scan conservative: only ports that produce at least
+    one parseable sensor row are returned, so the GUI can hide unrelated COM
+    ports.
+    """
+
+    matching_ports: list[str] = []
+    for port_info in serial.tools.list_ports.comports():
+        connection: serial.Serial | None = None
+        try:
+            connection = serial.Serial(port_info.device, baud_rate, timeout=timeout)
+            time.sleep(settle_delay)
+            for _ in range(read_attempts):
+                line = connection.readline().decode("utf-8", errors="ignore")
+                if parse_sensor_data(line) is not None:
+                    matching_ports.append(port_info.device)
+                    break
+        except (serial.SerialException, OSError, ValueError):
+            continue
+        finally:
+            if connection is not None:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+
+    return matching_ports
 
 
 def connect_serial(port: str, baud_rate: int, timeout: float = 1.0):

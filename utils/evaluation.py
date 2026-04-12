@@ -20,10 +20,8 @@ from sklearn.metrics import (
 from sklearn.preprocessing import label_binarize
 import torch
 import os
-import sys
 import logging
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     EVALUATION_CLASS_WEIGHT_EPSILON,
     EVALUATION_DPI,

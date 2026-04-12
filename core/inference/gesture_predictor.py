@@ -1,15 +1,11 @@
 import os
 import time
 from collections import deque
-import sys
 import logging
 
 import numpy as np
 import torch
 
-sys.path.insert(
-    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
 from config import (
     MODELS_DIR,
     SEQUENCE_LENGTH,

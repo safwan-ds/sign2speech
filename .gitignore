@@ -1,9 +1,9 @@
-.pio
-.idea
 .venv
 .vscode
+.env
 models
 __pycache__
 data
 graphs
 logs
+.pytest_cache

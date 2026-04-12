@@ -1,19 +1,11 @@
 """Model evaluation utilities"""
 
 import os
-import sys
 import numpy as np
 from datetime import datetime
 import torch
 import logging
 
-# Add parent directory to path for config imports
-sys.path.insert(
-    0,
-    os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    ),
-)
 from config import MODELS_DIR
 from utils.evaluation import (
     comprehensive_evaluation,

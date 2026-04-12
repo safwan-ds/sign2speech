@@ -129,7 +129,7 @@ MIN_STRATIFY_SAMPLES = 2
 DEFAULT_VALIDATION_SIZE = 0.1
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(BASE_DIR, "data", "raw")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 TEST_DATA_DIR = os.path.join(BASE_DIR, "data", "test")

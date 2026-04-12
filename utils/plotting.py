@@ -1,12 +1,10 @@
 """Shared plotting utilities for Sign Language Glove project"""
 
 import os
-import sys
 import csv
 import matplotlib.pyplot as plt
 import logging
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
     PLOT_FIGURE_WIDTH,
     PLOT_FIGURE_HEIGHT,

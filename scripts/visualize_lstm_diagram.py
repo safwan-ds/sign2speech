@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torchviz import make_dot
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from config import (
     MODELS_DIR,
     SEQUENCE_LENGTH,

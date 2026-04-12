@@ -22,7 +22,13 @@ from config import (
 
 from utils.serial_utils import parse_sensor_data, select_serial_port
 from utils.plotting import plot_recording
-from utils.data_utils import convert_to_snake_case
+from utils.recording_utils import (
+    SENSOR_COLUMNS,
+    build_recording_file_path,
+    count_csv_samples,
+    load_gesture_names,
+    sanitize_gesture_label,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +57,6 @@ def prompt_input(prompt: str) -> str:
     finally:
         clear_input_buffer()
         _input_event.clear()
-
-
-def convert_to_snake_case(label: str) -> str:
-    """Convert gesture label to snake case (two-word to first_second)"""
-    return label.replace(" ", "_")
 
 
 def keyboard_listener():
@@ -95,29 +96,17 @@ def main():
         logger.error(f"Error connecting: {e}")
         return
 
-    gestures_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "gestures.txt",
-    )
-    with open(gestures_path, "r") as f:
-        gesture_list = [line.strip() for line in f.readlines() if line.strip()]
-
-    parsed_gestures: list[str] = []
-    for line in gesture_list:
-        if " - " in line:
-            gesture_name = line.split(" - ")[0].strip()
-        else:
-            gesture_name = line.strip()
-        parsed_gestures.append(gesture_name)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    parsed_gestures = load_gesture_names(project_root)
+    if not parsed_gestures:
+        logger.error("No gestures found in config/gestures.txt")
+        return
 
     gesture_counts: dict[str, int] = {}
     for gesture_name in parsed_gestures:
-        gesture_dir = os.path.join(LOGS_DIR, gesture_name)
-        if os.path.exists(gesture_dir):
-            count = len([f for f in os.listdir(gesture_dir) if f.endswith(".csv")])
-        else:
-            count = 0
-        gesture_counts[gesture_name] = count
+        gesture_counts[gesture_name] = count_csv_samples(
+            gesture_name, base_dir=LOGS_DIR
+        )
 
     logger.info("Available gestures:")
     for i, gesture_name in enumerate(parsed_gestures):
@@ -131,7 +120,7 @@ def main():
                 prompt_input(f"Enter gesture number (0-{len(parsed_gestures)-1}): ")
             )
             if 0 <= num < len(parsed_gestures):
-                gesture_label = convert_to_snake_case(parsed_gestures[num])
+                gesture_label = sanitize_gesture_label(parsed_gestures[num])
             else:
                 logger.warning(
                     f"Invalid number. Please enter 0-{len(parsed_gestures)-1}."
@@ -154,15 +143,6 @@ def main():
     csv_file = None
     csv_writer = None
 
-    expected_sensors = [f"flex{i}" for i in range(5)] + [
-        "accelX",
-        "accelY",
-        "accelZ",
-        "gyroX",
-        "gyroY",
-        "gyroZ",
-    ]
-
     gesture_dir = os.path.join(LOGS_DIR, gesture_label)
     try:
         while not _quit_event.is_set():
@@ -172,16 +152,15 @@ def main():
                     if not os.path.exists(gesture_dir):
                         os.makedirs(gesture_dir)
 
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = os.path.join(
-                        gesture_dir, f"{gesture_label}_{timestamp}.csv"
+                    filename = str(
+                        build_recording_file_path(gesture_label, base_dir=LOGS_DIR)
                     )
                     csv_file = open(filename, "w", newline="")
                     csv_writer = csv.writer(csv_file)
 
                     record_start_time = time.perf_counter()
 
-                    header = ["t_ms"] + expected_sensors
+                    header = ["t_ms", *SENSOR_COLUMNS]
                     csv_writer.writerow(header)
 
                     logger.info(f"RECORDING STARTED: {filename}")
@@ -237,7 +216,7 @@ def main():
                             and record_start_time is not None
                         ):
                             t_ms = int((time.perf_counter() - record_start_time) * 1000)
-                            row = [t_ms] + [sensor_dict[k] for k in expected_sensors]
+                            row = [t_ms] + [sensor_dict[k] for k in SENSOR_COLUMNS]
                             csv_writer.writerow(row)
                             print(".", end="", flush=True)
 

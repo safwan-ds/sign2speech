@@ -3,11 +3,8 @@
 import os
 import glob
 import numpy as np
-import sys
 import logging
 
-# Add parent directory to path for config imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import PROCESSED_DIR, TEST_DATA_DIR, TEST_SIZE, USE_TEST_SPLIT
 
 logger = logging.getLogger(__name__)

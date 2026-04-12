@@ -1,12 +1,7 @@
 """Unit tests for augmentation module"""
 
-import os
-import sys
-
 import numpy as np
 import pytest
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.augmentation import TimeSeriesAugmenter, create_augmented_dataset
 

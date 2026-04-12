@@ -1,0 +1,11 @@
+REST
+hello - merhaba
+me - ben
+mine - benim
+project - proje
+sign_language - işaret dili
+teacher - öğretmen
+thank_you - teşekkür ederim
+welcome - hoş geldiniz
+glove - eldiven
+safwan - safwan
