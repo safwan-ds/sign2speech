@@ -26,7 +26,7 @@ from gui.ui.localization import LOCALIZATION
 from core.inference.gesture_translations import load_gesture_translations
 
 
-class SignLanguageDashboard(
+class Sign2SpeechDashboard(
     AppWindowLayoutMixin,
     AppWindowActionsMixin,
     AppWindowEventMixin,
@@ -241,7 +241,7 @@ def run_dashboard(project_root: Path) -> None:
             safe_font.setPointSize(10)
             app.setFont(safe_font)
 
-    window = SignLanguageDashboard(project_root=project_root)
+    window = Sign2SpeechDashboard(project_root=project_root)
     window.show()
 
     if owns_app:
