@@ -8,7 +8,7 @@ GESTURES_PATH = os.path.join(BASE_DIR, "config", "gestures.txt")
 
 
 def load_gesture_translations(path: str = GESTURES_PATH):
-    translations: dict[str, str | None] = {}
+    translations: dict[str, str] = {}
     if not os.path.exists(path):
         logger.warning(f"Warning: Gestures file not found at {path}")
         return translations
@@ -23,24 +23,35 @@ def load_gesture_translations(path: str = GESTURES_PATH):
                 original, translated = [part.strip() for part in line.split("-", 1)]
                 if not original:
                     continue
-                if translated:
-                    translations[original.lower()] = translated
-                else:
-                    translations[original.lower()] = None
-            else:
-                translations[line.lower()] = None
+                translations[original.lower()] = translated
 
     return translations
 
 
-def translate_gesture(gesture: str, translations: dict[str, str | None]) -> str:
-    translated = translations.get(gesture.lower())
+def translate_gesture(
+    gesture: str,
+    translations: dict[str, str],
+    target_language: str = "tr",
+) -> str:
+    normalized = gesture.strip()
+    if not normalized:
+        return ""
+
+    if target_language.lower() == "en":
+        return normalized.replace("_", " ")
+
+    translated = translations.get(normalized.lower(), "").strip()
     if translated:
         return translated
-    return gesture.replace("_", " ")
+    return normalized.replace("_", " ")
 
 
 def translate_gestures(
-    gestures: list[str], translations: dict[str, str | None]
+    gestures: list[str],
+    translations: dict[str, str],
+    target_language: str = "tr",
 ) -> list[str]:
-    return [translate_gesture(gesture, translations) for gesture in gestures]
+    return [
+        translate_gesture(gesture, translations, target_language=target_language)
+        for gesture in gestures
+    ]

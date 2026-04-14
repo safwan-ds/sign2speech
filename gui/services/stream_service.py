@@ -27,6 +27,7 @@ class StreamConfig:
     serial_settings: SerialSettings
     confidence_threshold: float
     smoothing_window: int
+    language: str = "tr"
 
 
 class StreamWorker(threading.Thread):
@@ -108,7 +109,9 @@ class StreamWorker(threading.Thread):
                 smooth_token = self._smoother.update(str(gesture))
                 display_token = smooth_token
                 if confidence < self._config.confidence_threshold:
-                    display_token = "Belirsiz"
+                    display_token = (
+                        "Belirsiz" if self._config.language == "tr" else "Uncertain"
+                    )
 
                 self._event_queue.put(
                     {
@@ -122,11 +125,15 @@ class StreamWorker(threading.Thread):
 
                 stable_token = smooth_token.upper()
                 if (
-                    display_token != "Belirsiz"
+                    display_token not in {"Belirsiz", "Uncertain"}
                     and stable_token != "REST"
                     and self._sentence.try_append(smooth_token)
                 ):
-                    translated = translate_gesture(smooth_token, self._translations)
+                    translated = translate_gesture(
+                        smooth_token,
+                        self._translations,
+                        target_language=self._config.language,
+                    )
                     self._event_queue.put(
                         {
                             "type": "sentence",
@@ -147,7 +154,9 @@ class StreamWorker(threading.Thread):
                     ):
                         gesture_names = [name for name, _ in collected_gestures]
                         translated_gestures = translate_gestures(
-                            gesture_names, self._translations
+                            gesture_names,
+                            self._translations,
+                            target_language=self._config.language,
                         )
                         gesture_text = " ".join(translated_gestures)
 
@@ -157,12 +166,12 @@ class StreamWorker(threading.Thread):
                                 "text": gesture_text,
                             }
                         )
-                        self._logger.info("QWEN düzenleme isteği kuyruğa alındı")
+                        self._logger.info("LLM refinement request queued")
 
                         collected_gestures.clear()
                         last_added_gesture = None
                         consecutive_rest_frames = 0
-                elif is_new and display_token != "Belirsiz":
+                elif is_new and display_token not in {"Belirsiz", "Uncertain"}:
                     consecutive_rest_frames = 0
 
                     if smooth_token != last_added_gesture:

@@ -2,10 +2,25 @@ REST
 hello - merhaba
 me - ben
 mine - benim
+you - sen
+do - yapmak
 project - proje
 sign_language - işaret dili
-teacher - öğretmen
+teacher - hoca
 thank_you - teşekkür ederim
 welcome - hoş geldiniz
 glove - eldiven
-safwan - safwan
+how - nasıl
+good - iyi 
+gray_wolf - bozkurt
+ok - tamam
+one - bir
+two - iki
+three - üç
+four - dört
+five - beş
+six - altı
+seven - yedi
+eight - sekiz
+nine - dokuz
+ten - on

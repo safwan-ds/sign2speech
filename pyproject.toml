@@ -19,6 +19,7 @@ dependencies = [
     "keyboard",
     "PySide6",
     "llama-cpp-python",
+    "edge-tts",
 ]
 
 [project.optional-dependencies]
