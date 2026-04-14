@@ -72,7 +72,7 @@ class SignLanguageDashboard(QMainWindow):
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.project_root = project_root
-        self.setWindowTitle("Sign2Speech")
+        self.setWindowTitle(self._t("title"))
         self.resize(1520, 900)
         self.setMinimumSize(1200, 700)
 
@@ -118,6 +118,14 @@ class SignLanguageDashboard(QMainWindow):
         self._recording_thread: threading.Thread | None = None
         self._recording_started_at: float | None = None
         self._recording_serial = SerialService()
+        self._recording_countdown_active = False
+        self._recording_countdown_remaining = 0
+        self._recording_pending_request: tuple[str, str, int] | None = None
+        self._recording_countdown_timer = QTimer(self)
+        self._recording_countdown_timer.setInterval(1000)
+        self._recording_countdown_timer.timeout.connect(
+            self._on_recording_countdown_tick
+        )
 
         self._build_ui()
         self._build_shortcuts()
@@ -147,6 +155,9 @@ class SignLanguageDashboard(QMainWindow):
         table = self._i18n.get(self.ui_language, self._i18n["tr"])
         return table.get(key, key)
 
+    def _tf(self, key: str, **kwargs: object) -> str:
+        return self._t(key).format(**kwargs)
+
     def _format_runtime(self, value: str) -> str:
         return f"{self._t('runtime')}: {value}"
 
@@ -160,11 +171,11 @@ class SignLanguageDashboard(QMainWindow):
         return self.ui_language if self.llm_language == "auto" else self.llm_language
 
     def _refresh_language_option_labels(self) -> None:
-        self.ui_language_combo.setItemText(0, "Türkçe")
-        self.ui_language_combo.setItemText(1, "English")
+        self.ui_language_combo.setItemText(0, self._t("language_turkish"))
+        self.ui_language_combo.setItemText(1, self._t("language_english"))
         self.llm_language_combo.setItemText(0, self._t("auto"))
-        self.llm_language_combo.setItemText(1, "Türkçe")
-        self.llm_language_combo.setItemText(2, "English")
+        self.llm_language_combo.setItemText(1, self._t("language_turkish"))
+        self.llm_language_combo.setItemText(2, self._t("language_english"))
         self.tts_mode_combo.setItemText(0, self._t("tts_mode_instant"))
         self.tts_mode_combo.setItemText(1, self._t("tts_mode_llm"))
 
@@ -177,7 +188,7 @@ class SignLanguageDashboard(QMainWindow):
         outer.setContentsMargins(12, 12, 12, 12)
         outer.setSpacing(8)
 
-        self.title_label = QLabel("Sign2Speech")
+        self.title_label = QLabel(self._t("title"))
         self.title_label.setObjectName("title")
         self.subtitle_label = QLabel("")
         self.subtitle_label.setObjectName("subtitle")
@@ -193,8 +204,8 @@ class SignLanguageDashboard(QMainWindow):
         self.top_language_label = QLabel("")
         top_controls.addWidget(self.top_language_label)
         self.ui_language_combo = QComboBox()
-        self.ui_language_combo.addItem("Türkçe", "tr")
-        self.ui_language_combo.addItem("English", "en")
+        self.ui_language_combo.addItem(self._t("language_turkish"), "tr")
+        self.ui_language_combo.addItem(self._t("language_english"), "en")
         current_ui_idx = self.ui_language_combo.findData(self.ui_language)
         self.ui_language_combo.setCurrentIndex(
             current_ui_idx if current_ui_idx >= 0 else 0
@@ -205,9 +216,9 @@ class SignLanguageDashboard(QMainWindow):
         self.top_llm_language_label = QLabel("")
         top_controls.addWidget(self.top_llm_language_label)
         self.llm_language_combo = QComboBox()
-        self.llm_language_combo.addItem("Auto", "auto")
-        self.llm_language_combo.addItem("Türkçe", "tr")
-        self.llm_language_combo.addItem("English", "en")
+        self.llm_language_combo.addItem(self._t("auto"), "auto")
+        self.llm_language_combo.addItem(self._t("language_turkish"), "tr")
+        self.llm_language_combo.addItem(self._t("language_english"), "en")
         current_llm_idx = self.llm_language_combo.findData(self.llm_language)
         self.llm_language_combo.setCurrentIndex(
             current_llm_idx if current_llm_idx >= 0 else 0
@@ -346,14 +357,12 @@ class SignLanguageDashboard(QMainWindow):
 
         self.start_stop_btn = QPushButton("")
         self.start_stop_btn.clicked.connect(self.toggle_stream)
-        self.start_stop_btn.setToolTip(
-            "Gerçek zamanlı tahmin akışını başlatır veya durdurur."
-        )
+        self.start_stop_btn.setToolTip(self._t("tooltip_stream_toggle"))
         layout.addWidget(self.start_stop_btn)
 
         self.clear_btn = QPushButton("")
         self.clear_btn.clicked.connect(self.clear_sentence)
-        self.clear_btn.setToolTip("Biriken cümleyi ve düzenlenmiş metni temizler.")
+        self.clear_btn.setToolTip(self._t("tooltip_clear_sentence"))
         layout.addWidget(self.clear_btn)
 
         self.copy_btn = QPushButton("")
@@ -362,9 +371,7 @@ class SignLanguageDashboard(QMainWindow):
 
         self.export_btn = QPushButton("")
         self.export_btn.clicked.connect(self.export_sentence_text)
-        self.export_btn.setToolTip(
-            "Cümleyi logs klasörüne metin dosyası olarak kaydeder."
-        )
+        self.export_btn.setToolTip(self._t("tooltip_export_sentence"))
         layout.addWidget(self.export_btn)
 
         layout.addStretch(1)
@@ -375,7 +382,7 @@ class SignLanguageDashboard(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setSpacing(10)
 
-        self.prediction_card = QLabel("REST")
+        self.prediction_card = QLabel(self._t("rest_label"))
         self.prediction_card.setObjectName("predictionCard")
         self.prediction_card.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.prediction_card)
@@ -607,7 +614,9 @@ class SignLanguageDashboard(QMainWindow):
 
         row = QHBoxLayout()
         self.record_start_btn = QPushButton("")
-        self.record_start_btn.clicked.connect(self.start_manual_recording)
+        self.record_start_btn.clicked.connect(
+            self._start_manual_recording_with_countdown
+        )
         self.record_stop_btn = QPushButton("")
         self.record_stop_btn.clicked.connect(self.stop_manual_recording)
         self.record_stop_btn.setEnabled(False)
@@ -666,6 +675,16 @@ class SignLanguageDashboard(QMainWindow):
         copy_action.setShortcut(QKeySequence("Ctrl+C"))
         copy_action.triggered.connect(self.copy_sentence)
         self.addAction(copy_action)
+
+        start_recording_action = QAction(self)
+        start_recording_action.setShortcut(QKeySequence("Ctrl+R"))
+        start_recording_action.triggered.connect(self.start_manual_recording)
+        self.addAction(start_recording_action)
+
+        stop_recording_action = QAction(self)
+        stop_recording_action.setShortcut(QKeySequence("Ctrl+Shift+R"))
+        stop_recording_action.triggered.connect(self.stop_manual_recording)
+        self.addAction(stop_recording_action)
 
     def _set_connection_badge(self, connected: bool) -> None:
         if connected:
@@ -784,7 +803,7 @@ class SignLanguageDashboard(QMainWindow):
         self.current_sentence_tokens.clear()
         self.sentence_box.setPlainText(self._t("placeholder_sentence"))
         self.refined_box.setPlainText(self._t("placeholder_refined"))
-        self.prediction_card.setText("REST")
+        self.prediction_card.setText(self._t("rest_label"))
         self._last_confidence = 0.0
         self._apply_localization()
         self._load_gesture_options()
@@ -811,11 +830,14 @@ class SignLanguageDashboard(QMainWindow):
         self.export_btn.setEnabled(has_sentence)
         self.record_start_btn.setEnabled(
             (not self._recording_active)
+            and (not self._recording_countdown_active)
             and (not streaming)
             and has_port
             and has_gesture
         )
-        self.record_stop_btn.setEnabled(self._recording_active)
+        self.record_stop_btn.setEnabled(
+            self._recording_active or self._recording_countdown_active
+        )
 
     def _selected_port(self) -> str:
         data = self.port_combo.currentData()
@@ -831,37 +853,16 @@ class SignLanguageDashboard(QMainWindow):
 
     def _clear_logs_view(self) -> None:
         self.log_box.clear()
-        self._set_status(
-            (
-                "Kayıt görünümü temizlendi"
-                if self.ui_language == "tr"
-                else "Log view cleared"
-            ),
-            "INFO",
-        )
+        self._set_status(self._t("log_view_cleared"), "INFO")
 
     def _export_logs_view(self) -> None:
         text = self.log_box.toPlainText().strip()
         if not text:
-            self._set_status(
-                (
-                    "Dışa aktarılacak kayıt yok"
-                    if self.ui_language == "tr"
-                    else "No logs to export"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("no_logs_to_export"), "WARNING")
             return
         target = Path(LOGS_OUTPUT_DIR) / f"gui_view_{now_stamp()}.log"
         target.write_text(text + "\n", encoding="utf-8")
-        self._set_status(
-            (
-                f"Kayıtlar dışa aktarıldı: {target.name}"
-                if self.ui_language == "tr"
-                else f"Logs exported: {target.name}"
-            ),
-            "INFO",
-        )
+        self._set_status(self._tf("logs_exported", name=target.name), "INFO")
 
     def _set_status(self, message: str, level: str = "INFO") -> None:
         if level == "ERROR":
@@ -905,17 +906,8 @@ class SignLanguageDashboard(QMainWindow):
         entries = SerialService.list_port_entries()
         self.port_combo.clear()
         if not entries:
-            self.port_combo.addItem(
-                "Port Yok" if self.ui_language == "tr" else "No Ports"
-            )
-            self._set_status(
-                (
-                    "Seri port bulunamadı"
-                    if self.ui_language == "tr"
-                    else "No serial ports found"
-                ),
-                "WARNING",
-            )
+            self.port_combo.addItem(self._t("no_ports"))
+            self._set_status(self._t("no_serial_ports_found"), "WARNING")
             self._refresh_action_states()
             return
 
@@ -943,14 +935,7 @@ class SignLanguageDashboard(QMainWindow):
             else:
                 self.port_combo.setCurrentIndex(0)
 
-        self._set_status(
-            (
-                "Seri portlar yenilendi"
-                if self.ui_language == "tr"
-                else "Serial ports refreshed"
-            ),
-            "INFO",
-        )
+        self._set_status(self._t("serial_ports_refreshed"), "INFO")
         self._refresh_action_states()
 
     def _load_gesture_options(self) -> None:
@@ -964,12 +949,16 @@ class SignLanguageDashboard(QMainWindow):
                     if not line:
                         continue
                     if " - " in line:
-                        english_name, turkish_name = [part.strip() for part in line.split(" - ", 1)]
+                        english_name, turkish_name = [
+                            part.strip() for part in line.split(" - ", 1)
+                        ]
                     else:
                         english_name, turkish_name = line, line
                     if english_name and english_name not in seen:
                         seen.add(english_name)
-                        display_name = turkish_name if self.ui_language == "tr" else english_name
+                        display_name = (
+                            turkish_name if self.ui_language == "tr" else english_name
+                        )
                         labels.append((display_name, english_name))
 
         raw_dir = Path(LOGS_DIR)
@@ -986,7 +975,7 @@ class SignLanguageDashboard(QMainWindow):
         if not labels:
             labels = [
                 (
-                    "Jest bulunamadı" if self.ui_language == "tr" else "No gestures found",
+                    self._t("no_gestures_found"),
                     "",
                 )
             ]
@@ -1004,11 +993,7 @@ class SignLanguageDashboard(QMainWindow):
     def select_model_dir(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
             self,
-            (
-                "Model klasörü seç"
-                if self.ui_language == "tr"
-                else "Select model directory"
-            ),
+            self._t("select_model_directory"),
             str(self.project_root),
         )
         if chosen:
@@ -1019,10 +1004,7 @@ class SignLanguageDashboard(QMainWindow):
 
     def load_model_async(self) -> None:
         model_dir = Path(self.model_path_edit.text().strip())
-        self._set_status(
-            "Model yükleniyor..." if self.ui_language == "tr" else "Loading model...",
-            "INFO",
-        )
+        self._set_status(self._t("model_loading_progress"), "INFO")
         self._set_model_badge(self._t("model_loading"), "loading")
         self._model_loaded = False
         self.load_btn.setEnabled(False)
@@ -1059,11 +1041,7 @@ class SignLanguageDashboard(QMainWindow):
     def _get_stream_config(self) -> StreamConfig:
         port = self._selected_port()
         if not port:
-            raise ValueError(
-                "Seri port seçilmedi"
-                if self.ui_language == "tr"
-                else "Serial port is not selected"
-            )
+            raise ValueError(self._t("serial_port_not_selected"))
 
         baud = int(self.baud_edit.text().strip())
         serial_settings = SerialSettings(port=port, baud_rate=baud)
@@ -1082,14 +1060,7 @@ class SignLanguageDashboard(QMainWindow):
 
     def start_stream(self) -> None:
         if self.model_service.predictor is None:
-            self._set_status(
-                (
-                    "Yayından önce bir model yükleyin"
-                    if self.ui_language == "tr"
-                    else "Load a model before starting the stream"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("load_model_before_stream"), "WARNING")
             return
 
         try:
@@ -1117,14 +1088,7 @@ class SignLanguageDashboard(QMainWindow):
             self.llm_service.preload_model()
         self.worker.start()
         self.start_stop_btn.setText(self._t("stop_stream"))
-        self._set_status(
-            (
-                "Yayın başlatılıyor... veri bekleniyor"
-                if self.ui_language == "tr"
-                else "Starting stream... waiting for data"
-            ),
-            "INFO",
-        )
+        self._set_status(self._t("stream_starting_waiting_data"), "INFO")
 
     def stop_stream(
         self, feedback_message: str | None = None, level: str = "INFO"
@@ -1141,180 +1105,132 @@ class SignLanguageDashboard(QMainWindow):
         if feedback_message:
             self._set_status(feedback_message, level)
         else:
-            self._set_status(
-                (
-                    "Yayın durduruluyor..."
-                    if self.ui_language == "tr"
-                    else "Stopping stream..."
-                ),
-                "INFO",
-            )
+            self._set_status(self._t("stream_stopping"), "INFO")
         self._refresh_action_states()
 
     def copy_sentence(self) -> None:
         sentence = " ".join(self.current_sentence_tokens).strip()
         if not sentence:
-            self._set_status(
-                (
-                    "Kopyalanacak cümle yok"
-                    if self.ui_language == "tr"
-                    else "No sentence to copy"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("no_sentence_to_copy"), "WARNING")
             return
         clipboard = QApplication.clipboard()
         clipboard.setText(sentence)
-        self._set_status(
-            (
-                "Cümle panoya kopyalandı"
-                if self.ui_language == "tr"
-                else "Sentence copied to clipboard"
-            ),
-            "INFO",
-        )
+        self._set_status(self._t("sentence_copied"), "INFO")
 
     def copy_refined(self) -> None:
         text = self.refined_box.toPlainText().strip()
         if not text:
-            self._set_status(
-                (
-                    "Kopyalanacak düzenlenmiş metin yok"
-                    if self.ui_language == "tr"
-                    else "No refined text to copy"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("no_refined_text_to_copy"), "WARNING")
             return
         clipboard = QApplication.clipboard()
         clipboard.setText(text)
-        self._set_status(
-            (
-                "Düzenlenmiş metin panoya kopyalandı"
-                if self.ui_language == "tr"
-                else "Refined text copied to clipboard"
-            ),
-            "INFO",
-        )
+        self._set_status(self._t("refined_text_copied"), "INFO")
 
     def clear_sentence(self) -> None:
         self.current_sentence_tokens.clear()
         self.word_count_label.setText(self._format_word_count(0))
         self.sentence_box.setPlainText(self._t("placeholder_sentence"))
         self.refined_box.setPlainText(self._t("placeholder_refined"))
-        self._set_status(
-            "Cümle temizlendi" if self.ui_language == "tr" else "Sentence cleared",
-            "INFO",
-        )
+        self._set_status(self._t("sentence_cleared"), "INFO")
         self._refresh_action_states()
 
     def export_sentence_text(self) -> None:
         sentence = " ".join(self.current_sentence_tokens)
         if not sentence.strip():
-            self._set_status(
-                (
-                    "Dışa aktarılacak cümle yok"
-                    if self.ui_language == "tr"
-                    else "No sentence to export"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("no_sentence_to_export"), "WARNING")
             return
 
         target = export_sentence(sentence, Path(LOGS_OUTPUT_DIR))
-        self._set_status(
-            (
-                f"Cümle dışa aktarıldı: {target.name}"
-                if self.ui_language == "tr"
-                else f"Sentence exported: {target.name}"
-            ),
-            "INFO",
-        )
+        self._set_status(self._tf("sentence_exported", name=target.name), "INFO")
         self.logger.info("Sentence exported to %s", target)
 
     def run_script(self, relative_script_path: str) -> None:
         ok = self.script_runner.run_script(relative_script_path)
         if not ok:
-            self._set_status(
-                (
-                    "Zaten çalışan bir script var"
-                    if self.ui_language == "tr"
-                    else "A script is already running"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("script_already_running"), "WARNING")
 
-    def start_manual_recording(self) -> None:
+    def _resolve_manual_recording_request(self) -> tuple[str, str, int] | None:
         if self.worker and self.worker.is_alive():
-            self._set_status(
-                (
-                    "Örnek kaydı için önce yayını durdurun"
-                    if self.ui_language == "tr"
-                    else "Stop the stream before recording samples"
-                ),
-                "WARNING",
-            )
-            return
+            self._set_status(self._t("stop_stream_before_recording"), "WARNING")
+            return None
         if self._recording_active:
-            self._set_status(
-                (
-                    "Kayıt zaten devam ediyor"
-                    if self.ui_language == "tr"
-                    else "Recording is already in progress"
-                ),
-                "WARNING",
-            )
-            return
+            self._set_status(self._t("recording_already_in_progress"), "WARNING")
+            return None
+
+        if self._recording_countdown_active:
+            self._set_status(self._t("recording_countdown_in_progress"), "WARNING")
+            return None
 
         gesture = self._selected_recording_gesture()
         if not gesture:
-            self._set_status(
-                (
-                    "Önce kayıt için bir jest seçin"
-                    if self.ui_language == "tr"
-                    else "Select a gesture before recording"
-                ),
-                "WARNING",
-            )
-            return
+            self._set_status(self._t("select_gesture_before_recording"), "WARNING")
+            return None
 
         port = self._selected_port()
         if not port:
-            self._set_status(
-                (
-                    "Örnek kaydı için bir seri port seçin"
-                    if self.ui_language == "tr"
-                    else "Select a serial port before recording"
-                ),
-                "WARNING",
-            )
-            return
+            self._set_status(self._t("select_port_before_recording"), "WARNING")
+            return None
 
         try:
             baud = int(self.baud_edit.text().strip())
         except ValueError:
-            self._set_status(
-                (
-                    "Baud hızı sayısal olmalıdır"
-                    if self.ui_language == "tr"
-                    else "Baud rate must be numeric"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("baud_must_be_numeric"), "WARNING")
+            return None
+
+        return (gesture, port, baud)
+
+    def _start_manual_recording_with_countdown(self) -> None:
+        request = self._resolve_manual_recording_request()
+        if request is None:
             return
 
+        self._recording_pending_request = request
+        self._recording_countdown_active = True
+        self._recording_countdown_remaining = 3
+        self.recording_state_label.setText(
+            self._tf("recording_starts_in_seconds", seconds=3)
+        )
+        self._set_status(self._tf("recording_starts_in_seconds", seconds=3), "INFO")
+        self._refresh_action_states()
+        self._recording_countdown_timer.start()
+
+    def _on_recording_countdown_tick(self) -> None:
+        if not self._recording_countdown_active:
+            self._recording_countdown_timer.stop()
+            return
+
+        self._recording_countdown_remaining -= 1
+        if self._recording_countdown_remaining <= 0:
+            self._recording_countdown_timer.stop()
+            self._recording_countdown_active = False
+            request = self._recording_pending_request
+            self._recording_pending_request = None
+            self._refresh_action_states()
+            if request is not None:
+                self._start_manual_recording_core(*request)
+            return
+
+        self.recording_state_label.setText(
+            self._tf(
+                "recording_starts_in_seconds",
+                seconds=self._recording_countdown_remaining,
+            )
+        )
+
+    def start_manual_recording(self) -> None:
+        request = self._resolve_manual_recording_request()
+        if request is None:
+            return
+        self._start_manual_recording_core(*request)
+
+    def _start_manual_recording_core(self, gesture: str, port: str, baud: int) -> None:
         try:
             self._recording_serial.connect(
                 SerialSettings(port=port, baud_rate=baud, timeout=0.1)
             )
         except Exception as exc:
             self._set_status(
-                (
-                    f"Seri bağlantı açılamadı: {exc}"
-                    if self.ui_language == "tr"
-                    else f"Could not open serial connection: {exc}"
-                ),
-                "ERROR",
+                self._tf("serial_connection_open_failed", error=exc), "ERROR"
             )
             return
 
@@ -1323,18 +1239,10 @@ class SignLanguageDashboard(QMainWindow):
         self._recording_active = True
         self.record_start_btn.setEnabled(False)
         self.record_stop_btn.setEnabled(True)
-        if self.ui_language == "tr":
-            self.recording_state_label.setText(
-                f"Kaydediliyor: {gesture} (0 örnek satırı)"
-            )
-            self._set_status(
-                "Kayıt başladı. Hareketi yapıp Kaydı Durdur'a basın", "INFO"
-            )
-        else:
-            self.recording_state_label.setText(f"Recording: {gesture} (0 sample rows)")
-            self._set_status(
-                "Recording started. Perform gesture and press Stop Recording", "INFO"
-            )
+        self.recording_state_label.setText(
+            self._tf("recording_progress_rows", gesture=gesture, rows=0)
+        )
+        self._set_status(self._t("recording_started_hint"), "INFO")
         self._recording_thread = threading.Thread(
             target=self._recording_loop,
             args=(gesture,),
@@ -1344,30 +1252,21 @@ class SignLanguageDashboard(QMainWindow):
         self._refresh_action_states()
 
     def stop_manual_recording(self) -> None:
+        if self._recording_countdown_active:
+            self._recording_countdown_timer.stop()
+            self._recording_countdown_active = False
+            self._recording_pending_request = None
+            self.recording_state_label.setText(self._t("recording_ready"))
+            self._set_status(self._t("recording_countdown_cancelled"), "INFO")
+            self._refresh_action_states()
+            return
+
         if not self._recording_active:
-            self._set_status(
-                (
-                    "Durdurulacak aktif kayıt yok"
-                    if self.ui_language == "tr"
-                    else "No active recording to stop"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("no_active_recording_to_stop"), "WARNING")
             return
         self._recording_stop_event.set()
-        self.recording_state_label.setText(
-            "Kayıt durduruluyor..."
-            if self.ui_language == "tr"
-            else "Stopping recording..."
-        )
-        self._set_status(
-            (
-                "Kayıt durduruluyor, grafik hazırlanıyor..."
-                if self.ui_language == "tr"
-                else "Stopping recording, preparing plot..."
-            ),
-            "INFO",
-        )
+        self.recording_state_label.setText(self._t("recording_stopping"))
+        self._set_status(self._t("recording_stopping_preparing_plot"), "INFO")
 
     def _recording_loop(self, gesture: str) -> None:
         rows: list[dict[str, float | int]] = []
@@ -1406,31 +1305,18 @@ class SignLanguageDashboard(QMainWindow):
         rows: list[dict[str, float | int]],
     ) -> None:
         if not rows:
-            self._set_status(
-                (
-                    "Kayıtta geçerli sensör verisi yakalanmadı"
-                    if self.ui_language == "tr"
-                    else "No valid sensor data was captured"
-                ),
-                "WARNING",
-            )
+            self._set_status(self._t("recording_no_valid_sensor_data"), "WARNING")
             self.recording_state_label.setText(self._t("recording_ready"))
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle(
-            f"Kayıt Önizleme - {gesture}"
-            if self.ui_language == "tr"
-            else f"Recording Preview - {gesture}"
-        )
+        dialog.setWindowTitle(self._tf("recording_preview_title", gesture=gesture))
         dialog.resize(1120, 760)
 
         layout = QVBoxLayout(dialog)
         layout.addWidget(
             QLabel(
-                f"{gesture} | {len(rows)} örnek satırı"
-                if self.ui_language == "tr"
-                else f"{gesture} | {len(rows)} sample rows"
+                self._tf("recording_preview_summary", gesture=gesture, rows=len(rows))
             )
         )
 
@@ -1444,22 +1330,22 @@ class SignLanguageDashboard(QMainWindow):
             key = f"flex{i}"
             series = [float(r.get(key, 0.0)) for r in rows]
             ax_flex.plot(t_values, series, label=key)
-        ax_flex.set_title("Flex")
+        ax_flex.set_title(self._t("plot_flex"))
         ax_flex.grid(True, alpha=0.3)
         ax_flex.legend(loc="upper right")
 
         for key in ["accelX", "accelY", "accelZ"]:
             series = [float(r.get(key, 0.0)) for r in rows]
             ax_accel.plot(t_values, series, label=key)
-        ax_accel.set_title("Accelerometer")
+        ax_accel.set_title(self._t("plot_accelerometer"))
         ax_accel.grid(True, alpha=0.3)
         ax_accel.legend(loc="upper right")
 
         for key in ["gyroX", "gyroY", "gyroZ"]:
             series = [float(r.get(key, 0.0)) for r in rows]
             ax_gyro.plot(t_values, series, label=key)
-        ax_gyro.set_title("Gyroscope")
-        ax_gyro.set_xlabel("Time (ms)")
+        ax_gyro.set_title(self._t("plot_gyroscope"))
+        ax_gyro.set_xlabel(self._t("plot_time_ms"))
         ax_gyro.grid(True, alpha=0.3)
         ax_gyro.legend(loc="upper right")
 
@@ -1468,31 +1354,21 @@ class SignLanguageDashboard(QMainWindow):
         layout.addWidget(canvas, stretch=1)
 
         btn_row = QHBoxLayout()
-        save_btn = QPushButton("Kaydet" if self.ui_language == "tr" else "Save")
-        discard_btn = QPushButton("Sil" if self.ui_language == "tr" else "Delete")
+        save_btn = QPushButton(self._t("save"))
+        discard_btn = QPushButton(self._t("delete"))
         btn_row.addWidget(save_btn)
         btn_row.addWidget(discard_btn)
         layout.addLayout(btn_row)
 
         def _save() -> None:
             path = self._save_recording_rows(gesture, rows)
-            self._set_status(
-                (
-                    f"Kayıt kaydedildi: {path.name}"
-                    if self.ui_language == "tr"
-                    else f"Recording saved: {path.name}"
-                ),
-                "INFO",
-            )
+            self._set_status(self._tf("recording_saved", name=path.name), "INFO")
             self.recording_state_label.setText(self._t("recording_ready"))
             self.logger.info("Recording saved to %s", path)
             dialog.accept()
 
         def _discard() -> None:
-            self._set_status(
-                "Kayıt silindi" if self.ui_language == "tr" else "Recording deleted",
-                "WARNING",
-            )
+            self._set_status(self._t("recording_deleted"), "WARNING")
             self.recording_state_label.setText(self._t("recording_ready"))
             dialog.reject()
 
@@ -1542,8 +1418,9 @@ class SignLanguageDashboard(QMainWindow):
         self.log_box.appendPlainText(formatted)
 
     def _on_prediction(self, event: dict) -> None:
-        raw_gesture = str(event.get("raw_gesture", event.get("gesture", "Unknown")))
-        event_gesture = str(event.get("gesture", "Unknown"))
+        unknown = self._t("unknown")
+        raw_gesture = str(event.get("raw_gesture", event.get("gesture", unknown)))
+        event_gesture = str(event.get("gesture", unknown))
         confidence = float(event.get("confidence", 0.0))
 
         if event_gesture in {"Belirsiz", "Uncertain"}:
@@ -1615,10 +1492,9 @@ class SignLanguageDashboard(QMainWindow):
         if self.worker and self.worker.is_alive() and self._active_stream_port:
             if self._active_stream_port not in SerialService.list_ports():
                 self.stop_stream(
-                    (
-                        f"Seçili seri port artık bulunamadı: {self._active_stream_port}. Yayın durduruldu."
-                        if self.ui_language == "tr"
-                        else f"Selected serial port is no longer available: {self._active_stream_port}. Stream stopped."
+                    self._tf(
+                        "selected_port_no_longer_available",
+                        port=self._active_stream_port,
                     ),
                     "WARNING",
                 )
@@ -1633,11 +1509,7 @@ class SignLanguageDashboard(QMainWindow):
             and time.monotonic() >= self._stream_start_timeout_at
         ):
             self.stop_stream(
-                (
-                    "Seçili port doğru veri göndermiyor veya yanlış port seçildi. Yayın durduruldu."
-                    if self.ui_language == "tr"
-                    else "Selected port is not sending valid data or wrong port is selected. Stream stopped."
-                ),
+                self._t("selected_port_no_valid_data_stream_stopped"),
                 "WARNING",
             )
             self._set_connection_badge(False)
@@ -1674,44 +1546,18 @@ class SignLanguageDashboard(QMainWindow):
                         self.start_stop_btn.setText(self._t("stop_stream"))
                         if not self._stream_input_detected:
                             self._set_status(
-                                (
-                                    "Port bağlandı, veri bekleniyor..."
-                                    if self.ui_language == "tr"
-                                    else "Port connected, waiting for data..."
-                                ),
-                                "INFO",
+                                self._t("port_connected_waiting_data"), "INFO"
                             )
                 elif event_type == "stream_input_detected":
                     self._stream_input_detected = True
                     self._stream_start_timeout_at = None
-                    self._set_status(
-                        (
-                            "Port doğrulandı, yayın hazırlanıyor..."
-                            if self.ui_language == "tr"
-                            else "Port validated, preparing stream..."
-                        ),
-                        "INFO",
-                    )
+                    self._set_status(self._t("port_validated_preparing_stream"), "INFO")
                 elif event_type == "stream_started":
                     self._stream_started_at = time.time()
-                    self._set_status(
-                        (
-                            "Yayın başlatıldı"
-                            if self.ui_language == "tr"
-                            else "Stream started"
-                        ),
-                        "INFO",
-                    )
+                    self._set_status(self._t("stream_started"), "INFO")
                 elif event_type == "model_loaded":
                     self._update_model_meta(event["metadata"])
-                    self._set_status(
-                        (
-                            "Model başarıyla yüklendi"
-                            if self.ui_language == "tr"
-                            else "Model loaded successfully"
-                        ),
-                        "INFO",
-                    )
+                    self._set_status(self._t("model_loaded_successfully"), "INFO")
                 elif event_type == "stopped":
                     was_connected = self._stream_connected
                     had_error = self._stream_had_error
@@ -1726,36 +1572,17 @@ class SignLanguageDashboard(QMainWindow):
                                 self._stream_stop_message, self._stream_stop_level
                             )
                         else:
-                            self._set_status(
-                                (
-                                    "Yayın durduruldu"
-                                    if self.ui_language == "tr"
-                                    else "Stream stopped"
-                                ),
-                                "INFO",
-                            )
+                            self._set_status(self._t("stream_stopped"), "INFO")
                     elif not had_error:
                         if was_connected:
                             self._set_status(
-                                (
-                                    "Yayın beklenmedik şekilde durdu"
-                                    if self.ui_language == "tr"
-                                    else "Stream stopped unexpectedly"
-                                ),
-                                "WARNING",
+                                self._t("stream_stopped_unexpectedly"), "WARNING"
                             )
                         else:
-                            self._set_status(
-                                (
-                                    "Yayın başlatılamadı"
-                                    if self.ui_language == "tr"
-                                    else "Stream failed to start"
-                                ),
-                                "ERROR",
-                            )
+                            self._set_status(self._t("stream_failed_to_start"), "ERROR")
                     self._refresh_action_states()
                 elif event_type == "error":
-                    message = str(event.get("message", "Unknown error"))
+                    message = str(event.get("message", self._t("unknown_error")))
                     self._stream_had_error = True
                     self._set_status(message, "ERROR")
                     if "Model" in message:
@@ -1780,14 +1607,9 @@ class SignLanguageDashboard(QMainWindow):
                 elif event_type == "recording_progress":
                     gesture = str(event.get("gesture", ""))
                     rows = int(event.get("rows", 0))
-                    if self.ui_language == "tr":
-                        self.recording_state_label.setText(
-                            f"Kaydediliyor: {gesture} ({rows} örnek satırı)"
-                        )
-                    else:
-                        self.recording_state_label.setText(
-                            f"Recording: {gesture} ({rows} sample rows)"
-                        )
+                    self.recording_state_label.setText(
+                        self._tf("recording_progress_rows", gesture=gesture, rows=rows)
+                    )
                 elif event_type == "recording_ready_review":
                     self._recording_active = False
                     self.record_start_btn.setEnabled(True)
@@ -1805,11 +1627,7 @@ class SignLanguageDashboard(QMainWindow):
                         str(
                             event.get(
                                 "message",
-                                (
-                                    "Kayıt hatası"
-                                    if self.ui_language == "tr"
-                                    else "Recording error"
-                                ),
+                                self._t("recording_error"),
                             )
                         ),
                         "ERROR",
@@ -1820,6 +1638,9 @@ class SignLanguageDashboard(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self.stop_stream()
+        self._recording_countdown_timer.stop()
+        self._recording_countdown_active = False
+        self._recording_pending_request = None
         self._recording_stop_event.set()
         self._recording_serial.disconnect()
         self.llm_service.shutdown()
