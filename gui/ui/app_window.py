@@ -72,6 +72,7 @@ class SignLanguageDashboard(QMainWindow):
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.project_root = project_root
+        self._i18n = LOCALIZATION
         self.setWindowTitle(self._t("title"))
         self.resize(1520, 900)
         self.setMinimumSize(1200, 700)
@@ -111,7 +112,6 @@ class SignLanguageDashboard(QMainWindow):
         )
         self.llm_language = "auto"
         self._gesture_translations = load_gesture_translations()
-        self._i18n = LOCALIZATION
 
         self._recording_active = False
         self._recording_stop_event = threading.Event()
@@ -672,7 +672,7 @@ class SignLanguageDashboard(QMainWindow):
         self.addAction(export_action)
 
         copy_action = QAction(self)
-        copy_action.setShortcut(QKeySequence("Ctrl+C"))
+        copy_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
         copy_action.triggered.connect(self.copy_sentence)
         self.addAction(copy_action)
 
@@ -824,7 +824,13 @@ class SignLanguageDashboard(QMainWindow):
         has_gesture = bool(self._selected_recording_gesture())
 
         self.start_stop_btn.setEnabled(
-            streaming or (has_model and has_port and not self._recording_active)
+            streaming
+            or (
+                has_model
+                and has_port
+                and not self._recording_active
+                and not self._recording_countdown_active
+            )
         )
         self.copy_btn.setEnabled(has_sentence)
         self.export_btn.setEnabled(has_sentence)
@@ -1643,6 +1649,8 @@ class SignLanguageDashboard(QMainWindow):
         self._recording_pending_request = None
         self._recording_stop_event.set()
         self._recording_serial.disconnect()
+        if self.worker and self.worker.is_alive():
+            self.worker.join(timeout=1.5)
         self.llm_service.shutdown()
         self.tts_service.stop()
         event.accept()
