@@ -216,6 +216,8 @@ class AppWindowActionsMixin:
         self.word_count_label.setText(self._format_word_count(0))
         self.sentence_box.setPlainText(self._t("placeholder_sentence"))
         self.refined_box.setPlainText(self._t("placeholder_refined"))
+        if self.llm_enabled:
+            self._set_llm_progress_state("idle")
         self._set_status(self._t("sentence_cleared"), "INFO")
         self._refresh_action_states()
 

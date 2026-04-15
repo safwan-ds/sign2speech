@@ -24,6 +24,7 @@ from gui.ui.app_window_events import AppWindowEventMixin
 from gui.ui.app_window_layout import AppWindowLayoutMixin
 from gui.ui.localization import LOCALIZATION
 from core.inference.gesture_translations import load_gesture_translations
+from gui.utils.formatting import percent
 
 
 class Sign2SpeechDashboard(
@@ -74,6 +75,8 @@ class Sign2SpeechDashboard(
         self.current_sentence_tokens: list[str] = []
         self.model_dir = str(Path(MODELS_DIR) / "latest")
         self.llm_enabled = True
+        self._llm_progress_state = "idle"
+        self._llm_backend_state = "unknown"
         self._gesture_translations = load_gesture_translations()
 
         self._build_ui()
@@ -108,11 +111,45 @@ class Sign2SpeechDashboard(
     def _format_runtime(self, value: str) -> str:
         return f"{self._t('runtime')}: {value}"
 
-    def _format_confidence(self, value: str) -> str:
-        return f"{self._t('confidence')}: {value}"
+    def _format_confidence(self, value: float | str) -> str:
+        if isinstance(value, str):
+            formatted = value
+        else:
+            formatted = percent(value)
+        return f"{self._t('confidence')}: {formatted}"
 
     def _format_word_count(self, count: int) -> str:
         return f"{self._t('word_count')}: {count}"
+
+    def _format_llm_progress(self, state: str) -> str:
+        state_map = {
+            "idle": self._t("llm_state_idle"),
+            "loading": self._t("llm_state_loading"),
+            "generating": self._t("llm_state_generating"),
+            "ready": self._t("llm_state_ready"),
+            "error": self._t("llm_state_error"),
+            "unavailable": self._t("llm_state_unavailable"),
+            "disabled": self._t("llm_state_disabled"),
+        }
+        return f"{self._t('llm_progress')}: {state_map.get(state, state)}"
+
+    def _format_llm_backend(self, backend: str) -> str:
+        backend_map = {
+            "gpu": self._t("llm_backend_gpu"),
+            "cpu": self._t("llm_backend_cpu"),
+            "unknown": self._t("llm_backend_unknown"),
+        }
+        return f"{self._t('llm_backend')}: {backend_map.get(backend, backend)}"
+
+    def _set_llm_progress_state(self, state: str) -> None:
+        self._llm_progress_state = state
+        if hasattr(self, "llm_progress_label"):
+            self.llm_progress_label.setText(self._format_llm_progress(state))
+
+    def _set_llm_backend_state(self, backend: str) -> None:
+        self._llm_backend_state = backend
+        if hasattr(self, "llm_backend_label"):
+            self.llm_backend_label.setText(self._format_llm_backend(backend))
 
     def _effective_llm_language(self) -> str:
         return self.ui_language if self.llm_language == "auto" else self.llm_language
@@ -212,6 +249,10 @@ class Sign2SpeechDashboard(
 
     def _on_llm_changed(self, state: int) -> None:
         self.llm_enabled = state == 2
+        if self.llm_enabled:
+            self._set_llm_progress_state("idle")
+        else:
+            self._set_llm_progress_state("disabled")
 
     def _on_tts_changed(self, state: int) -> None:
         self.tts_enabled = state == 2

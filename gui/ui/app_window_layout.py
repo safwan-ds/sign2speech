@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
 )
 
 from config import BAUD_RATE
-from gui.utils.formatting import percent
 
 
 class AppWindowLayoutMixin:
@@ -289,6 +288,12 @@ class AppWindowLayoutMixin:
         refined_header.addWidget(self.refined_copy_btn)
         refined_layout.addLayout(refined_header)
 
+        self.llm_progress_label = QLabel("")
+        refined_layout.addWidget(self.llm_progress_label)
+
+        self.llm_backend_label = QLabel("")
+        refined_layout.addWidget(self.llm_backend_label)
+
         self.refined_box = QTextEdit()
         self.refined_box.setReadOnly(True)
         self.refined_box.setPlainText("")
@@ -477,14 +482,18 @@ class AppWindowLayoutMixin:
         self.copy_btn.setText(self._t("copy_sentence"))
         self.export_btn.setText(self._t("export_text"))
 
-        self.confidence_label.setText(
-            self._format_confidence(percent(self._last_confidence))
-        )
+        self.confidence_label.setText(self._format_confidence(self._last_confidence))
         self.word_count_label.setText(
             self._format_word_count(len(self.current_sentence_tokens))
         )
         self.sentence_header_label.setText(self._t("translated_sentence"))
         self.refined_header_label.setText(self._t("refined_sentence"))
+        self.llm_progress_label.setText(
+            self._format_llm_progress(self._llm_progress_state)
+        )
+        self.llm_backend_label.setText(
+            self._format_llm_backend(self._llm_backend_state)
+        )
         self.sentence_copy_btn.setText(self._t("copy"))
         self.refined_copy_btn.setText(self._t("copy"))
         self.history_label.setText(self._t("history"))

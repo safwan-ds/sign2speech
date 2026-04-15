@@ -8,6 +8,7 @@ import threading
 from dataclasses import dataclass
 from queue import Queue
 
+from config import QWEN_N_GPU_LAYERS
 from utils.llm_utils import generate_reply, load_qwen_model
 
 
@@ -72,8 +73,18 @@ class LLMService:
             pass
         self._worker.join(timeout=1.0)
 
-    def _emit_status(self, message: str) -> None:
-        self._event_queue.put({"type": "llm_status", "message": message})
+    def _emit_status(
+        self,
+        message: str,
+        progress: str | None = None,
+        backend: str | None = None,
+    ) -> None:
+        payload: dict[str, str] = {"type": "llm_status", "message": message}
+        if progress:
+            payload["progress"] = progress
+        if backend:
+            payload["backend"] = backend
+        self._event_queue.put(payload)
 
     def _emit_result(self, result: LLMResultEvent) -> None:
         self._event_queue.put(
@@ -96,19 +107,26 @@ class LLMService:
             self._is_loading = True
 
         try:
-            self._emit_status("QWEN modeli yükleniyor...")
+            self._emit_status(
+                "QWEN model is loading...",
+                progress="loading",
+                backend="unknown",
+            )
             self._logger.info("Loading QWEN model for GUI refinement")
             llm = load_qwen_model()
             if llm is None:
                 self._logger.warning("QWEN unavailable; refinement disabled")
                 self._emit_status(
-                    "QWEN unavailable. Check model path and dependencies."
+                    "QWEN unavailable. Check model path and dependencies.",
+                    progress="unavailable",
+                    backend="unknown",
                 )
                 return False
 
             self._llm = llm
+            backend = self._detect_backend()
             self._logger.info("QWEN model loaded")
-            self._emit_status("QWEN ready")
+            self._emit_status("QWEN ready", progress="ready", backend=backend)
             return True
         finally:
             with self._load_lock:
@@ -131,6 +149,12 @@ class LLMService:
                 continue
 
             try:
+                backend = self._detect_backend()
+                self._emit_status(
+                    "QWEN is generating refined text...",
+                    progress="generating",
+                    backend=backend,
+                )
                 refined = generate_reply(
                     self._llm,
                     request.text,
@@ -141,6 +165,29 @@ class LLMService:
                         LLMResultEvent(text=refined, source_text=request.text)
                     )
                     self._logger.info("QWEN refinement generated")
+                    self._emit_status(
+                        "QWEN refinement complete",
+                        progress="ready",
+                        backend=backend,
+                    )
             except Exception as exc:  # pragma: no cover
                 self._logger.exception("QWEN refinement failed: %s", exc)
-                self._emit_status("QWEN refinement failed")
+                self._emit_status(
+                    "QWEN refinement failed",
+                    progress="error",
+                    backend=self._detect_backend(),
+                )
+
+    def _detect_backend(self) -> str:
+        # Backend mode is inferred from offload support and requested GPU layers.
+        if self._llm is None:
+            return "unknown"
+        try:
+            from llama_cpp import llama_cpp as llama_lib
+
+            supports_gpu = bool(llama_lib.llama_supports_gpu_offload())
+            if supports_gpu and QWEN_N_GPU_LAYERS != 0:
+                return "gpu"
+        except Exception:
+            return "unknown"
+        return "cpu"

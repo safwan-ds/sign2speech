@@ -12,7 +12,7 @@ welcome - hoş geldiniz
 glove - eldiven
 how - nasıl
 good - iyi 
-gray_wolf - bozkurt
+wolf - kurt
 ok - tamam
 one - bir
 two - iki

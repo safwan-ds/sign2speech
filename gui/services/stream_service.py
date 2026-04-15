@@ -124,11 +124,12 @@ class StreamWorker(threading.Thread):
                 )
 
                 stable_token = smooth_token.upper()
-                if (
-                    display_token not in {"Belirsiz", "Uncertain"}
-                    and stable_token != "REST"
-                    and self._sentence.try_append(smooth_token)
-                ):
+                is_rest_like = stable_token == "REST" or display_token in {
+                    "Belirsiz",
+                    "Uncertain",
+                }
+
+                if not is_rest_like and self._sentence.try_append(smooth_token):
                     translated = translate_gesture(
                         smooth_token,
                         self._translations,
@@ -142,7 +143,7 @@ class StreamWorker(threading.Thread):
                         }
                     )
 
-                is_rest = stable_token == "REST"
+                is_rest = is_rest_like
                 is_new = smooth_token != last_gesture
 
                 if is_rest:
@@ -171,7 +172,7 @@ class StreamWorker(threading.Thread):
                         collected_gestures.clear()
                         last_added_gesture = None
                         consecutive_rest_frames = 0
-                elif is_new and display_token not in {"Belirsiz", "Uncertain"}:
+                elif is_new and not is_rest_like:
                     consecutive_rest_frames = 0
 
                     if smooth_token != last_added_gesture:

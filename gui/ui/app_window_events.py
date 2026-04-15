@@ -84,12 +84,21 @@ class AppWindowEventMixin:
         if not text:
             return
         self.refined_box.setPlainText(text)
+        self._set_llm_progress_state("ready")
 
         if self.tts_enabled and self.tts_mode == "llm":
             self.tts_service.speak(text, self._effective_llm_language())
 
     def _on_llm_status(self, event: dict) -> None:
         message = str(event.get("message", "")).strip()
+        progress = str(event.get("progress", "")).strip().lower()
+        backend = str(event.get("backend", "")).strip().lower()
+
+        if progress:
+            self._set_llm_progress_state(progress)
+        if backend in {"gpu", "cpu", "unknown"}:
+            self._set_llm_backend_state(backend)
+
         if message:
             self._set_status(message, "INFO")
 
