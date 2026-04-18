@@ -171,7 +171,7 @@ def main():
                         csv_file = None
                         csv_writer = None
 
-                    print()  # Move to next line after progress dots
+                    print()
                     logger.info("RECORDING STOPPED. File Saved.")
                     is_recording = False
                     record_start_time = None

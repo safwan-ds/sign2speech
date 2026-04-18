@@ -73,6 +73,21 @@ python -m gui.main
 python scripts/run_gui.py
 ```
 
+### Running the Dataset Manager GUI
+
+```bash
+python -m gui.data_manager_main
+# or
+python scripts/run_data_manager_gui.py
+```
+
+This manager GUI is focused on data lifecycle tasks:
+
+1. Record new samples for training
+2. Process raw recordings into train/test sequences
+3. Train a new model (default or advanced runtime overrides)
+4. Review captures with trace plots and quarantine invalid samples
+
 **Keyboard Shortcuts:**
 
 - `Ctrl+S`: Start/Stop real-time stream

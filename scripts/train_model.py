@@ -96,6 +96,7 @@ def main():
 
         save_lstm_model(model, label_encoder, mean, std, metadata, model_dir=model_dir)
 
+        logger.info(f"MODEL_DIR={model_dir}")
         logger.info("TRAINING COMPLETE!")
 
 

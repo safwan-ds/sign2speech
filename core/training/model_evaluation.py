@@ -1,6 +1,7 @@
 """Model evaluation utilities"""
 
 import os
+import json
 import numpy as np
 from datetime import datetime
 import torch
@@ -109,5 +110,33 @@ def evaluate_lstm_model(
         # Save evaluation summary
         summary_path = os.path.join(eval_dir, "evaluation_summary.txt")
         save_evaluation_summary(val_metrics, history, summary_path)
+
+    # Save metrics to JSON for GUI display
+    gui_metrics: dict = {
+        "eval_dir": eval_dir,
+        "validation": {
+            "accuracy": float(val_metrics["accuracy"]),  # type: ignore
+            "precision": float(val_metrics["precision"]),  # type: ignore
+            "recall": float(val_metrics["recall"]),  # type: ignore
+            "f1_score": float(val_metrics["f1_score"]),  # type: ignore
+            "confusion_matrix": np.asarray(val_metrics["confusion_matrix"]).tolist(),  # type: ignore
+            "class_names": list(label_encoder.classes_),
+        },
+    }
+
+    if test_metrics:
+        gui_metrics["test"] = {
+            "accuracy": float(test_metrics["accuracy"]),  # type: ignore
+            "precision": float(test_metrics["precision"]),  # type: ignore
+            "recall": float(test_metrics["recall"]),  # type: ignore
+            "f1_score": float(test_metrics["f1_score"]),  # type: ignore
+            "confusion_matrix": np.asarray(test_metrics["confusion_matrix"]).tolist(),  # type: ignore
+            "class_names": list(label_encoder.classes_),
+        }
+
+    metrics_json_path = os.path.join(eval_dir, "metrics.json")
+    with open(metrics_json_path, "w") as f:
+        json.dump(gui_metrics, f, indent=2)
+    logger.info(f"Metrics JSON saved to: {metrics_json_path}")
 
     return val_metrics["accuracy"], test_metrics["accuracy"] if test_metrics else None

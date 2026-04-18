@@ -22,7 +22,7 @@ from config import (
     setup_logging,
 )
 
-# Import utilities
+
 from utils.data_utils import (
     normalize_dataframe,
     segment_sequences,
@@ -79,15 +79,12 @@ def load_all_logs() -> dict[str, list[pd.DataFrame]]:
 
     gestures_data: dict[str, list[pd.DataFrame]] = {}
 
-    # Iterate through gesture subfolders
     for gesture_folder in os.listdir(LOGS_DIR):
         gesture_path = os.path.join(LOGS_DIR, gesture_folder)
 
-        # Skip if not a directory
         if not os.path.isdir(gesture_path):
             continue
 
-        # Get all CSV files in this gesture folder
         csv_files = glob.glob(os.path.join(gesture_path, "*.csv"))
 
         if not csv_files:
@@ -104,7 +101,7 @@ def load_all_logs() -> dict[str, list[pd.DataFrame]]:
         for file in csv_files:
             df = load_log_file(file)
             if df is not None:
-                # Normalize the data
+
                 df = normalize_dataframe(df)
                 gestures_data[gesture_folder].append(df)
 
@@ -112,6 +109,27 @@ def load_all_logs() -> dict[str, list[pd.DataFrame]]:
         logger.error(f"No log files found in {LOGS_DIR}")
 
     return gestures_data
+
+
+def clear_previous_sequence_files() -> None:
+    """Remove previously generated sequence files before regenerating data."""
+    for output_dir in (PROCESSED_DIR, TEST_DATA_DIR):
+        if not os.path.exists(output_dir):
+            continue
+
+        removed_files = 0
+        for file_path in glob.glob(os.path.join(output_dir, "sequences_*.npz")):
+            try:
+                os.remove(file_path)
+                removed_files += 1
+                logger.info("Removed stale sequence file: %s", file_path)
+            except OSError as exc:
+                logger.warning("Could not remove %s: %s", file_path, exc)
+
+        if removed_files:
+            logger.info(
+                "Cleared %s old sequence file(s) from %s", removed_files, output_dir
+            )
 
 
 def prepare_lstm_dataset(
@@ -182,15 +200,14 @@ def main():
     setup_logging("process_data")
 
     logger.info("LSTM DATA PROCESSING")
+    clear_previous_sequence_files()
 
-    # Load all log files grouped by gesture
     gestures_data = load_all_logs()
 
     if not gestures_data:
         logger.error("No data to process!")
         return
 
-    # Display found gestures
     logger.info(f"Found {len(gestures_data)} gesture(s):")
     total_samples = 0
     for gesture_label, dataframes in gestures_data.items():
@@ -230,32 +247,29 @@ def main():
         logger.info("Enhanced features: DISABLED")
         logger.info("  - Using only base sensor values")
 
-    # Process each gesture separately
     processed_count = 0
     test_data_available = False
 
     for gesture_label, dataframes in gestures_data.items():
         logger.info(f"Processing gesture: '{gesture_label}'")
 
-        # Split recordings at FILE level to prevent data leakage
-        # (overlapping sequences from the same recording must not span train/test)
         n_files = len(dataframes)
         rng = np.random.RandomState(RANDOM_STATE)
         shuffled_indices = rng.permutation(n_files)
 
         if not USE_TEST_SPLIT:
-            # No holdout test set — use all recordings for training
+
             train_dfs = dataframes
             test_dfs = []
         elif n_files >= 2:
             split_idx = max(1, int(n_files * (1 - TEST_DATA_SPLIT_PERCENTAGE)))
-            # Ensure at least 1 file goes to test
+
             if split_idx >= n_files:
                 split_idx = n_files - 1
             train_dfs = [dataframes[i] for i in shuffled_indices[:split_idx]]
             test_dfs = [dataframes[i] for i in shuffled_indices[split_idx:]]
         else:
-            # Only 1 file — all goes to training
+
             train_dfs = dataframes
             test_dfs = []
 
@@ -263,7 +277,6 @@ def main():
             f"  File-level split: {len(train_dfs)} train, {len(test_dfs)} test recordings"
         )
 
-        # Create sequences from training recordings
         X_train, y_train = prepare_lstm_dataset(train_dfs, gesture_label)
 
         if X_train is not None and y_train is not None:
@@ -274,7 +287,6 @@ def main():
         else:
             logger.warning(f"Could not create training sequences for '{gesture_label}'")
 
-        # Create sequences from test recordings
         if test_dfs:
             X_test, y_test = prepare_lstm_dataset(test_dfs, gesture_label)
             if X_test is not None and y_test is not None:

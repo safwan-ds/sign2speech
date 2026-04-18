@@ -27,6 +27,7 @@ dev = ["pytest", "torchviz"]
 
 [project.scripts]
 sign-glove-gui = "gui.main:main"
+sign-glove-manager = "gui.data_manager_main:main"
 sign-glove-train = "scripts.train_model:main"
 sign-glove-predict = "scripts.predict:main"
 sign-glove-process = "scripts.process_data:main"

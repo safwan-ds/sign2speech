@@ -122,7 +122,7 @@ PREDICTION_INTERVAL = 0.5
 
 
 RANDOM_STATE = 42
-USE_TEST_SPLIT = True  # If False, all data is used for training (no holdout test set)
+USE_TEST_SPLIT = False  # If False, all data is used for training (no holdout test set)
 TEST_SIZE = 0.1
 TEST_DATA_SPLIT_PERCENTAGE = 0.15
 MIN_STRATIFY_SAMPLES = 2
