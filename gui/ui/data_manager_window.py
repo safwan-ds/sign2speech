@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
-    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -29,7 +28,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QSpinBox,
     QSplitter,
     QStatusBar,
     QTabWidget,
@@ -286,29 +284,9 @@ class DataManagerWindow(QMainWindow):
         base_group = QGroupBox("Train New Model")
         form = QFormLayout(base_group)
 
-        self.train_use_advanced = QCheckBox("Enable advanced hyperparameters")
-        self.train_use_advanced.toggled.connect(self._on_advanced_toggle)
-        form.addRow(self.train_use_advanced)
-
-        self.train_epochs = QSpinBox()
-        self.train_epochs.setRange(5, 1000)
-        self.train_epochs.setValue(150)
-        form.addRow("Epochs", self.train_epochs)
-
-        self.train_batch = QSpinBox()
-        self.train_batch.setRange(4, 1024)
-        self.train_batch.setValue(32)
-        form.addRow("Batch Size", self.train_batch)
-
-        self.train_lr = QDoubleSpinBox()
-        self.train_lr.setDecimals(6)
-        self.train_lr.setRange(0.000001, 0.1)
-        self.train_lr.setValue(0.0005)
-        self.train_lr.setSingleStep(0.0001)
-        form.addRow("Learning Rate", self.train_lr)
-
-        self.train_ensemble = QCheckBox("Use ensemble mode")
-        form.addRow(self.train_ensemble)
+        train_config_label = QLabel("Training uses the default project configuration.")
+        train_config_label.setWordWrap(True)
+        form.addRow(train_config_label)
 
         mainLayout.addWidget(base_group)
 
@@ -319,9 +297,7 @@ class DataManagerWindow(QMainWindow):
         action_row.addStretch(1)
         mainLayout.addLayout(action_row)
 
-        self.train_note = QLabel(
-            "Default mode runs scripts/train_model.py. Advanced mode uses runtime overrides for this session only."
-        )
+        self.train_note = QLabel("Runs scripts/train_model.py with default settings.")
         self.train_note.setWordWrap(True)
         self.train_note.setMaximumHeight(30)
         mainLayout.addWidget(self.train_note)
@@ -480,7 +456,6 @@ class DataManagerWindow(QMainWindow):
 
         mainLayout.addWidget(hsplitter, stretch=1)
 
-        self._on_advanced_toggle(False)
         return tab
 
     def _build_review_tab(self) -> QWidget:
@@ -1284,30 +1259,10 @@ class DataManagerWindow(QMainWindow):
 
     def start_training(self) -> None:
         self._reset_train_ui()
-        if not self.train_use_advanced.isChecked():
-            if not self._run_script("scripts/train_model.py", [], "train_model"):
-                self.train_status_label.setText("Status: could not start")
-                return
-            self._set_status("Training started (default mode)", "INFO")
-            return
-
-        args = [
-            "--epochs",
-            str(self.train_epochs.value()),
-            "--batch-size",
-            str(self.train_batch.value()),
-            "--learning-rate",
-            str(self.train_lr.value()),
-        ]
-        if self.train_ensemble.isChecked():
-            args.append("--use-ensemble")
-
-        if not self._run_script(
-            "scripts/train_model_gui.py", args, "train_model_advanced"
-        ):
+        if not self._run_script("scripts/train_model.py", [], "train_model"):
             self.train_status_label.setText("Status: could not start")
             return
-        self._set_status("Training started (advanced mode)", "INFO")
+        self._set_status("Training started", "INFO")
 
     def _run_script(
         self, script_rel_path: str, args: list[str], task_name: str
@@ -1324,12 +1279,6 @@ class DataManagerWindow(QMainWindow):
 
         self._set_task_state(True, task_name)
         return True
-
-    def _on_advanced_toggle(self, checked: bool) -> None:
-        self.train_epochs.setEnabled(checked)
-        self.train_batch.setEnabled(checked)
-        self.train_lr.setEnabled(checked)
-        self.train_ensemble.setEnabled(checked)
 
     def _refresh_record_count(self) -> None:
         gesture = self.record_gesture_combo.currentText().strip()
