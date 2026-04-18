@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import BAUD_RATE
+from config import BAUD_RATE, CONFIDENCE_THRESHOLD
 
 
 class AppWindowLayoutMixin:
@@ -386,7 +386,7 @@ class AppWindowLayoutMixin:
         settings_layout.addWidget(self.threshold_label, 5, 0, 1, 2)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setRange(30, 99)
-        self.threshold_slider.setValue(70)
+        self.threshold_slider.setValue(int(CONFIDENCE_THRESHOLD * 100))
         self.threshold_slider.valueChanged.connect(self._on_threshold_change)
         settings_layout.addWidget(self.threshold_slider, 6, 0, 1, 2)
 

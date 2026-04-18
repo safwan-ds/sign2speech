@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import logging
 import os
 import sys
@@ -20,7 +21,9 @@ from config import (
 )
 from utils.serial_utils import connect_serial, parse_sensor_data
 from utils.recording_utils import (
+    build_recording_metadata_path,
     save_rows_to_csv,
+    save_recording_metadata,
     sanitize_gesture_label,
     build_recording_file_path,
 )
@@ -32,6 +35,7 @@ def _record_one_sample(
     ser,
     output_dir: str,
     gesture_label: str,
+    orientation: str,
     duration_seconds: float,
     min_rows: int,
 ) -> str | None:
@@ -65,7 +69,19 @@ def _record_one_sample(
         return None
 
     file_path = build_recording_file_path(gesture_label, base_dir=output_dir)
-    return str(save_rows_to_csv(file_path, rows))
+    saved_path = save_rows_to_csv(file_path, rows)
+    metadata_path = build_recording_metadata_path(saved_path)
+    metadata = {
+        "sample_id": saved_path.stem,
+        "gesture": gesture_label,
+        "orientation": orientation,
+        "recorded_at": datetime.now().isoformat(timespec="seconds"),
+        "duration_seconds": duration_seconds,
+        "row_count": len(rows),
+        "csv_path": str(saved_path),
+    }
+    save_recording_metadata(metadata_path, metadata)
+    return str(saved_path)
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -92,6 +108,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Pause in seconds between samples",
     )
     parser.add_argument(
+        "--orientation",
+        default="unspecified",
+        help="Physical orientation for the capture (stored in sidecar metadata)",
+    )
+    parser.add_argument(
         "--min-rows",
         type=int,
         default=20,
@@ -112,6 +133,8 @@ def main() -> None:
         raise ValueError("--duration must be greater than 0")
     if args.pause < 0:
         raise ValueError("--pause must be >= 0")
+    if not args.orientation.strip():
+        raise ValueError("--orientation must not be empty")
 
     output_dir = os.path.join(LOGS_DIR, gesture_label)
     os.makedirs(output_dir, exist_ok=True)
@@ -138,6 +161,7 @@ def main() -> None:
                 ser,
                 output_dir=output_dir,
                 gesture_label=gesture_label,
+                orientation=args.orientation,
                 duration_seconds=args.duration,
                 min_rows=args.min_rows,
             )

@@ -28,6 +28,7 @@ from utils.data_utils import (
     segment_sequences,
     segment_sequences_with_enhanced_features,
 )
+from utils.recording_utils import SENSOR_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,35 @@ def load_log_file(filepath: str) -> pd.DataFrame | None:
     """Load a single CSV log file"""
     try:
         df = pd.read_csv(filepath)
-        logger.info(f"Loaded: {os.path.basename(filepath)} ({len(df)} samples)")
-        return df
+        missing_columns = [col for col in SENSOR_COLUMNS if col not in df.columns]
+        if missing_columns:
+            logger.error(
+                "Error loading %s: missing required sensor columns: %s",
+                filepath,
+                ", ".join(missing_columns),
+            )
+            return None
+
+        numeric_df = df.loc[:, SENSOR_COLUMNS].copy()
+        for column in SENSOR_COLUMNS:
+            numeric_df[column] = pd.to_numeric(numeric_df[column], errors="coerce")
+
+        before_rows = len(numeric_df)
+        numeric_df = numeric_df.dropna(axis=0, how="any").reset_index(drop=True)
+        dropped_rows = before_rows - len(numeric_df)
+        if dropped_rows:
+            logger.warning(
+                "Dropped %s non-numeric row(s) from %s before serialization",
+                dropped_rows,
+                os.path.basename(filepath),
+            )
+
+        if numeric_df.empty:
+            logger.error(f"Error loading {filepath}: no valid numeric sensor rows")
+            return None
+
+        logger.info(f"Loaded: {os.path.basename(filepath)} ({len(numeric_df)} samples)")
+        return numeric_df
     except Exception as e:
         logger.error(f"Error loading {filepath}: {e}")
         return None

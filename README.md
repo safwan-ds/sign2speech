@@ -178,6 +178,12 @@ sequences = data['sequences']  # Shape: (num_samples, 30, 11)
 labels = data['labels']        # Shape: (num_samples,)
 ```
 
+### Recording Protocol
+
+New recordings keep the sensor CSV numeric-only. Any capture metadata such as orientation is written to a sidecar `.meta.json` file with the same sample stem, so tensor preparation stays compatible with NumPy and PyTorch.
+
+See [docs/data_collection_protocol.md](docs/data_collection_protocol.md) for the capture rules used by the unified LSTM pipeline.
+
 ## 🧪 Testing
 
 Run pytest from project root:

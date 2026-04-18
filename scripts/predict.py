@@ -16,8 +16,8 @@ from config import (
     BAUD_RATE,
     TIMEOUT,
     SEQUENCE_LENGTH,
+    CONFIDENCE_THRESHOLD,
     PREDICTION_MOTION_THRESHOLD,
-    PREDICTION_MIN_CONFIDENCE,
     PREDICTION_CONSENSUS_FRAMES,
     PREDICTION_AVG_MOTION_THRESHOLD,
     PREDICTION_MOTION_VARIANCE_MIN,
@@ -150,7 +150,7 @@ def main():
     logger.info(
         f"Motion Variance Min: {PREDICTION_MOTION_VARIANCE_MIN} (motion variation)"
     )
-    logger.info(f"Min Confidence for Gestures: {PREDICTION_MIN_CONFIDENCE:.1%}")
+    logger.info(f"Min Confidence for Gestures: {CONFIDENCE_THRESHOLD:.1%}")
     logger.info(
         f"Min Confidence Gap: {PREDICTION_MIN_CONFIDENCE_GAP:.1%} (certainty margin)"
     )
@@ -231,17 +231,17 @@ def main():
                                 valid = (
                                     confidence is not None
                                     and confidence_gap is not None
-                                    and confidence >= PREDICTION_MIN_CONFIDENCE
+                                    and confidence >= CONFIDENCE_THRESHOLD
                                     and confidence_gap >= PREDICTION_MIN_CONFIDENCE_GAP
                                 )
 
                                 if PREDICTION_DEBUG_MODE and not valid:
                                     if (
                                         confidence is not None
-                                        and confidence < PREDICTION_MIN_CONFIDENCE
+                                        and confidence < CONFIDENCE_THRESHOLD
                                     ):
                                         logger.debug(
-                                            f"Filtered {original_gesture}: confidence {confidence:.2%} < {PREDICTION_MIN_CONFIDENCE:.2%}"
+                                            f"Filtered {original_gesture}: confidence {confidence:.2%} < {CONFIDENCE_THRESHOLD:.2%}"
                                         )
                                     elif (
                                         confidence_gap is not None

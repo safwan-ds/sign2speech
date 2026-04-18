@@ -30,6 +30,41 @@ class StreamConfig:
     language: str = "tr"
 
 
+@dataclass(slots=True)
+class GestureLockState:
+    """Track the currently emitted gesture and suppress duplicate static holds."""
+
+    locked_token: str | None = None
+    locked_at: float | None = None
+    last_transition_at: float | None = None
+
+    def observe(
+        self, token: str, confidence: float, confidence_threshold: float
+    ) -> tuple[bool, bool, str]:
+        """Return (should_emit, is_rest, normalized_token)."""
+        normalized = token.strip().upper()
+        is_rest = normalized == "REST"
+        confident = confidence >= confidence_threshold
+        now = time.monotonic()
+
+        if is_rest:
+            self.locked_token = None
+            self.locked_at = None
+            self.last_transition_at = now
+            return False, True, normalized
+
+        if not confident:
+            return False, False, normalized
+
+        if self.locked_token is None or self.locked_token != normalized:
+            self.locked_token = normalized
+            self.locked_at = now
+            self.last_transition_at = now
+            return True, False, normalized
+
+        return False, False, normalized
+
+
 class StreamWorker(threading.Thread):
     """Thread that reads serial data, predicts, smooths, and emits queue events."""
 
@@ -50,6 +85,7 @@ class StreamWorker(threading.Thread):
         self._smoother = PredictionSmoother(config.smoothing_window)
         self._sentence = SentenceAssembler()
         self._translations = load_gesture_translations()
+        self._lock_state = GestureLockState()
 
     def stop(self) -> None:
         """Request worker shutdown."""
@@ -67,8 +103,6 @@ class StreamWorker(threading.Thread):
                 self._config.serial_settings.baud_rate,
             )
 
-            last_gesture = None
-            last_added_gesture = None
             collected_gestures: list[tuple[str, float]] = []
             consecutive_rest_frames = 0
             stream_input_emitted = False
@@ -107,11 +141,18 @@ class StreamWorker(threading.Thread):
                     stream_started_emitted = True
 
                 smooth_token = self._smoother.update(str(gesture))
-                display_token = smooth_token
-                if confidence < self._config.confidence_threshold:
-                    display_token = (
-                        "Belirsiz" if self._config.language == "tr" else "Uncertain"
-                    )
+                is_confident = confidence >= self._config.confidence_threshold
+                display_token = (
+                    smooth_token
+                    if is_confident
+                    else ("Belirsiz" if self._config.language == "tr" else "Uncertain")
+                )
+
+                should_emit, is_rest, _ = self._lock_state.observe(
+                    smooth_token,
+                    confidence,
+                    self._config.confidence_threshold,
+                )
 
                 self._event_queue.put(
                     {
@@ -123,28 +164,20 @@ class StreamWorker(threading.Thread):
                     }
                 )
 
-                stable_token = smooth_token.upper()
-                is_rest_like = stable_token == "REST" or display_token in {
-                    "Belirsiz",
-                    "Uncertain",
-                }
-
-                if not is_rest_like and self._sentence.try_append(smooth_token):
+                if should_emit and not is_rest:
                     translated = translate_gesture(
                         smooth_token,
                         self._translations,
                         target_language=self._config.language,
                     )
-                    self._event_queue.put(
-                        {
-                            "type": "sentence",
-                            "token": translated,
-                            "sentence": self._sentence.text(),
-                        }
-                    )
-
-                is_rest = is_rest_like
-                is_new = smooth_token != last_gesture
+                    if self._sentence.try_append(smooth_token):
+                        self._event_queue.put(
+                            {
+                                "type": "sentence",
+                                "token": translated,
+                                "sentence": self._sentence.text(),
+                            }
+                        )
 
                 if is_rest:
                     consecutive_rest_frames += 1
@@ -170,16 +203,11 @@ class StreamWorker(threading.Thread):
                         self._logger.info("LLM refinement request queued")
 
                         collected_gestures.clear()
-                        last_added_gesture = None
                         consecutive_rest_frames = 0
-                elif is_new and not is_rest_like:
+                elif should_emit and is_confident:
                     consecutive_rest_frames = 0
 
-                    if smooth_token != last_added_gesture:
-                        collected_gestures.append((smooth_token, confidence))
-                        last_added_gesture = smooth_token
-
-                last_gesture = smooth_token
+                    collected_gestures.append((smooth_token, confidence))
         except Exception as exc:  # pragma: no cover - guarded by UI notifications
             self._logger.exception("Stream worker failed")
             self._event_queue.put(

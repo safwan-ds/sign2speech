@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import re
 from datetime import datetime
@@ -48,6 +49,11 @@ def build_recording_file_path(gesture_label: str, base_dir: str = LOGS_DIR) -> P
     )
 
 
+def build_recording_metadata_path(recording_path: str | Path) -> Path:
+    """Create a sidecar metadata path for a recording file."""
+    return Path(recording_path).with_suffix(".meta.json")
+
+
 def save_rows_to_csv(file_path: str | Path, rows: list[dict[str, float | int]]) -> Path:
     """Save recording rows using a consistent schema."""
     target = Path(file_path)
@@ -56,6 +62,15 @@ def save_rows_to_csv(file_path: str | Path, rows: list[dict[str, float | int]]) 
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
+    return target
+
+
+def save_recording_metadata(file_path: str | Path, metadata: dict[str, object]) -> Path:
+    """Save recording metadata as a sidecar JSON file."""
+    target = Path(file_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, ensure_ascii=False, indent=2, sort_keys=True)
     return target
 
 
