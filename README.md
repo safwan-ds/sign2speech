@@ -13,6 +13,7 @@ A production-grade system for real-time sign language gesture recognition using 
   - Cosine annealing + learning rate plateau scheduling
   - Ensemble training support
 - **Production GUI (PySide6)**: Non-blocking threaded pipeline with real-time prediction cards, confidence bars, and sentence assembly
+- **QtGraphs Trace Previews**: Dataset manager trace panels use PySide6 QtGraphs with automatic matplotlib fallback
 - **Startup Quality-of-Life**: Automatically loads `models/latest` on launch
 - **Smart Port UX**: Lists all serial ports, auto-selects CH340 when available, and validates input stream with startup timeout
 - **Optional LLM Refinement**: QWEN 2.5 model integration for contextual sentence generation
@@ -162,6 +163,10 @@ All configuration is centralized in `config.py` and can be overridden via enviro
 
 - `USE_QWEN_LLM`: Enable sentence refinement
 - `QWEN_N_GPU_LAYERS`: GPU acceleration (-1 for full GPU)
+
+**Evaluation Plot Backend:**
+
+- `EVALUATION_PLOT_BACKEND`: Plot backend for evaluation exports (`matplotlib` default, `qtgraphs` experimental and requires an active Qt app)
 
 See [config.py](config.py) for all ~100 configurable parameters.
 

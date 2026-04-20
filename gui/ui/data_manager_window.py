@@ -9,8 +9,6 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QAction, QBrush, QColor, QKeySequence
 from PySide6.QtWidgets import (
@@ -43,6 +41,7 @@ from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
 from gui.services.script_runner import ScriptRunner
 from gui.services.serial_service import SerialService
+from gui.ui.trace_preview_widget import TracePreviewWidget
 from utils.recording_utils import (
     count_csv_samples,
     load_gesture_names,
@@ -216,11 +215,9 @@ class DataManagerWindow(QMainWindow):
         preview_layout = QVBoxLayout(preview_group)
         preview_layout.setContentsMargins(8, 8, 8, 8)
         preview_layout.setSpacing(6)
-        self.record_preview_figure = Figure(figsize=(10, 4.8), dpi=100)
-        self.record_preview_canvas = FigureCanvas(self.record_preview_figure)
-        self.record_preview_canvas.setMinimumHeight(360)
-        preview_layout.addWidget(self.record_preview_canvas, stretch=1)
-        layout.addWidget(preview_group, stretch=1)
+        self.record_preview_plot = TracePreviewWidget(minimum_height=540)
+        preview_layout.addWidget(self.record_preview_plot, stretch=1)
+        layout.addWidget(preview_group, stretch=2)
 
         return tab
 
@@ -548,14 +545,14 @@ class DataManagerWindow(QMainWindow):
         plot_layout.setContentsMargins(0, 0, 0, 0)
         self.plot_title_label = QLabel("Select a sample to inspect traces")
         plot_layout.addWidget(self.plot_title_label)
-        self.figure = Figure(figsize=(9, 4), dpi=100)
-        self.canvas = FigureCanvas(self.figure)
-        plot_layout.addWidget(self.canvas)
+        self.sample_trace_plot = TracePreviewWidget(minimum_height=420)
+        plot_layout.addWidget(self.sample_trace_plot)
 
         splitter.addWidget(table_host)
         splitter.addWidget(plot_host)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
+        splitter.setSizes([360, 520])
         layout.addWidget(splitter, stretch=1)
 
         return tab
@@ -666,13 +663,10 @@ class DataManagerWindow(QMainWindow):
             QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
             """
         )
-        if hasattr(self, "record_preview_canvas"):
-            self.record_preview_canvas.setStyleSheet(
-                f"border: 1px solid {palette['group_border']}; border-radius: 8px;"
-            )
-        if hasattr(self, "record_preview_figure"):
-            self._apply_plot_theme(self.record_preview_figure)
-            self.record_preview_canvas.draw_idle()
+        if hasattr(self, "record_preview_plot"):
+            self.record_preview_plot.set_plot_palette(self._plot_palette)
+        if hasattr(self, "sample_trace_plot"):
+            self.sample_trace_plot.set_plot_palette(self._plot_palette)
 
     def _set_status(self, message: str, level: str = "INFO") -> None:
         if level == "ERROR":
@@ -947,64 +941,7 @@ class DataManagerWindow(QMainWindow):
         event.accept()
 
     def _plot_recording_preview(self, rows: list[dict[str, float | int]]) -> None:
-        frame = pd.DataFrame(rows)
-        self.record_preview_figure.clear()
-        self._apply_plot_theme(self.record_preview_figure)
-
-        flex_axes = ["flex0", "flex1", "flex2", "flex3", "flex4"]
-        accel_axes = ["accelX", "accelY", "accelZ"]
-        gyro_axes = ["gyroX", "gyroY", "gyroZ"]
-        line_colors = [
-            self._plot_palette["line_a"],
-            self._plot_palette["line_b"],
-            self._plot_palette["line_c"],
-            self._plot_palette["line_d"],
-            self._plot_palette["line_e"],
-        ]
-
-        ax1 = self.record_preview_figure.add_subplot(311)
-        ax2 = self.record_preview_figure.add_subplot(312)
-        ax3 = self.record_preview_figure.add_subplot(313)
-
-        for axis in (ax1, ax2, ax3):
-            axis.set_facecolor(self._plot_palette["axes_bg"])
-            axis.tick_params(colors=self._plot_palette["text"])
-            axis.grid(alpha=0.28, color=self._plot_palette["grid"])
-            for spine in axis.spines.values():
-                spine.set_color(self._plot_palette["spine"])
-
-        for idx, col in enumerate(flex_axes):
-            if col in frame.columns:
-                ax1.plot(
-                    frame[col].to_numpy(),
-                    linewidth=1.5,
-                    color=line_colors[idx % len(line_colors)],
-                )
-        ax1.set_title("Flex Sensors", color=self._plot_palette["text"])
-
-        for idx, col in enumerate(accel_axes):
-            if col in frame.columns:
-                ax2.plot(
-                    frame[col].to_numpy(),
-                    linewidth=1.5,
-                    color=line_colors[idx % len(line_colors)],
-                )
-        ax2.set_title("Accelerometer", color=self._plot_palette["text"])
-
-        for idx, col in enumerate(gyro_axes):
-            if col in frame.columns:
-                ax3.plot(
-                    frame[col].to_numpy(),
-                    linewidth=1.5,
-                    color=line_colors[idx % len(line_colors)],
-                )
-        ax3.set_title("Gyroscope", color=self._plot_palette["text"])
-
-        self.record_preview_figure.tight_layout()
-        self.record_preview_canvas.draw_idle()
-
-    def _apply_plot_theme(self, figure: Figure) -> None:
-        figure.patch.set_facecolor(self._plot_palette["figure_bg"])
+        self.record_preview_plot.plot_rows(rows)
 
     def _reset_process_ui(self) -> None:
         self._process_total_gestures = 0
@@ -1406,8 +1343,7 @@ class DataManagerWindow(QMainWindow):
 
         self.quarantine_btn.setEnabled(False)
         self.restore_btn.setEnabled(False)
-        self.figure.clear()
-        self.canvas.draw_idle()
+        self.sample_trace_plot.clear_plot()
 
     @staticmethod
     def _sample_quality(sample: SampleRecord) -> str:
@@ -1444,44 +1380,16 @@ class DataManagerWindow(QMainWindow):
         self._plot_sample(sample)
 
     def _plot_sample(self, sample: SampleRecord) -> None:
-        self.figure.clear()
         self.plot_title_label.setText(f"Trace Preview: {sample.file_name}")
 
         try:
             data = pd.read_csv(sample.csv_path)
         except Exception as exc:
             self._set_status(f"Could not read sample: {exc}", "ERROR")
-            self.canvas.draw_idle()
+            self.sample_trace_plot.clear_plot()
             return
 
-        flex_axes = ["flex0", "flex1", "flex2", "flex3", "flex4"]
-        accel_axes = ["accelX", "accelY", "accelZ"]
-        gyro_axes = ["gyroX", "gyroY", "gyroZ"]
-
-        ax1 = self.figure.add_subplot(311)
-        ax2 = self.figure.add_subplot(312)
-        ax3 = self.figure.add_subplot(313)
-
-        for col in flex_axes:
-            if col in data.columns:
-                ax1.plot(data[col].to_numpy(), linewidth=1)
-        ax1.set_title("Flex Sensors")
-        ax1.grid(alpha=0.3)
-
-        for col in accel_axes:
-            if col in data.columns:
-                ax2.plot(data[col].to_numpy(), linewidth=1)
-        ax2.set_title("Accelerometer")
-        ax2.grid(alpha=0.3)
-
-        for col in gyro_axes:
-            if col in data.columns:
-                ax3.plot(data[col].to_numpy(), linewidth=1)
-        ax3.set_title("Gyroscope")
-        ax3.grid(alpha=0.3)
-
-        self.figure.tight_layout()
-        self.canvas.draw_idle()
+        self.sample_trace_plot.plot_dataframe(data)
 
     def quarantine_selected(self) -> None:
         sample = self._selected_sample()
