@@ -24,6 +24,11 @@ from gui.ui.app_window_actions import AppWindowActionsMixin
 from gui.ui.app_window_events import AppWindowEventMixin
 from gui.ui.app_window_layout import AppWindowLayoutMixin
 from gui.ui.localization import LOCALIZATION
+from gui.ui.theme_manager import (
+    get_connection_badge_style,
+    get_model_badge_style,
+    get_status_banner_style,
+)
 from core.inference.gesture_translations import load_gesture_translations
 from gui.utils.formatting import percent
 
@@ -82,6 +87,7 @@ class Sign2SpeechDashboard(
         self._gesture_translations = load_gesture_translations()
         self._all_model_classes: list[str] = []
         self._filtered_model_class_count = 0
+        self._theme_name = "dark"
 
         self._build_ui()
         self._build_shortcuts()
@@ -194,24 +200,17 @@ class Sign2SpeechDashboard(
     def _set_connection_badge(self, connected: bool) -> None:
         if connected:
             self.connection_label.setText(self._t("device_connected"))
-            self.connection_label.setStyleSheet(
-                "padding: 6px 8px; border-radius: 6px; background: #e7f6ea; color: #1e6c35;"
-            )
         else:
             self.connection_label.setText(self._t("device_disconnected"))
-            self.connection_label.setStyleSheet(
-                "padding: 6px 8px; border-radius: 6px; background: #f4ecec; color: #7d1f1f;"
-            )
+        self.connection_label.setStyleSheet(
+            get_connection_badge_style(connected, self._theme_name)
+        )
 
     def _set_model_badge(self, text: str, state: str) -> None:
-        palette = {
-            "idle": "padding: 6px 8px; border-radius: 6px; background: #fff4e5; color: #7d5200;",
-            "loading": "padding: 6px 8px; border-radius: 6px; background: #e8f0ff; color: #1f4a86;",
-            "ready": "padding: 6px 8px; border-radius: 6px; background: #e7f6ea; color: #1e6c35;",
-            "error": "padding: 6px 8px; border-radius: 6px; background: #fdecea; color: #8a1c1c;",
-        }
         self.model_status_label.setText(text)
-        self.model_status_label.setStyleSheet(palette.get(state, palette["idle"]))
+        self.model_status_label.setStyleSheet(
+            get_model_badge_style(state, self._theme_name)
+        )
 
     def _refresh_action_states(self) -> None:
         streaming = bool(self.worker and self.worker.is_alive())
@@ -230,18 +229,9 @@ class Sign2SpeechDashboard(
         return ""
 
     def _set_status(self, message: str, level: str = "INFO") -> None:
-        if level == "ERROR":
-            self.status_banner.setStyleSheet(
-                "padding: 8px 10px; border-radius: 6px; background: #fdecea; color: #8a1c1c;"
-            )
-        elif level == "WARNING":
-            self.status_banner.setStyleSheet(
-                "padding: 8px 10px; border-radius: 6px; background: #fff4e5; color: #7d5200;"
-            )
-        else:
-            self.status_banner.setStyleSheet(
-                "padding: 8px 10px; border-radius: 6px; background: #e9f5ec; color: #12381f;"
-            )
+        self.status_banner.setStyleSheet(
+            get_status_banner_style(level, self._theme_name)
+        )
         self.status_banner.setText(message)
         self.statusBar().showMessage(message, 3000)
 

@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from config import BAUD_RATE, CONFIDENCE_THRESHOLD
+from gui.ui.theme_manager import build_dashboard_stylesheet
 
 
 class AppWindowLayoutMixin:
@@ -105,109 +106,10 @@ class AppWindowLayoutMixin:
         status = QStatusBar(self)
         self.setStatusBar(status)
 
-        self._apply_window_styles("dark")
+        self._apply_window_styles(getattr(self, "_theme_name", "dark"))
 
     def _apply_window_styles(self, theme: str) -> None:
-        palettes: dict[str, dict[str, str]] = {
-            "light": {
-                "bg": "#f6f7fb",
-                "panel": "#ffffff",
-                "text": "#1f2937",
-                "subtext": "#5a6777",
-                "input_bg": "#ffffff",
-                "input_border": "#d1d5db",
-                "button_bg": "#f3f4f6",
-                "button_hover": "#e5e7eb",
-                "group_border": "#d1d5db",
-                "prediction_bg": "#eef2ff",
-                "prediction_text": "#13264d",
-            },
-            "dark": {
-                "bg": "#1f2329",
-                "panel": "#2b3139",
-                "text": "#e5e7eb",
-                "subtext": "#b3bcc9",
-                "input_bg": "#242a31",
-                "input_border": "#3d4651",
-                "button_bg": "#353d48",
-                "button_hover": "#46505d",
-                "group_border": "#4b5563",
-                "prediction_bg": "#2f3540",
-                "prediction_text": "#f3f4f6",
-            },
-        }
-
-        palette = palettes.get(theme, palettes["light"])
-        self.setStyleSheet(
-            f"""
-            QMainWindow, QWidget#centralRoot {{ background: {palette['bg']}; }}
-            QWidget {{ color: {palette['text']}; }}
-            QWidget#centralRoot {{ background: {palette['bg']}; }}
-            QTabWidget::pane, QGroupBox, QPlainTextEdit, QTextEdit, QTableWidget, QStatusBar {{ background: {palette['panel']}; }}
-            QTabWidget#rightTabs {{ background: {palette['panel']}; }}
-            QWidget#settingsTab, QWidget#actionsTab, QWidget#logsTab {{ background: {palette['panel']}; }}
-            QTabWidget#rightTabs QGroupBox {{ background: {palette['panel']}; }}
-            QTabBar::tab {{
-                background: {palette['button_bg']};
-                border: 1px solid {palette['input_border']};
-                border-bottom: none;
-                padding: 6px 12px;
-                margin-right: 2px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-            }}
-            QTabBar::tab:selected {{
-                background: {palette['panel']};
-                color: {palette['text']};
-            }}
-            QLineEdit, QComboBox, QTextEdit, QPlainTextEdit, QTableWidget {{
-                background: {palette['input_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 6px;
-                padding: 4px;
-            }}
-            QHeaderView::section {{
-                background: {palette['button_bg']};
-                color: {palette['text']};
-                border: 1px solid {palette['input_border']};
-                padding: 4px;
-            }}
-            QPushButton {{
-                background: {palette['button_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 6px;
-                padding: 6px 10px;
-            }}
-            QPushButton:hover {{ background: {palette['button_hover']}; }}
-            QLabel#title {{ font-size: 30px; font-weight: 700; }}
-            QLabel#subtitle {{ color: {palette['subtext']}; }}
-            QLabel#statusInfo {{ padding: 8px 10px; border-radius: 6px; background: #e9f5ec; color: #12381f; }}
-            QLabel#predictionCard {{
-                font-size: 64px;
-                font-weight: 700;
-                border-radius: 12px;
-                padding: 20px;
-                background: {palette['prediction_bg']};
-                color: {palette['prediction_text']};
-            }}
-            QLabel#panelTitle {{ font-size: 20px; font-weight: 700; }}
-            QWidget#modelMetricCard {{
-                background: {palette['input_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 8px;
-                min-height: 76px;
-            }}
-            QLabel#modelMetricLabel {{ color: {palette['subtext']}; font-size: 11px; }}
-            QLabel#modelMetricValue {{ font-size: 16px; font-weight: 700; }}
-            QListWidget#modelClassesList {{
-                background: {palette['input_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 8px;
-            }}
-            QGroupBox {{ font-weight: 600; margin-top: 8px; border: 1px solid {palette['group_border']}; border-radius: 8px; }}
-            QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
-            """
-        )
+        self.setStyleSheet(build_dashboard_stylesheet(theme))
 
     def _build_left_panel(self) -> QWidget:
         panel = QWidget()

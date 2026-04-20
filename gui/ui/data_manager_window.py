@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QColor, QKeySequence
+from PySide6.QtGui import QAction, QBrush, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -41,6 +41,13 @@ from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
 from gui.services.script_runner import ScriptRunner
 from gui.services.serial_service import SerialService
+from gui.ui.theme_manager import (
+    build_data_manager_stylesheet,
+    get_confusion_cell_color,
+    get_confusion_text_color,
+    get_plot_palette,
+    get_status_banner_style,
+)
 from gui.ui.trace_preview_widget import TracePreviewWidget
 from utils.recording_utils import (
     count_csv_samples,
@@ -69,6 +76,7 @@ class DataManagerWindow(QMainWindow):
         self._train_result_rows: dict[str, int] = {}
         self._train_metrics: dict[str, str] = {}
         self._train_model_dir = ""  # Track latest model dir for metrics loading
+        self._theme_name = "dark"
 
         self.event_queue: queue.Queue[dict] = queue.Queue()
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
@@ -87,7 +95,7 @@ class DataManagerWindow(QMainWindow):
 
         self._build_ui()
         self._build_shortcuts()
-        self._apply_window_styles("dark")
+        self._apply_window_styles(self._theme_name)
         self.refresh_record_ports(announce=False)
 
         self._load_gesture_options()
@@ -580,102 +588,18 @@ class DataManagerWindow(QMainWindow):
         return panel
 
     def _apply_window_styles(self, theme: str) -> None:
-        palettes: dict[str, dict[str, str]] = {
-            "light": {
-                "bg": "#f6f7fb",
-                "panel": "#ffffff",
-                "text": "#1f2937",
-                "subtext": "#5a6777",
-                "input_bg": "#ffffff",
-                "input_border": "#d1d5db",
-                "button_bg": "#f3f4f6",
-                "button_hover": "#e5e7eb",
-                "group_border": "#d1d5db",
-            },
-            "dark": {
-                "bg": "#1f2329",
-                "panel": "#2b3139",
-                "text": "#e5e7eb",
-                "subtext": "#b3bcc9",
-                "input_bg": "#242a31",
-                "input_border": "#3d4651",
-                "button_bg": "#353d48",
-                "button_hover": "#46505d",
-                "group_border": "#4b5563",
-            },
-        }
-
-        palette = palettes.get(theme, palettes["light"])
-        self._plot_palette = {
-            "figure_bg": palette["panel"],
-            "axes_bg": palette["input_bg"],
-            "text": palette["text"],
-            "grid": palette["group_border"],
-            "spine": palette["input_border"],
-            "line_a": "#63b3ed",
-            "line_b": "#f6ad55",
-            "line_c": "#68d391",
-            "line_d": "#f687b3",
-            "line_e": "#f6e05e",
-        }
-        self.setStyleSheet(
-            f"""
-            QMainWindow, QWidget#centralRoot {{ background: {palette['bg']}; }}
-            QWidget {{ color: {palette['text']}; }}
-            QTabWidget::pane, QGroupBox, QPlainTextEdit, QTableWidget, QStatusBar {{ background: {palette['panel']}; }}
-            QTabBar::tab {{
-                background: {palette['button_bg']};
-                border: 1px solid {palette['input_border']};
-                border-bottom: none;
-                padding: 6px 12px;
-                margin-right: 2px;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
-            }}
-            QTabBar::tab:selected {{
-                background: {palette['panel']};
-                color: {palette['text']};
-            }}
-            QLineEdit, QComboBox, QPlainTextEdit, QTableWidget, QSpinBox, QDoubleSpinBox {{
-                background: {palette['input_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 6px;
-                padding: 4px;
-            }}
-            QHeaderView::section {{
-                background: {palette['button_bg']};
-                color: {palette['text']};
-                border: 1px solid {palette['input_border']};
-                padding: 4px;
-            }}
-            QPushButton {{
-                background: {palette['button_bg']};
-                border: 1px solid {palette['input_border']};
-                border-radius: 6px;
-                padding: 6px 10px;
-            }}
-            QPushButton:hover {{ background: {palette['button_hover']}; }}
-            QLabel#title {{ font-size: 30px; font-weight: 700; }}
-            QLabel#subtitle {{ color: {palette['subtext']}; }}
-            QLabel#statusInfo {{ padding: 8px 10px; border-radius: 6px; background: #e9f5ec; color: #12381f; }}
-            QLabel#panelTitle {{ font-size: 20px; font-weight: 700; }}
-            QGroupBox {{ font-weight: 600; margin-top: 8px; border: 1px solid {palette['group_border']}; border-radius: 8px; }}
-            QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
-            """
-        )
+        self._theme_name = theme
+        self._plot_palette = get_plot_palette(theme)
+        self.setStyleSheet(build_data_manager_stylesheet(theme))
         if hasattr(self, "record_preview_plot"):
             self.record_preview_plot.set_plot_palette(self._plot_palette)
         if hasattr(self, "sample_trace_plot"):
             self.sample_trace_plot.set_plot_palette(self._plot_palette)
 
     def _set_status(self, message: str, level: str = "INFO") -> None:
-        if level == "ERROR":
-            style = "padding: 8px 10px; border-radius: 6px; background: #fdecea; color: #8a1c1c;"
-        elif level == "WARNING":
-            style = "padding: 8px 10px; border-radius: 6px; background: #fff4e5; color: #7d5200;"
-        else:
-            style = "padding: 8px 10px; border-radius: 6px; background: #e9f5ec; color: #12381f;"
-        self.status_banner.setStyleSheet(style)
+        self.status_banner.setStyleSheet(
+            get_status_banner_style(level, self._theme_name)
+        )
         self.status_banner.setText(message)
         self.statusBar().showMessage(message, 3500)
 
@@ -1228,7 +1152,7 @@ class DataManagerWindow(QMainWindow):
 
                 color = self._confusion_cell_color(ratio)
                 item.setBackground(QBrush(color))
-                text_color = QColor("#f8fafc") if ratio >= 0.55 else QColor("#0f172a")
+                text_color = get_confusion_text_color(ratio, self._theme_name)
                 item.setForeground(QBrush(text_color))
                 self.train_cm_table.setItem(row_idx, col_idx, item)
 
@@ -1239,14 +1163,8 @@ class DataManagerWindow(QMainWindow):
         )
 
     def _confusion_cell_color(self, ratio: float) -> QColor:
-        """Blend from light-blue to deep-blue based on normalized cell value."""
-        value = max(0.0, min(1.0, ratio))
-        start_rgb = (227, 242, 253)
-        end_rgb = (13, 71, 161)
-        red = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * value)
-        green = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * value)
-        blue = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * value)
-        return QColor(red, green, blue)
+        """Resolve confusion-matrix background color from theme manager."""
+        return get_confusion_cell_color(ratio, self._theme_name)
 
     def _handle_progress_from_script_log(self, message: str) -> None:
         process_prefix = "[script:scripts/process_data.py] "

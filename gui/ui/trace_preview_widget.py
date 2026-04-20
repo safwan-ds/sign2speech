@@ -11,6 +11,7 @@ import pandas as pd
 from PySide6.QtCore import QPointF, QUrl
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from gui.ui.theme_manager import get_plot_palette
 
 logger = logging.getLogger(__name__)
 
@@ -18,18 +19,7 @@ FLEX_AXES = ["flex0", "flex1", "flex2", "flex3", "flex4"]
 ACCEL_AXES = ["accelX", "accelY", "accelZ"]
 GYRO_AXES = ["gyroX", "gyroY", "gyroZ"]
 
-DEFAULT_PLOT_PALETTE: dict[str, str] = {
-    "figure_bg": "#2b3139",
-    "axes_bg": "#242a31",
-    "text": "#e5e7eb",
-    "grid": "#4b5563",
-    "spine": "#3d4651",
-    "line_a": "#63b3ed",
-    "line_b": "#f6ad55",
-    "line_c": "#68d391",
-    "line_d": "#f687b3",
-    "line_e": "#f6e05e",
-}
+DEFAULT_PLOT_PALETTE: dict[str, str] = get_plot_palette("dark")
 
 _QTGRAPHS_IMPORT_ERROR: Exception | None = None
 try:
