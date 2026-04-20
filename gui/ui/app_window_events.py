@@ -228,6 +228,7 @@ class AppWindowEventMixin:
         self.stop_stream()
         if self.worker and self.worker.is_alive():
             self.worker.join(timeout=1.5)
+        self.serial_service.disconnect()
         self.llm_service.shutdown()
         self.tts_service.stop()
         event.accept()

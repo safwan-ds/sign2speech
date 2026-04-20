@@ -156,6 +156,7 @@ class AppWindowActionsMixin:
 
         self.worker = StreamWorker(
             model_service=self.model_service,
+            serial_service=self.serial_service,
             event_queue=self.event_queue,
             logger=self.logger,
             config=config,

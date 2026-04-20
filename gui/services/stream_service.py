@@ -71,17 +71,18 @@ class StreamWorker(threading.Thread):
     def __init__(
         self,
         model_service: ModelService,
+        serial_service: SerialService,
         event_queue: Queue[dict],
         logger: logging.Logger,
         config: StreamConfig,
     ) -> None:
         super().__init__(daemon=True)
         self._model_service = model_service
+        self._serial_service = serial_service
         self._event_queue = event_queue
         self._logger = logger
         self._config = config
         self._stop_event = threading.Event()
-        self._serial_service = SerialService()
         self._smoother = PredictionSmoother(config.smoothing_window)
         self._sentence = SentenceAssembler()
         self._translations = load_gesture_translations()
@@ -95,13 +96,20 @@ class StreamWorker(threading.Thread):
         """Worker lifecycle entrypoint."""
         try:
             predictor = self._model_service.require_predictor()
-            self._serial_service.connect(self._config.serial_settings)
+            opened = self._serial_service.connect(self._config.serial_settings)
+            if opened:
+                self._logger.info(
+                    "Connected to %s @ %s",
+                    self._config.serial_settings.port,
+                    self._config.serial_settings.baud_rate,
+                )
+            else:
+                self._logger.info(
+                    "Reusing open serial connection on %s @ %s",
+                    self._config.serial_settings.port,
+                    self._config.serial_settings.baud_rate,
+                )
             self._event_queue.put({"type": "connected", "value": True})
-            self._logger.info(
-                "Connected to %s @ %s",
-                self._config.serial_settings.port,
-                self._config.serial_settings.baud_rate,
-            )
 
             collected_gestures: list[tuple[str, float]] = []
             consecutive_rest_frames = 0
@@ -217,7 +225,6 @@ class StreamWorker(threading.Thread):
                 }
             )
         finally:
-            self._serial_service.disconnect()
             self._event_queue.put({"type": "connected", "value": False})
             self._event_queue.put({"type": "stopped"})
             self._logger.info("Streaming stopped")

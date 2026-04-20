@@ -10,13 +10,14 @@ import time
 from queue import Queue
 
 from config import BAUD_RATE, COM_PORT, LOGS_DIR, SERIAL_CONNECTION_DELAY, TIMEOUT
+from gui.services.serial_service import SerialService, SerialSettings
 from utils.recording_utils import (
     build_recording_file_path,
     build_recording_metadata_path,
     save_recording_metadata,
     save_rows_to_csv,
 )
-from utils.serial_utils import connect_serial, parse_sensor_data, select_serial_port
+from utils.serial_utils import select_serial_port
 
 
 @dataclass(slots=True)
@@ -25,14 +26,21 @@ class RecordingConfig:
 
     gesture_label: str
     orientation: str = "unspecified"
+    port: str | None = None
 
 
 class RecordingService:
     """Capture one sample between start and stop, and stream progress to UI."""
 
-    def __init__(self, logger: logging.Logger, event_queue: Queue[dict]) -> None:
+    def __init__(
+        self,
+        logger: logging.Logger,
+        event_queue: Queue[dict],
+        serial_service: SerialService,
+    ) -> None:
         self._logger = logger
         self._event_queue = event_queue
+        self._serial_service = serial_service
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
@@ -58,13 +66,18 @@ class RecordingService:
     def stop(self) -> None:
         self._stop_event.set()
 
+    def join(self, timeout: float | None = None) -> None:
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout=timeout)
+
     def _run(self, config: RecordingConfig) -> None:
-        serial_conn = None
         selected_port: str | None = None
         rows: list[dict[str, float | int]] = []
         started_at = time.perf_counter()
         try:
-            selected_port = select_serial_port(COM_PORT)
+            preferred_port = config.port.strip() if isinstance(config.port, str) else ""
+            selected_port = select_serial_port(preferred_port or COM_PORT)
             if not selected_port:
                 raise RuntimeError("No serial ports detected")
 
@@ -73,9 +86,12 @@ class RecordingService:
                 selected_port,
                 BAUD_RATE,
             )
-            serial_conn = connect_serial(selected_port, BAUD_RATE, timeout=TIMEOUT)
-            time.sleep(SERIAL_CONNECTION_DELAY)
-            serial_conn.reset_input_buffer()
+            opened = self._serial_service.connect(
+                SerialSettings(port=selected_port, baud_rate=BAUD_RATE, timeout=TIMEOUT)
+            )
+            if opened:
+                time.sleep(SERIAL_CONNECTION_DELAY)
+            self._serial_service.reset_input_buffer()
 
             self._event_queue.put(
                 {
@@ -88,20 +104,17 @@ class RecordingService:
             last_emit = 0.0
             while not self._stop_event.is_set():
                 try:
-                    raw_line = (
-                        serial_conn.readline().decode("utf-8", errors="ignore").strip()
-                    )
+                    sensor_row = self._serial_service.read_sensor_row()
                 except Exception:
                     continue
 
-                parsed = parse_sensor_data(raw_line)
-                if parsed is None:
+                if sensor_row is None:
                     continue
 
                 elapsed = time.perf_counter() - started_at
                 elapsed_ms = int(elapsed * 1000)
                 row: dict[str, float | int] = {"t_ms": elapsed_ms}
-                row.update(parsed)
+                row.update(sensor_row)
                 rows.append(row)
 
                 if elapsed - last_emit >= 0.1:
@@ -129,11 +142,8 @@ class RecordingService:
             self._logger.exception("[record] Recording failed: %s", exc)
             self._event_queue.put({"type": "record_error", "message": str(exc)})
         finally:
-            if serial_conn is not None:
-                try:
-                    serial_conn.close()
-                except Exception:
-                    pass
+            with self._lock:
+                self._thread = None
 
     def save_recording(
         self,

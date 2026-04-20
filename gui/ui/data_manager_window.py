@@ -42,11 +42,13 @@ from gui.services.logging_service import configure_gui_logger
 from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
 from gui.services.script_runner import ScriptRunner
+from gui.services.serial_service import SerialService
 from utils.recording_utils import (
     count_csv_samples,
     load_gesture_names,
     sanitize_gesture_label,
 )
+from utils.serial_utils import select_serial_port
 
 
 class DataManagerWindow(QMainWindow):
@@ -72,9 +74,11 @@ class DataManagerWindow(QMainWindow):
         self.event_queue: queue.Queue[dict] = queue.Queue()
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
         self.script_runner = ScriptRunner(project_root=project_root, logger=self.logger)
+        self.serial_service = SerialService()
         self.recording_service = RecordingService(
             logger=self.logger,
             event_queue=self.event_queue,
+            serial_service=self.serial_service,
         )
         self.sample_service = SampleReviewService(self.raw_data_root)
 
@@ -85,6 +89,7 @@ class DataManagerWindow(QMainWindow):
         self._build_ui()
         self._build_shortcuts()
         self._apply_window_styles("dark")
+        self.refresh_record_ports(announce=False)
 
         self._load_gesture_options()
         self.refresh_samples()
@@ -157,6 +162,20 @@ class DataManagerWindow(QMainWindow):
         form.addRow("Gesture", self.record_gesture_combo)
 
         layout.addWidget(self.record_group)
+
+        self.record_port_group = QGroupBox("Serial Port Management")
+        port_layout = QVBoxLayout(self.record_port_group)
+        port_layout.setSpacing(6)
+
+        self.record_port_combo = QComboBox()
+        self.record_port_combo.setToolTip("Select serial port used for recording")
+        port_layout.addWidget(self.record_port_combo)
+
+        self.record_refresh_ports_btn = QPushButton("Refresh Ports")
+        self.record_refresh_ports_btn.clicked.connect(self.refresh_record_ports)
+        port_layout.addWidget(self.record_refresh_ports_btn)
+
+        layout.addWidget(self.record_port_group)
 
         action_row = QHBoxLayout()
         self.record_btn = QPushButton("Start Recording")
@@ -672,6 +691,8 @@ class DataManagerWindow(QMainWindow):
         enabled = not active
 
         self.record_btn.setEnabled(enabled)
+        self.record_port_combo.setEnabled(enabled)
+        self.record_refresh_ports_btn.setEnabled(enabled)
         self.process_btn.setEnabled(enabled)
         self.train_btn.setEnabled(enabled)
         self.record_stop_btn.setEnabled(active and task_name == "record_sample")
@@ -837,6 +858,54 @@ class DataManagerWindow(QMainWindow):
                 self.review_gesture_filter.setCurrentIndex(idx)
         self.review_gesture_filter.blockSignals(False)
 
+    def _selected_record_port(self) -> str:
+        data = self.record_port_combo.currentData()
+        if isinstance(data, str):
+            return data.strip()
+        return ""
+
+    def refresh_record_ports(self, announce: bool = True) -> None:
+        current = self._selected_record_port()
+        entries = SerialService.list_port_entries()
+
+        self.record_port_combo.blockSignals(True)
+        self.record_port_combo.clear()
+
+        if not entries:
+            self.record_port_combo.addItem("No serial ports found")
+            self.record_port_combo.blockSignals(False)
+            if announce:
+                self._set_status("No serial ports found", "WARNING")
+            return
+
+        ports = [device for _label, device in entries]
+        for label, device in entries:
+            self.record_port_combo.addItem(label, device)
+
+        preferred_port = ""
+        for label, device in entries:
+            if "USB-SERIAL CH340" in label.upper():
+                preferred_port = device
+                break
+
+        if not preferred_port:
+            preferred_port = select_serial_port(current if current in ports else None)
+
+        if preferred_port and preferred_port in ports:
+            idx = self.record_port_combo.findData(preferred_port)
+            if idx >= 0:
+                self.record_port_combo.setCurrentIndex(idx)
+        else:
+            idx = self.record_port_combo.findData(current)
+            if idx >= 0:
+                self.record_port_combo.setCurrentIndex(idx)
+            else:
+                self.record_port_combo.setCurrentIndex(0)
+
+        self.record_port_combo.blockSignals(False)
+        if announce:
+            self._set_status("Serial ports refreshed", "INFO")
+
     def start_recording(self) -> None:
         if self._task_active:
             self._set_status("Another task is already running", "WARNING")
@@ -848,10 +917,12 @@ class DataManagerWindow(QMainWindow):
             return
         gesture = sanitize_gesture_label(gesture)
         self.record_gesture_combo.setCurrentText(gesture)
+        selected_port = self._selected_record_port()
 
         config = RecordingConfig(
             gesture_label=gesture,
             orientation="unspecified",
+            port=selected_port or None,
         )
 
         if not self.recording_service.start(config):
@@ -868,6 +939,12 @@ class DataManagerWindow(QMainWindow):
         self.recording_service.stop()
         self.recording_status_label.setText("Recording status: stopping")
         self._set_status("Stopping recording...", "WARNING")
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        self.recording_service.stop()
+        self.recording_service.join(timeout=1.5)
+        self.serial_service.disconnect()
+        event.accept()
 
     def _plot_recording_preview(self, rows: list[dict[str, float | int]]) -> None:
         frame = pd.DataFrame(rows)

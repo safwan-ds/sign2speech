@@ -18,6 +18,7 @@ from config import (
 from gui.services.llm_service import LLMService
 from gui.services.logging_service import configure_gui_logger
 from gui.services.model_service import ModelService
+from gui.services.serial_service import SerialService
 from gui.services.tts_service import TTSService
 from gui.ui.app_window_actions import AppWindowActionsMixin
 from gui.ui.app_window_events import AppWindowEventMixin
@@ -55,6 +56,7 @@ class Sign2SpeechDashboard(
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
 
         self.model_service = ModelService()
+        self.serial_service = SerialService()
         self.llm_service = LLMService(event_queue=self.event_queue, logger=self.logger)
         self.worker = None
         self.tts_service = TTSService(logger=self.logger)

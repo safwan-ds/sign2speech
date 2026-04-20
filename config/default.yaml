@@ -59,9 +59,9 @@ inference:
     smoothing_window: 3
 
   prediction:
-    min_confidence: 0.70
+    min_confidence: 0.80
     consensus_frames: 2
-    confidence_gap_threshold: 0.20
+    confidence_gap_threshold: 0.15
     min_consecutive_rest: 5
 
 llm:
