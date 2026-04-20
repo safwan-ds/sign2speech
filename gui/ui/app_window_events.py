@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QTableWidgetItem
 
 from core.inference.gesture_translations import translate_gesture
 from gui.services.serial_service import SerialService
+from gui.utils.formatting import display_upper
 
 
 class AppWindowEventMixin:
@@ -41,7 +42,7 @@ class AppWindowEventMixin:
             )
         history_gesture = display_gesture
 
-        self.prediction_card.setText(display_gesture.upper())
+        self.prediction_card.setText(display_upper(display_gesture, self.ui_language))
         self.confidence_bar.setValue(int(max(0.0, min(1.0, confidence)) * 100))
         self._last_confidence = confidence
         self.confidence_label.setText(self._format_confidence(self._last_confidence))

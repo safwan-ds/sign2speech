@@ -80,6 +80,8 @@ class Sign2SpeechDashboard(
         self._llm_progress_state = "idle"
         self._llm_backend_state = "unknown"
         self._gesture_translations = load_gesture_translations()
+        self._all_model_classes: list[str] = []
+        self._filtered_model_class_count = 0
 
         self._build_ui()
         self._build_shortcuts()

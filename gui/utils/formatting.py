@@ -20,3 +20,10 @@ def percent(value: float | None) -> str:
     if value is None:
         return "0.0%"
     return f"{value * 100:.1f}%"
+
+
+def display_upper(text: str, language: str | None = None) -> str:
+    """Uppercase text with Turkish-aware dotted/dotless i handling."""
+    if language and language.lower().startswith("tr"):
+        text = text.replace("i", "İ").replace("ı", "I")
+    return text.upper()

@@ -1,5 +1,7 @@
 """Action and workflow helpers for the dashboard window."""
 
+# pyright: reportAttributeAccessIssue=false, reportGeneralTypeIssues=false
+
 from __future__ import annotations
 
 import threading
@@ -9,8 +11,6 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QLineEdit,
-    QSlider,
 )
 
 from config import LOGS_OUTPUT_DIR, MODELS_DIR
@@ -24,6 +24,119 @@ from utils.serial_utils import select_serial_port
 
 class AppWindowActionsMixin:
     """Handle model, streaming, recording, and file operations."""
+
+    def _discover_model_dirs(self) -> list[Path]:
+        root = Path(MODELS_DIR)
+        if not root.exists():
+            return []
+
+        discovered: list[Path] = []
+        for entry in root.iterdir():
+            if not entry.is_dir():
+                continue
+            if (entry / "model.pth").exists() and (entry / "encoder.npy").exists():
+                discovered.append(entry)
+
+        discovered.sort(key=lambda item: item.name.lower(), reverse=True)
+        latest_dir = root / "latest"
+        if latest_dir in discovered:
+            discovered.remove(latest_dir)
+            discovered.insert(0, latest_dir)
+        return discovered
+
+    def _model_display_name(self, model_dir: Path) -> str:
+        if model_dir.name == "latest":
+            return self._tf("latest_model", name=self._t("latest"))
+        return model_dir.name
+
+    def _set_selected_model_dir(self, model_dir: Path, custom: bool = False) -> None:
+        if self.model_dir_combo.count() == 1 and self.model_dir_combo.itemData(0) == "":
+            self.model_dir_combo.clear()
+
+        self.model_dir_combo.setEnabled(True)
+        target = str(model_dir)
+        index = self.model_dir_combo.findData(target)
+        if index < 0:
+            label = (
+                self._tf("custom_model", name=model_dir.name)
+                if custom
+                else self._model_display_name(model_dir)
+            )
+            self.model_dir_combo.addItem(label, target)
+            index = self.model_dir_combo.count() - 1
+
+        self.model_dir_combo.setCurrentIndex(index)
+        self.model_path_edit.setText(target)
+
+    def refresh_model_dirs(self) -> None:
+        current_text = self.model_path_edit.text().strip()
+        current_dir = Path(current_text) if current_text else None
+        model_dirs = self._discover_model_dirs()
+
+        self.model_dir_combo.blockSignals(True)
+        self.model_dir_combo.clear()
+
+        for model_dir in model_dirs:
+            self.model_dir_combo.addItem(
+                self._model_display_name(model_dir),
+                str(model_dir),
+            )
+
+        if current_dir and current_dir.exists() and current_dir not in model_dirs:
+            self.model_dir_combo.addItem(
+                self._tf("custom_model", name=current_dir.name),
+                str(current_dir),
+            )
+
+        if self.model_dir_combo.count() == 0:
+            self.model_dir_combo.addItem(self._t("no_models_found"), "")
+            self.model_dir_combo.setEnabled(False)
+            self.model_path_edit.clear()
+            self.model_dir_combo.blockSignals(False)
+            return
+
+        self.model_dir_combo.setEnabled(True)
+        latest = Path(MODELS_DIR) / "latest"
+        target = current_dir if current_dir else latest
+        index = self.model_dir_combo.findData(str(target))
+        if index < 0:
+            index = 0
+        self.model_dir_combo.setCurrentIndex(index)
+
+        selected = self.model_dir_combo.currentData()
+        if isinstance(selected, str):
+            self.model_path_edit.setText(selected)
+
+        self.model_dir_combo.blockSignals(False)
+
+    def _on_model_selection_changed(self, _index: int) -> None:
+        selected = self.model_dir_combo.currentData()
+        if isinstance(selected, str):
+            self.model_path_edit.setText(selected)
+
+    def _filter_model_classes(self, text: str) -> None:
+        query = text.strip().lower()
+        if query:
+            filtered = [
+                class_name
+                for class_name in self._all_model_classes
+                if query in class_name.lower()
+            ]
+        else:
+            filtered = list(self._all_model_classes)
+
+        self.model_classes_list.clear()
+        if filtered:
+            self.model_classes_list.addItems(filtered)
+        elif self._all_model_classes:
+            self.model_classes_list.addItem(self._t("no_classes_match"))
+        else:
+            self.model_classes_list.addItem(self._t("model_not_loaded"))
+
+        self._filtered_model_class_count = len(filtered)
+        self.model_classes_header.setText(
+            self._tf("model_classes_count", count=self._filtered_model_class_count)
+        )
 
     def _clear_logs_view(self) -> None:
         self.log_box.clear()
@@ -77,18 +190,33 @@ class AppWindowActionsMixin:
 
     def select_model_dir(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
-            self,
+            None,
             self._t("select_model_directory"),
             str(self.project_root),
         )
         if chosen:
-            self.model_path_edit.setText(chosen)
+            self._set_selected_model_dir(Path(chosen), custom=True)
 
     def use_latest_model(self) -> None:
-        self.model_path_edit.setText(str(Path(MODELS_DIR) / "latest"))
+        latest_dir = Path(MODELS_DIR) / "latest"
+        if latest_dir.exists():
+            self._set_selected_model_dir(latest_dir)
+            return
+        self._set_status(self._t("latest_model_not_found"), "WARNING")
 
     def load_model_async(self) -> None:
-        model_dir = Path(self.model_path_edit.text().strip())
+        selected = self.model_dir_combo.currentData()
+        model_path = (
+            selected.strip()
+            if isinstance(selected, str) and selected.strip()
+            else self.model_path_edit.text().strip()
+        )
+        if not model_path:
+            self._set_status(self._t("no_models_found"), "WARNING")
+            return
+
+        model_dir = Path(model_path)
+        self.model_path_edit.setText(str(model_dir))
         self._set_status(self._t("model_loading_progress"), "INFO")
         self._set_model_badge(self._t("model_loading"), "loading")
         self._model_loaded = False
@@ -109,15 +237,14 @@ class AppWindowActionsMixin:
         threading.Thread(target=_load, daemon=True).start()
 
     def _update_model_meta(self, metadata: ModelMetadata) -> None:
-        classes_preview = ", ".join(metadata.classes[:10])
-        self.model_meta_label.setText(
-            (
-                f"{self._t('model_classes')} ({len(metadata.classes)}): {classes_preview}\n"
-                f"{self._t('sequence_length')}: {metadata.sequence_length}\n"
-                f"{self._t('input_shape')}: {metadata.input_shape}\n"
-                f"{self._t('loaded_at')}: {metadata.loaded_at}"
-            )
-        )
+        self._all_model_classes = [str(label) for label in metadata.classes]
+        self._set_selected_model_dir(metadata.model_dir)
+        self.model_classes_value.setText(str(len(self._all_model_classes)))
+        self.model_sequence_value.setText(str(metadata.sequence_length))
+        self.model_input_value.setText(metadata.input_shape)
+        self.model_loaded_value.setText(metadata.loaded_at)
+        self.model_class_filter.clear()
+        self._filter_model_classes("")
         self._model_loaded = True
         self._set_model_badge(self._t("model_ready"), "ready")
         self.load_btn.setEnabled(True)

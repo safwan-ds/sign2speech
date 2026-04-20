@@ -19,6 +19,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QProgressBar,
     QPlainTextEdit,
+    QListWidget,
+    QScrollArea,
     QSlider,
     QStatusBar,
     QTableWidget,
@@ -189,6 +191,19 @@ class AppWindowLayoutMixin:
                 color: {palette['prediction_text']};
             }}
             QLabel#panelTitle {{ font-size: 20px; font-weight: 700; }}
+            QWidget#modelMetricCard {{
+                background: {palette['input_bg']};
+                border: 1px solid {palette['input_border']};
+                border-radius: 8px;
+                min-height: 76px;
+            }}
+            QLabel#modelMetricLabel {{ color: {palette['subtext']}; font-size: 11px; }}
+            QLabel#modelMetricValue {{ font-size: 16px; font-weight: 700; }}
+            QListWidget#modelClassesList {{
+                background: {palette['input_bg']};
+                border: 1px solid {palette['input_border']};
+                border-radius: 8px;
+            }}
             QGroupBox {{ font-weight: 600; margin-top: 8px; border: 1px solid {palette['group_border']}; border-radius: 8px; }}
             QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
             """
@@ -333,15 +348,38 @@ class AppWindowLayoutMixin:
         return self.right_tabs
 
     def _build_settings_tab(self) -> QWidget:
-        tab = QWidget()
+        tab = QScrollArea()
         tab.setObjectName("settingsTab")
-        layout = QVBoxLayout(tab)
+        tab.setWidgetResizable(True)
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.setSpacing(10)
 
         self.model_group = QGroupBox("")
         model_layout = QVBoxLayout(self.model_group)
+        model_layout.setSpacing(8)
+
+        self.model_picker_label = QLabel("")
+        model_layout.addWidget(self.model_picker_label)
+
+        picker_row = QHBoxLayout()
+        self.model_dir_combo = QComboBox()
+        self.model_dir_combo.currentIndexChanged.connect(
+            self._on_model_selection_changed
+        )
+        picker_row.addWidget(self.model_dir_combo, stretch=1)
+
+        self.refresh_models_btn = QPushButton("")
+        self.refresh_models_btn.clicked.connect(self.refresh_model_dirs)
+        picker_row.addWidget(self.refresh_models_btn)
+        model_layout.addLayout(picker_row)
+
+        self.model_path_label = QLabel("")
+        model_layout.addWidget(self.model_path_label)
 
         self.model_path_edit = QLineEdit(self.model_dir)
+        self.model_path_edit.setReadOnly(True)
         model_layout.addWidget(self.model_path_edit)
 
         model_btns = QHBoxLayout()
@@ -356,9 +394,86 @@ class AppWindowLayoutMixin:
         model_btns.addWidget(self.load_btn)
         model_layout.addLayout(model_btns)
 
-        self.model_meta_label = QLabel("")
-        self.model_meta_label.setWordWrap(True)
-        model_layout.addWidget(self.model_meta_label)
+        model_stats = QGridLayout()
+        model_stats.setHorizontalSpacing(6)
+        model_stats.setVerticalSpacing(6)
+        model_stats.setColumnStretch(0, 1)
+        model_stats.setColumnStretch(1, 1)
+
+        self.model_classes_card = QWidget()
+        self.model_classes_card.setObjectName("modelMetricCard")
+        classes_card_layout = QVBoxLayout(self.model_classes_card)
+        classes_card_layout.setContentsMargins(10, 8, 10, 8)
+        classes_card_layout.setSpacing(2)
+        self.model_classes_stat_title = QLabel("")
+        self.model_classes_stat_title.setObjectName("modelMetricLabel")
+        self.model_classes_stat_title.setWordWrap(True)
+        self.model_classes_value = QLabel("0")
+        self.model_classes_value.setObjectName("modelMetricValue")
+        self.model_classes_value.setMinimumHeight(20)
+        classes_card_layout.addWidget(self.model_classes_stat_title)
+        classes_card_layout.addWidget(self.model_classes_value)
+        model_stats.addWidget(self.model_classes_card, 0, 0)
+
+        self.model_sequence_card = QWidget()
+        self.model_sequence_card.setObjectName("modelMetricCard")
+        sequence_card_layout = QVBoxLayout(self.model_sequence_card)
+        sequence_card_layout.setContentsMargins(10, 8, 10, 8)
+        sequence_card_layout.setSpacing(2)
+        self.model_sequence_stat_title = QLabel("")
+        self.model_sequence_stat_title.setObjectName("modelMetricLabel")
+        self.model_sequence_stat_title.setWordWrap(True)
+        self.model_sequence_value = QLabel("--")
+        self.model_sequence_value.setObjectName("modelMetricValue")
+        self.model_sequence_value.setMinimumHeight(20)
+        sequence_card_layout.addWidget(self.model_sequence_stat_title)
+        sequence_card_layout.addWidget(self.model_sequence_value)
+        model_stats.addWidget(self.model_sequence_card, 0, 1)
+
+        self.model_input_card = QWidget()
+        self.model_input_card.setObjectName("modelMetricCard")
+        input_card_layout = QVBoxLayout(self.model_input_card)
+        input_card_layout.setContentsMargins(10, 8, 10, 8)
+        input_card_layout.setSpacing(2)
+        self.model_input_stat_title = QLabel("")
+        self.model_input_stat_title.setObjectName("modelMetricLabel")
+        self.model_input_stat_title.setWordWrap(True)
+        self.model_input_value = QLabel("--")
+        self.model_input_value.setObjectName("modelMetricValue")
+        self.model_input_value.setMinimumHeight(20)
+        input_card_layout.addWidget(self.model_input_stat_title)
+        input_card_layout.addWidget(self.model_input_value)
+        model_stats.addWidget(self.model_input_card, 1, 0)
+
+        self.model_loaded_card = QWidget()
+        self.model_loaded_card.setObjectName("modelMetricCard")
+        loaded_card_layout = QVBoxLayout(self.model_loaded_card)
+        loaded_card_layout.setContentsMargins(10, 8, 10, 8)
+        loaded_card_layout.setSpacing(2)
+        self.model_loaded_stat_title = QLabel("")
+        self.model_loaded_stat_title.setObjectName("modelMetricLabel")
+        self.model_loaded_stat_title.setWordWrap(True)
+        self.model_loaded_value = QLabel("--")
+        self.model_loaded_value.setObjectName("modelMetricValue")
+        self.model_loaded_value.setMinimumHeight(20)
+        loaded_card_layout.addWidget(self.model_loaded_stat_title)
+        loaded_card_layout.addWidget(self.model_loaded_value)
+        model_stats.addWidget(self.model_loaded_card, 1, 1)
+
+        model_layout.addLayout(model_stats)
+
+        self.model_classes_header = QLabel("")
+        model_layout.addWidget(self.model_classes_header)
+
+        self.model_class_filter = QLineEdit()
+        self.model_class_filter.textChanged.connect(self._filter_model_classes)
+        model_layout.addWidget(self.model_class_filter)
+
+        self.model_classes_list = QListWidget()
+        self.model_classes_list.setObjectName("modelClassesList")
+        self.model_classes_list.setAlternatingRowColors(True)
+        self.model_classes_list.setMinimumHeight(120)
+        model_layout.addWidget(self.model_classes_list, stretch=1)
 
         layout.addWidget(self.model_group)
 
@@ -418,7 +533,9 @@ class AppWindowLayoutMixin:
         settings_layout.addWidget(self.tts_mode_combo, 12, 0, 1, 2)
 
         layout.addWidget(self.settings_group)
+        self.refresh_model_dirs()
         layout.addStretch(1)
+        tab.setWidget(content)
         return tab
 
     def _build_logs_tab(self) -> QWidget:
@@ -522,11 +639,32 @@ class AppWindowLayoutMixin:
         self.llm_checkbox.setText(self._t("enable_llm"))
         self.tts_checkbox.setText(self._t("enable_tts"))
         self.tts_mode_label.setText(self._t("tts_mode"))
+        self.model_picker_label.setText(self._t("available_models"))
+        self.model_path_label.setText(self._t("model_path"))
+        self.refresh_models_btn.setText(self._t("refresh_models"))
         self.model_browse_btn.setText(self._t("browse"))
         self.latest_btn.setText(self._t("latest"))
         self.load_btn.setText(self._t("load"))
-        if not self.model_meta_label.text().strip():
-            self.model_meta_label.setText(self._t("model_not_loaded"))
+        self.model_classes_stat_title.setText(self._t("model_classes"))
+        self.model_sequence_stat_title.setText(self._t("sequence_length"))
+        self.model_input_stat_title.setText(self._t("input_shape"))
+        self.model_loaded_stat_title.setText(self._t("loaded_at"))
+        self.model_classes_header.setText(
+            self._tf("model_classes_count", count=self._filtered_model_class_count)
+        )
+        self.model_class_filter.setPlaceholderText(
+            self._t("filter_classes_placeholder")
+        )
+        if self._all_model_classes:
+            self._filter_model_classes(self.model_class_filter.text())
+        else:
+            self._filtered_model_class_count = 0
+            self.model_classes_header.setText(
+                self._tf("model_classes_count", count=self._filtered_model_class_count)
+            )
+            self.model_classes_list.clear()
+            self.model_classes_list.addItem(self._t("model_not_loaded"))
+        self.refresh_model_dirs()
 
         self.clear_logs_btn.setText(self._t("clear_logs"))
         self.export_logs_btn.setText(self._t("export_logs"))
