@@ -23,6 +23,7 @@ from gui.services.tts_service import TTSService
 from gui.ui.app_window_actions import AppWindowActionsMixin
 from gui.ui.app_window_events import AppWindowEventMixin
 from gui.ui.app_window_layout import AppWindowLayoutMixin
+from gui.ui.custom_widgets_adapter import apply_custom_widgets_theme
 from gui.ui.localization import LOCALIZATION
 from gui.ui.theme_manager import (
     get_connection_badge_style,
@@ -277,6 +278,15 @@ def run_dashboard(project_root: Path) -> None:
             app.setFont(safe_font)
 
     window = Sign2SpeechDashboard(project_root=project_root)
+    theme_loaded = apply_custom_widgets_theme(
+        window,
+        project_root,
+    )
+    if not theme_loaded:
+        raise RuntimeError(
+            "CustomWidgets theme could not be loaded for dashboard startup. "
+            "Verify QT-PyQt-PySide-Custom-Widgets is installed and the style JSON is present."
+        )
     window.show()
 
     if owns_app:

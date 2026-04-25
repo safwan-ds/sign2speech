@@ -4,6 +4,7 @@ comm
 comtypes
 contourpy
 PySide6
+QT-PyQt-PySide-Custom-Widgets
 cycler
 debugpy
 decorator

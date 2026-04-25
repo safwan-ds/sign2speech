@@ -2,77 +2,157 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from PySide6.QtGui import QColor
 
-DEFAULT_THEME = "dark"
+_THEME_JSON_PATH = Path(__file__).with_name("custom_widgets_style.json")
 
-_PALETTES: dict[str, dict[str, str]] = {
-    "light": {
-        "bg": "#f6f7fb",
-        "panel": "#ffffff",
-        "text": "#1f2937",
-        "subtext": "#5a6777",
-        "input_bg": "#ffffff",
-        "input_border": "#d1d5db",
-        "button_bg": "#f3f4f6",
-        "button_hover": "#e5e7eb",
-        "group_border": "#d1d5db",
-        "prediction_bg": "#eef2ff",
-        "prediction_text": "#13264d",
-        "status_info_bg": "#e9f5ec",
-        "status_info_text": "#12381f",
-        "status_warning_bg": "#fff4e5",
-        "status_warning_text": "#7d5200",
-        "status_error_bg": "#fdecea",
-        "status_error_text": "#8a1c1c",
-        "badge_connected_bg": "#e7f6ea",
-        "badge_connected_text": "#1e6c35",
-        "badge_disconnected_bg": "#f4ecec",
-        "badge_disconnected_text": "#7d1f1f",
-        "badge_loading_bg": "#e8f0ff",
-        "badge_loading_text": "#1f4a86",
-        "confusion_text_low": "#0f172a",
-        "confusion_text_high": "#f8fafc",
-    },
-    "dark": {
-        "bg": "#1f2329",
-        "panel": "#2b3139",
-        "text": "#e5e7eb",
-        "subtext": "#b3bcc9",
-        "input_bg": "#242a31",
-        "input_border": "#3d4651",
-        "button_bg": "#353d48",
-        "button_hover": "#46505d",
-        "group_border": "#4b5563",
-        "prediction_bg": "#2f3540",
-        "prediction_text": "#f3f4f6",
-        "status_info_bg": "#e9f5ec",
-        "status_info_text": "#12381f",
-        "status_warning_bg": "#fff4e5",
-        "status_warning_text": "#7d5200",
-        "status_error_bg": "#fdecea",
-        "status_error_text": "#8a1c1c",
-        "badge_connected_bg": "#e7f6ea",
-        "badge_connected_text": "#1e6c35",
-        "badge_disconnected_bg": "#f4ecec",
-        "badge_disconnected_text": "#7d1f1f",
-        "badge_loading_bg": "#e8f0ff",
-        "badge_loading_text": "#1f4a86",
-        "confusion_text_low": "#0f172a",
-        "confusion_text_high": "#f8fafc",
-    },
+_REQUIRED_PALETTE_KEYS = {
+    "bg",
+    "panel",
+    "text",
+    "accent",
+    "accent_text",
+    "subtext",
+    "input_bg",
+    "input_border",
+    "button_bg",
+    "button_hover",
+    "group_border",
+    "prediction_bg",
+    "prediction_text",
+    "status_info_bg",
+    "status_info_text",
+    "status_warning_bg",
+    "status_warning_text",
+    "status_error_bg",
+    "status_error_text",
+    "badge_connected_bg",
+    "badge_connected_text",
+    "badge_disconnected_bg",
+    "badge_disconnected_text",
+    "badge_loading_bg",
+    "badge_loading_text",
+    "confusion_text_low",
+    "confusion_text_high",
 }
 
-_PLOT_LINE_COLORS: dict[str, str] = {
-    "line_a": "#63b3ed",
-    "line_b": "#f6ad55",
-    "line_c": "#68d391",
-    "line_d": "#f687b3",
-    "line_e": "#f6e05e",
+_REQUIRED_PLOT_LINE_KEYS = {
+    "line_a",
+    "line_b",
+    "line_c",
+    "line_d",
+    "line_e",
 }
 
-_CONFUSION_LOW_RGB = (227, 242, 253)
-_CONFUSION_HIGH_RGB = (13, 71, 161)
+
+def _as_string_map(value: object, section: str) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"Theme JSON section '{section}' must be an object.")
+    result: dict[str, str] = {}
+    for key, item in value.items():
+        result[str(key)] = str(item)
+    return result
+
+
+def _as_rgb_triplet(value: object, section: str) -> tuple[int, int, int]:
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        raise RuntimeError(
+            f"Theme JSON section '{section}' must be a 3-item list like [r, g, b]."
+        )
+    try:
+        red = max(0, min(255, int(value[0])))
+        green = max(0, min(255, int(value[1])))
+        blue = max(0, min(255, int(value[2])))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            f"Theme JSON section '{section}' must contain integer RGB values."
+        ) from exc
+    return red, green, blue
+
+
+def _load_theme_config() -> tuple[
+    str,
+    dict[str, dict[str, str]],
+    dict[str, str],
+    tuple[int, int, int],
+    tuple[int, int, int],
+]:
+    try:
+        raw = json.loads(_THEME_JSON_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to load theme configuration from '{_THEME_JSON_PATH}'."
+        ) from exc
+
+    if not isinstance(raw, dict):
+        raise RuntimeError("Theme JSON root must be an object.")
+
+    app_theme = raw.get("AppThemeConfig")
+    if not isinstance(app_theme, dict):
+        raise RuntimeError("Theme JSON is missing required object 'AppThemeConfig'.")
+
+    default_theme = str(app_theme.get("default_theme", "dark")).strip().lower()
+
+    raw_palettes = app_theme.get("palettes")
+    if not isinstance(raw_palettes, dict):
+        raise RuntimeError(
+            "Theme JSON is missing required object 'AppThemeConfig.palettes'."
+        )
+
+    palettes: dict[str, dict[str, str]] = {}
+    for theme_name in ("dark", "light"):
+        palette = _as_string_map(
+            raw_palettes.get(theme_name),
+            f"AppThemeConfig.palettes.{theme_name}",
+        )
+        missing = sorted(_REQUIRED_PALETTE_KEYS.difference(palette.keys()))
+        if missing:
+            raise RuntimeError(
+                "Theme JSON palette "
+                f"'AppThemeConfig.palettes.{theme_name}' is missing keys: {', '.join(missing)}"
+            )
+        palettes[theme_name] = palette
+
+    if default_theme not in palettes:
+        default_theme = "dark"
+
+    plot_line_colors = _as_string_map(
+        app_theme.get("plot_line_colors"),
+        "AppThemeConfig.plot_line_colors",
+    )
+    missing_plot_keys = sorted(
+        _REQUIRED_PLOT_LINE_KEYS.difference(plot_line_colors.keys())
+    )
+    if missing_plot_keys:
+        raise RuntimeError(
+            "Theme JSON section 'AppThemeConfig.plot_line_colors' "
+            f"is missing keys: {', '.join(missing_plot_keys)}"
+        )
+
+    confusion_gradient = app_theme.get("confusion_gradient")
+    if not isinstance(confusion_gradient, dict):
+        raise RuntimeError(
+            "Theme JSON is missing required object 'AppThemeConfig.confusion_gradient'."
+        )
+
+    low_rgb = _as_rgb_triplet(
+        confusion_gradient.get("low_rgb"),
+        "AppThemeConfig.confusion_gradient.low_rgb",
+    )
+    high_rgb = _as_rgb_triplet(
+        confusion_gradient.get("high_rgb"),
+        "AppThemeConfig.confusion_gradient.high_rgb",
+    )
+
+    return default_theme, palettes, plot_line_colors, low_rgb, high_rgb
+
+
+DEFAULT_THEME, _PALETTES, _PLOT_LINE_COLORS, _CONFUSION_LOW_RGB, _CONFUSION_HIGH_RGB = (
+    _load_theme_config()
+)
 
 
 def normalize_theme(theme: str | None) -> str:
@@ -200,12 +280,17 @@ def build_dashboard_stylesheet(theme: str | None = None) -> str:
             QTabBar::tab:selected {{
                 background: {palette['panel']};
                 color: {palette['text']};
+                border: 1px solid {palette['accent']};
+                border-bottom: 2px solid {palette['accent']};
             }}
             QLineEdit, QComboBox, QTextEdit, QPlainTextEdit, QTableWidget {{
                 background: {palette['input_bg']};
                 border: 1px solid {palette['input_border']};
                 border-radius: 6px;
                 padding: 4px;
+            }}
+            QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QPlainTextEdit:focus, QTableWidget:focus {{
+                border: 1px solid {palette['accent']};
             }}
             QHeaderView::section {{
                 background: {palette['button_bg']};
@@ -219,7 +304,11 @@ def build_dashboard_stylesheet(theme: str | None = None) -> str:
                 border-radius: 6px;
                 padding: 6px 10px;
             }}
-            QPushButton:hover {{ background: {palette['button_hover']}; }}
+            QPushButton:hover {{
+                background: {palette['accent']};
+                color: {palette['accent_text']};
+                border: 1px solid {palette['accent']};
+            }}
             QLabel#title {{ font-size: 30px; font-weight: 700; }}
             QLabel#subtitle {{ color: {palette['subtext']}; }}
             QLabel#statusInfo {{ {status_info_style} }}
@@ -273,12 +362,17 @@ def build_data_manager_stylesheet(theme: str | None = None) -> str:
             QTabBar::tab:selected {{
                 background: {palette['panel']};
                 color: {palette['text']};
+                border: 1px solid {palette['accent']};
+                border-bottom: 2px solid {palette['accent']};
             }}
             QLineEdit, QComboBox, QPlainTextEdit, QTableWidget, QSpinBox, QDoubleSpinBox {{
                 background: {palette['input_bg']};
                 border: 1px solid {palette['input_border']};
                 border-radius: 6px;
                 padding: 4px;
+            }}
+            QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus, QTableWidget:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+                border: 1px solid {palette['accent']};
             }}
             QHeaderView::section {{
                 background: {palette['button_bg']};
@@ -292,7 +386,11 @@ def build_data_manager_stylesheet(theme: str | None = None) -> str:
                 border-radius: 6px;
                 padding: 6px 10px;
             }}
-            QPushButton:hover {{ background: {palette['button_hover']}; }}
+            QPushButton:hover {{
+                background: {palette['accent']};
+                color: {palette['accent_text']};
+                border: 1px solid {palette['accent']};
+            }}
             QLabel#title {{ font-size: 30px; font-weight: 700; }}
             QLabel#subtitle {{ color: {palette['subtext']}; }}
             QLabel#statusInfo {{ {status_info_style} }}

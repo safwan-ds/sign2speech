@@ -18,6 +18,7 @@ dependencies = [
     "pyserial",
     "keyboard",
     "PySide6",
+    "QT-PyQt-PySide-Custom-Widgets",
     "llama-cpp-python",
     "edge-tts",
 ]

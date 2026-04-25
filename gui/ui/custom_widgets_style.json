@@ -1,0 +1,108 @@
+{
+	"ShowLogs": false,
+	"LiveCompileQss": false,
+	"CheckForMissingicons": false,
+	"QSettings": {
+		"AppSettings": {
+			"OrginizationName": "Sign Language Glove",
+			"ApplicationName": "Sign Language Glove",
+			"OrginizationDormain": "signlanguageglove.local"
+		},
+		"ThemeSettings": {
+			"CustomThemes": [
+				{
+					"Theme-name": "LightBlue",
+					"Background-color": "#FFFFFF",
+					"Text-color": "#010000",
+					"Accent-color": "#26bae3",
+					"Icons-color": "#000000",
+					"Default-Theme": false,
+					"Create-icons": false
+				},
+				{
+					"Theme-name": "DarkYellow",
+					"Background-color": "#21272a",
+					"Text-color": "#fefefe",
+					"Accent-color": "#fba43b",
+					"Icons-color": "#fefefe",
+					"Default-Theme": true,
+					"Create-icons": false
+				}
+			]
+		}
+	},
+	"AppThemeConfig": {
+		"default_theme": "dark",
+		"palettes": {
+			"light": {
+				"bg": "#ffffff",
+				"panel": "#ffffff",
+				"text": "#010000",
+				"subtext": "#4f555a",
+				"input_bg": "#ffffff",
+				"input_border": "#d0d5da",
+				"button_bg": "#f2f5f7",
+				"button_hover": "#e4edf2",
+				"group_border": "#d0d5da",
+				"prediction_bg": "#eaf8fd",
+				"prediction_text": "#010000",
+				"status_info_bg": "#e9f5ec",
+				"status_info_text": "#12381f",
+				"status_warning_bg": "#fff4e5",
+				"status_warning_text": "#7d5200",
+				"status_error_bg": "#fdecea",
+				"status_error_text": "#8a1c1c",
+				"badge_connected_bg": "#e7f6ea",
+				"badge_connected_text": "#1e6c35",
+				"badge_disconnected_bg": "#f4ecec",
+				"badge_disconnected_text": "#7d1f1f",
+				"badge_loading_bg": "#e8f0ff",
+				"badge_loading_text": "#1f4a86",
+				"confusion_text_low": "#0f172a",
+				"confusion_text_high": "#f8fafc",
+				"accent": "#26bae3",
+				"accent_text": "#010000"
+			},
+			"dark": {
+				"bg": "#21272a",
+				"panel": "#2a3136",
+				"text": "#fefefe",
+				"subtext": "#c7cfd6",
+				"input_bg": "#2b343a",
+				"input_border": "#4b565e",
+				"button_bg": "#354048",
+				"button_hover": "#42505a",
+				"group_border": "#4b565e",
+				"prediction_bg": "#30383f",
+				"prediction_text": "#fefefe",
+				"status_info_bg": "#e9f5ec",
+				"status_info_text": "#12381f",
+				"status_warning_bg": "#fff4e5",
+				"status_warning_text": "#7d5200",
+				"status_error_bg": "#fdecea",
+				"status_error_text": "#8a1c1c",
+				"badge_connected_bg": "#e7f6ea",
+				"badge_connected_text": "#1e6c35",
+				"badge_disconnected_bg": "#f4ecec",
+				"badge_disconnected_text": "#7d1f1f",
+				"badge_loading_bg": "#e8f0ff",
+				"badge_loading_text": "#1f4a86",
+				"confusion_text_low": "#0f172a",
+				"confusion_text_high": "#f8fafc",
+				"accent": "#fba43b",
+				"accent_text": "#21272a"
+			}
+		},
+		"plot_line_colors": {
+			"line_a": "#63b3ed",
+			"line_b": "#f6ad55",
+			"line_c": "#68d391",
+			"line_d": "#f687b3",
+			"line_e": "#f6e05e"
+		},
+		"confusion_gradient": {
+			"low_rgb": [227, 242, 253],
+			"high_rgb": [13, 71, 161]
+		}
+	}
+}

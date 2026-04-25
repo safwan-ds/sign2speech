@@ -41,6 +41,7 @@ from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
 from gui.services.script_runner import ScriptRunner
 from gui.services.serial_service import SerialService
+from gui.ui.custom_widgets_adapter import apply_custom_widgets_theme
 from gui.ui.theme_manager import (
     build_data_manager_stylesheet,
     get_confusion_cell_color,
@@ -1363,6 +1364,15 @@ def run_data_manager(project_root: Path) -> None:
         owns_app = True
 
     window = DataManagerWindow(project_root=project_root)
+    theme_loaded = apply_custom_widgets_theme(
+        window,
+        project_root,
+    )
+    if not theme_loaded:
+        raise RuntimeError(
+            "CustomWidgets theme could not be loaded for data manager startup. "
+            "Verify QT-PyQt-PySide-Custom-Widgets is installed and the style JSON is present."
+        )
     window.show()
 
     if owns_app:

@@ -21,6 +21,8 @@ REQUIRED_PALETTE_KEYS = {
     "bg",
     "panel",
     "text",
+    "accent",
+    "accent_text",
     "subtext",
     "input_bg",
     "input_border",
@@ -66,6 +68,26 @@ def test_get_palette_contains_required_keys_for_both_themes() -> None:
 def test_plot_palette_contains_expected_keys() -> None:
     plot_palette = get_plot_palette("dark")
     assert PLOT_KEYS.issubset(plot_palette.keys())
+
+
+def test_core_theme_values_match_24_modern_palette() -> None:
+    expected = {
+        "dark": {
+            "bg": "#21272a",
+            "text": "#fefefe",
+            "accent": "#fba43b",
+        },
+        "light": {
+            "bg": "#ffffff",
+            "text": "#010000",
+            "accent": "#26bae3",
+        },
+    }
+
+    for theme, expected_values in expected.items():
+        palette = get_palette(theme)
+        for key, expected_value in expected_values.items():
+            assert palette[key].lower() == expected_value.lower()
 
 
 def test_status_banner_styles_include_expected_theme_colors() -> None:
