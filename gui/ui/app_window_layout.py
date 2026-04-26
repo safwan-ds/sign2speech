@@ -411,7 +411,7 @@ class AppWindowLayoutMixin:
         settings_layout.addWidget(self.smoothing_label, 7, 0, 1, 2)
         self.smoothing_slider = QSlider(Qt.Orientation.Horizontal)
         self.smoothing_slider.setRange(1, 12)
-        self.smoothing_slider.setValue(5)
+        self.smoothing_slider.setValue(2)
         self.smoothing_slider.valueChanged.connect(self._on_smoothing_change)
         settings_layout.addWidget(self.smoothing_slider, 8, 0, 1, 2)
 
@@ -430,6 +430,7 @@ class AppWindowLayoutMixin:
         self.tts_mode_combo = QComboBox()
         self.tts_mode_combo.addItem("", "instant")
         self.tts_mode_combo.addItem("", "llm")
+        self.tts_mode_combo.addItem("", "hybrid")
         self.tts_mode_combo.currentIndexChanged.connect(self._on_tts_mode_changed)
         self.tts_mode_combo.setCurrentIndex(0)
         settings_layout.addWidget(self.tts_mode_combo, 12, 0, 1, 2)

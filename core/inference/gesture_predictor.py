@@ -209,7 +209,8 @@ class LSTMGesturePredictor:
             logger.info(f"Using ensemble of {len(self.ensemble_models)} models")
         logger.info(f"Device: {DEVICE}")
 
-        self.last_prediction_time = time.time()
+        # Start at zero so the first full buffer can be predicted immediately.
+        self.last_prediction_time = 0.0
 
     def _select_features(self, input_size: int) -> list[str]:
         base_features = [

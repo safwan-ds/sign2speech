@@ -150,6 +150,7 @@
 	"tts_mode": "TTS Konuşma Modu",
 	"tts_mode_instant": "Anında (kelime kelime)",
 	"tts_mode_llm": "LLM çıktısından sonra",
+	"tts_mode_hybrid": "Hibrit (anlık kelimeler + LLM cümlesi)",
 	"speak_prediction": "Tahmini Söyle",
 	"speak_sentence": "Cümleyi Söyle",
 	"speak_refined": "Düzeltilmiş Metni Söyle"

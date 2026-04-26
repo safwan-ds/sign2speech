@@ -21,6 +21,7 @@ dependencies = [
     "QT-PyQt-PySide-Custom-Widgets",
     "llama-cpp-python",
     "edge-tts",
+    "pyttsx3",
 ]
 
 [project.optional-dependencies]

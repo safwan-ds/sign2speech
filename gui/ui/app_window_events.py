@@ -63,8 +63,8 @@ class AppWindowEventMixin:
             return
 
         self.current_sentence_tokens.append(token)
-        if self.tts_enabled and self.tts_mode == "instant":
-            self.tts_service.speak(token, self.ui_language)
+        if self.tts_enabled and self.tts_mode in {"instant", "hybrid"}:
+            self.tts_service.speak(token, self.ui_language, backend="local")
         sentence_text = " ".join(self.current_sentence_tokens)
         self.word_count_label.setText(
             self._format_word_count(len(self.current_sentence_tokens))
@@ -87,8 +87,12 @@ class AppWindowEventMixin:
         self.refined_box.setPlainText(text)
         self._set_llm_progress_state("ready")
 
-        if self.tts_enabled and self.tts_mode == "llm":
-            self.tts_service.speak(text, self._effective_llm_language())
+        if self.tts_enabled and self.tts_mode in {"llm", "hybrid"}:
+            self.tts_service.speak(
+                text,
+                self._effective_llm_language(),
+                backend="edge",
+            )
 
     def _on_llm_status(self, event: dict) -> None:
         message = str(event.get("message", "")).strip()

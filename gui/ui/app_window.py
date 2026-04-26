@@ -101,7 +101,7 @@ class Sign2SpeechDashboard(
         self.load_model_async()
 
         self.event_timer = QTimer(self)
-        self.event_timer.setInterval(80)
+        self.event_timer.setInterval(25)
         self.event_timer.timeout.connect(self._poll_events)
         self.event_timer.start()
 
@@ -173,6 +173,7 @@ class Sign2SpeechDashboard(
         self.llm_language_combo.setItemText(2, self._t("language_english"))
         self.tts_mode_combo.setItemText(0, self._t("tts_mode_instant"))
         self.tts_mode_combo.setItemText(1, self._t("tts_mode_llm"))
+        self.tts_mode_combo.setItemText(2, self._t("tts_mode_hybrid"))
 
     def _on_language_changed(self, _index: int) -> None:
         selected = self.ui_language_combo.currentData()
@@ -257,7 +258,7 @@ class Sign2SpeechDashboard(
     def _on_tts_mode_changed(self, _index: int) -> None:
         selected = self.tts_mode_combo.currentData()
         mode = str(selected) if isinstance(selected, str) else "instant"
-        if mode not in {"instant", "llm"}:
+        if mode not in {"instant", "llm", "hybrid"}:
             mode = "instant"
         self.tts_mode = mode
 

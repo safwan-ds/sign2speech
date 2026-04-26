@@ -150,6 +150,7 @@
 	"tts_mode": "TTS Speaking Mode",
 	"tts_mode_instant": "Instant (word by word)",
 	"tts_mode_llm": "After LLM output",
+	"tts_mode_hybrid": "Hybrid (instant words + LLM sentence)",
 	"speak_prediction": "Speak Prediction",
 	"speak_sentence": "Speak Sentence",
 	"speak_refined": "Speak Refined"
