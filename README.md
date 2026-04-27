@@ -24,21 +24,20 @@ A production-grade system for real-time sign language gesture recognition using 
 
 ```text
 sign_language_glove/
-├── core/
-│   ├── inference/          # Real-time prediction pipeline
-│   ├── models/             # LSTM architecture definitions
-│   └── training/           # Training orchestration & evaluation
-├── gui/                    # Production PySide6 dashboard
-├── scripts/                # CLI entry points (training, prediction, data processing)
-├── data/
-│   ├── raw/                # Raw sensor recordings per gesture
-│   ├── processed/          # Normalized sequences (.npz format)
-│   └── test/               # Holdout test set
-├── models/                 # Trained model weights & encoders
-├── utils/                  # Shared utilities (data, augmentation, plotting, serial)
-├── config/                 # Configuration files (gestures, templates)
-├── tests/                  # Unit tests (pytest)
-└── docs/                   # API and architecture documentation
+├── core/                    # ML logic (models, inference, training)
+├── gui/                    # UI services and components
+├── scripts/                # Utility scripts
+├── data/                   # Raw and processed datasets
+├── models/                 # Trained weights
+├── utils/                  # Shared helpers
+├── config/                 # System configuration
+├── tests/                  # Pytest suite
+├── docs/                   # Documentation
+├── main.py                 # Primary GUI entry point
+├── data_manager_gui.py     # Dataset manager entry point
+├── config.py               # Shared constants
+├── pyproject.toml          # Build configuration
+└── requirements.txt        # Frozen dependencies
 ```
 
 ## 🚀 Quick Start
@@ -69,17 +68,17 @@ pip install -e .
 ### Running the GUI
 
 ```bash
-python -m gui.main
-# or
-python scripts/run_gui.py
+python main.py
+# or using the installed script
+sign-glove-gui
 ```
 
 ### Running the Dataset Manager GUI
 
 ```bash
-python -m gui.data_manager_main
-# or
-python scripts/run_data_manager_gui.py
+python data_manager_gui.py
+# or using the installed script
+sign-glove-manager
 ```
 
 This manager GUI is focused on data lifecycle tasks:
@@ -214,23 +213,6 @@ pytest tests/test_data_utils.py -v              # Specific test file
 pytest tests/ -k "augmentation" --tb=short      # Filter tests
 ```
 
-## 📝 API Documentation
-
-See [docs/API.md](docs/API.md) for detailed module interfaces.
-
-### Core Modules
-
-| Module                             | Purpose                             |
-| ---------------------------------- | ----------------------------------- |
-| `core.inference.gesture_predictor` | Real-time prediction from sequences |
-| `core.models.lstm_model`           | LSTM architecture factory           |
-| `core.training.model_training`     | Training loop with validation       |
-| `core.training.data_loader`        | Load/split datasets                 |
-| `utils.data_utils`                 | Normalization, windowing, sampling  |
-| `utils.augmentation`               | Data augmentation pipelines         |
-| `utils.serial_utils`               | Serial communication with glove     |
-| `gui.services.model_service`       | Model loading/metadata              |
-
 ## 🏗️ Architecture
 
 ### Training Pipeline
@@ -271,22 +253,20 @@ Serial Stream (glove hardware)
 3. **Commits**: Use conventional format (`feat:`, `fix:`, `docs:`, `chore:`)
 4. **Config changes**: Update `config.py` and `.env.example` together
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
 ## 📄 License
 
-[Add license information]
+This project is licensed under the MIT License.
 
 ## 👥 Contributors
 
-- Your Name
+- Safwan (Creator)
 
 ## 📞 Support
 
-For issues, questions, or feature requests, open a GitHub issue or contact [maintainer email].
+For issues, questions, or feature requests, open a GitHub issue.
 
 ---
 
-**Last Updated**: April 2026  
+**Last Updated**: April 27, 2026  
 **Python Version**: 3.11+  
-**Framework**: PyTorch 2.0+, CustomTkinter
+**Framework**: PyTorch 2.0+, PySide6

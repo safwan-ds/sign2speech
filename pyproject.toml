@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sign-lang-glove"
 version = "0.1.0"
-description = "Sign Language Glove - Gesture recognition with LSTM"
+description = "Sign2Speech - Real-time gesture recognition with LSTM and attention"
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
