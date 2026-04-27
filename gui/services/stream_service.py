@@ -115,11 +115,14 @@ class StreamWorker(threading.Thread):
             consecutive_rest_frames = 0
             stream_input_emitted = False
             stream_started_emitted = False
+            last_llm_text: str | None = None
 
             while not self._stop_event.is_set():
-                sensor = self._serial_service.read_sensor_row()
+                # read_sensor_row() blocks on the SerialService queue until a
+                # parsed frame is available or the timeout expires, so no extra
+                # sleep is needed here.
+                sensor = self._serial_service.read_sensor_row(timeout=0.2)
                 if sensor is None:
-                    time.sleep(0.01)
                     continue
 
                 if not stream_input_emitted:
@@ -202,13 +205,21 @@ class StreamWorker(threading.Thread):
                         )
                         gesture_text = " ".join(translated_gestures)
 
-                        self._event_queue.put(
-                            {
-                                "type": "llm_request",
-                                "text": gesture_text,
-                            }
-                        )
-                        self._logger.info("LLM refinement request queued")
+                        # Debounce: skip refinement if the gesture sequence
+                        # hasn't changed since the last LLM call.
+                        if gesture_text != last_llm_text:
+                            self._event_queue.put(
+                                {
+                                    "type": "llm_request",
+                                    "text": gesture_text,
+                                }
+                            )
+                            last_llm_text = gesture_text
+                            self._logger.info("LLM refinement request queued")
+                        else:
+                            self._logger.debug(
+                                "LLM refinement skipped (duplicate sequence)"
+                            )
 
                         collected_gestures.clear()
                         consecutive_rest_frames = 0

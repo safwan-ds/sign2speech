@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=64"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "sign-lang-glove"
@@ -28,8 +28,8 @@ dependencies = [
 dev = ["pytest", "torchviz"]
 
 [project.scripts]
-sign-glove-gui = "gui.main:main"
-sign-glove-manager = "gui.data_manager_main:main"
+sign-glove-gui = "main:main"
+sign-glove-manager = "data_manager_gui:main"
 sign-glove-train = "scripts.train_model:main"
 sign-glove-predict = "scripts.predict:main"
 sign-glove-process = "scripts.process_data:main"

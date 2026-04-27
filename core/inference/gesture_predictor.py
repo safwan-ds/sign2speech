@@ -100,6 +100,10 @@ class LSTMGesturePredictor:
 
         self.norm_mean = None
         self.norm_std = None
+        # GPU-resident copies for the inference hot path; avoids NumPy↔tensor
+        # round-trips on every predict() call.
+        self._norm_mean_t: torch.Tensor | None = None
+        self._norm_std_t: torch.Tensor | None = None
         if os.path.exists(NORM_PATH):
             try:
                 norm_data = np.load(NORM_PATH)
@@ -190,6 +194,17 @@ class LSTMGesturePredictor:
             self.norm_mean = None
             self.norm_std = None
 
+        # Move normalization stats to the inference device once, so the hot path
+        # can stay in tensor land (no per-prediction NumPy subtract/divide).
+        if self.norm_mean is not None and self.norm_std is not None:
+            self._norm_mean_t = torch.from_numpy(self.norm_mean).to(DEVICE)
+            self._norm_std_t = torch.from_numpy(self.norm_std).to(DEVICE)
+
+        # Compile the forward graph for steady-state latency reduction. First
+        # call pays a ~3-10s warmup cost, so we trigger it eagerly with a dummy
+        # input. torch.compile is a no-op on PyTorch builds without it.
+        self._maybe_compile_models(input_size)
+
         logger.info(f"Model loaded: {len(self.classes)} classes")
         logger.info(f"Classes: {', '.join(self.classes)}")
         logger.info(f"Model type: {MODEL_TYPE}")
@@ -211,6 +226,35 @@ class LSTMGesturePredictor:
 
         # Start at zero so the first full buffer can be predicted immediately.
         self.last_prediction_time = 0.0
+
+    def _maybe_compile_models(self, input_size: int) -> None:
+        compile_fn = getattr(torch, "compile", None)
+        if compile_fn is None:
+            return
+        try:
+            if self.use_ensemble:
+                self.ensemble_models = [
+                    compile_fn(m, mode="reduce-overhead") for m in self.ensemble_models
+                ]
+            else:
+                self.model = compile_fn(self.model, mode="reduce-overhead")
+
+            # Warmup: run one forward pass so the compile cost is paid up-front
+            # rather than on the first user gesture.
+            dummy = torch.zeros(
+                (1, self.sequence_length, input_size),
+                dtype=torch.float32,
+                device=DEVICE,
+            )
+            with torch.no_grad():
+                if self.use_ensemble:
+                    for m in self.ensemble_models:
+                        m(dummy)
+                else:
+                    self.model(dummy)
+            logger.info("torch.compile warmup complete")
+        except Exception as e:
+            logger.warning(f"torch.compile unavailable or failed; running uncompiled: {e}")
 
     def _select_features(self, input_size: int) -> list[str]:
         base_features = [
@@ -311,10 +355,9 @@ class LSTMGesturePredictor:
 
             sequence = np.concatenate(enhanced_sequence, axis=1)
 
-        if self.norm_mean is not None:
-            sequence = (sequence - self.norm_mean) / self.norm_std
-
-        sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0).to(DEVICE)
+        sequence_tensor = torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(DEVICE)
+        if self._norm_mean_t is not None:
+            sequence_tensor = (sequence_tensor - self._norm_mean_t) / self._norm_std_t
 
         if self.use_ensemble:
             # Ensemble prediction: average probabilities across all models

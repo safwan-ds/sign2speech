@@ -107,6 +107,16 @@ class AppWindowEventMixin:
         if message:
             self._set_status(message, "INFO")
 
+    def _on_tts_status(self, event: dict) -> None:
+        state = str(event.get("state", "waiting")).strip().lower()
+        backend = str(event.get("backend", "local")).strip().lower()
+        message = str(event.get("message", "")).strip()
+        if state not in {"waiting", "working", "error"}:
+            state = "waiting"
+        if backend not in {"local", "edge"}:
+            backend = "local"
+        self._set_tts_status_state(state, backend, message)
+
     def _on_connected(self, value: bool) -> None:
         self._set_connection_badge(value)
 
@@ -226,6 +236,8 @@ class AppWindowEventMixin:
                     self._on_llm_status(event)
                 elif event_type == "llm_request":
                     self._on_llm_request(event)
+                elif event_type == "tts_status":
+                    self._on_tts_status(event)
         except queue.Empty:
             return
 

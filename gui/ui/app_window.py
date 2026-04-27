@@ -65,9 +65,11 @@ class Sign2SpeechDashboard(
         self.serial_service = SerialService()
         self.llm_service = LLMService(event_queue=self.event_queue, logger=self.logger)
         self.worker = None
-        self.tts_service = TTSService(logger=self.logger)
+        self.tts_service = TTSService(logger=self.logger, event_queue=self.event_queue)
         self.tts_enabled = True
         self.tts_mode = "instant"
+        self._tts_status_state = "waiting"
+        self._tts_status_backend = "local"
         self._stream_started_at: float | None = None
         self._stream_stop_requested = False
         self._stream_had_error = False
@@ -162,6 +164,50 @@ class Sign2SpeechDashboard(
         if hasattr(self, "llm_backend_label"):
             self.llm_backend_label.setText(self._format_llm_backend(backend))
 
+    def _format_tts_status(self, state: str, backend: str) -> str:
+        state_map = {
+            "waiting": self._t("tts_state_waiting"),
+            "working": self._t("tts_state_working"),
+            "error": self._t("tts_state_error"),
+        }
+        backend_map = {
+            "local": self._t("tts_backend_local"),
+            "edge": self._t("tts_backend_edge"),
+        }
+        state_text = state_map.get(state, state)
+        backend_text = backend_map.get(backend, self._t("tts_backend_unknown"))
+        return self._tf("tts_status_format", backend=backend_text, state=state_text)
+
+    def _set_tts_status_state(
+        self,
+        state: str,
+        backend: str,
+        message: str = "",
+        update_banner: bool = True,
+    ) -> None:
+        self._tts_status_state = state
+        self._tts_status_backend = backend
+
+        if hasattr(self, "tts_status_value_label"):
+            self.tts_status_value_label.setText(self._format_tts_status(state, backend))
+            badge_state = "idle"
+            if state == "working":
+                badge_state = "loading"
+            elif state == "error":
+                badge_state = "error"
+            self.tts_status_value_label.setStyleSheet(
+                get_model_badge_style(badge_state, self._theme_name)
+            )
+
+        if update_banner:
+            level = "ERROR" if state == "error" else "INFO"
+            banner_text = (
+                message.strip()
+                if message.strip()
+                else self._format_tts_status(state, backend)
+            )
+            self._set_status(banner_text, level)
+
     def _effective_llm_language(self) -> str:
         return self.ui_language if self.llm_language == "auto" else self.llm_language
 
@@ -254,6 +300,8 @@ class Sign2SpeechDashboard(
         self.tts_enabled = state == 2
         self.tts_mode_label.setEnabled(self.tts_enabled)
         self.tts_mode_combo.setEnabled(self.tts_enabled)
+        self.tts_status_label.setEnabled(self.tts_enabled)
+        self.tts_status_value_label.setEnabled(self.tts_enabled)
 
     def _on_tts_mode_changed(self, _index: int) -> None:
         selected = self.tts_mode_combo.currentData()

@@ -435,6 +435,11 @@ class AppWindowLayoutMixin:
         self.tts_mode_combo.setCurrentIndex(0)
         settings_layout.addWidget(self.tts_mode_combo, 12, 0, 1, 2)
 
+        self.tts_status_label = QLabel("")
+        settings_layout.addWidget(self.tts_status_label, 13, 0, 1, 2)
+        self.tts_status_value_label = QLabel("")
+        settings_layout.addWidget(self.tts_status_value_label, 14, 0, 1, 2)
+
         layout.addWidget(self.settings_group)
         self.refresh_model_dirs()
         layout.addStretch(1)
@@ -542,6 +547,12 @@ class AppWindowLayoutMixin:
         self.llm_checkbox.setText(self._t("enable_llm"))
         self.tts_checkbox.setText(self._t("enable_tts"))
         self.tts_mode_label.setText(self._t("tts_mode"))
+        self.tts_status_label.setText(self._t("tts_status"))
+        self._set_tts_status_state(
+            self._tts_status_state,
+            self._tts_status_backend,
+            update_banner=False,
+        )
         self.model_picker_label.setText(self._t("available_models"))
         self.model_path_label.setText(self._t("model_path"))
         self.refresh_models_btn.setText(self._t("refresh_models"))
