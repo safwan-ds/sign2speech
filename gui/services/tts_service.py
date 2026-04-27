@@ -19,6 +19,8 @@ import tempfile
 import threading
 import time
 import uuid
+import diskcache
+
 from dataclasses import dataclass
 
 import edge_tts
@@ -72,9 +74,19 @@ class TTSService:
         self,
         logger: logging.Logger | None = None,
         event_queue: queue.Queue[dict] | None = None,
+        cache_dir: str | None = None,
     ) -> None:
         self._logger = logger or logging.getLogger(__name__)
         self._event_queue = event_queue
+
+        # Initialize diskcache for Edge TTS audio
+        if cache_dir is None:
+            from config import BASE_DIR
+
+            cache_dir = os.path.join(BASE_DIR, "data", "cache", "tts")
+        os.makedirs(cache_dir, exist_ok=True)
+        self._cache = diskcache.Cache(cache_dir, size_limit=100 * 1024 * 1024)  # 100MB limit
+
         self._local_requests: queue.Queue[TTSRequest | None] = queue.Queue(maxsize=6)
         self._edge_requests: queue.Queue[TTSRequest | None] = queue.Queue(maxsize=2)
         self._stop_event = threading.Event()
@@ -224,6 +236,25 @@ class TTSService:
         voice: str,
         loop: asyncio.AbstractEventLoop,
     ) -> None:
+        # Check cache first
+        cache_key = f"{voice}_{text}"
+        cached_audio = self._cache.get(cache_key)
+
+        if cached_audio:
+            self._logger.debug("TTS Cache hit: %s", text)
+            fd, audio_path = tempfile.mkstemp(prefix="sign_glove_tts_", suffix=".mp3")
+            os.close(fd)
+            try:
+                with open(audio_path, "wb") as f:
+                    f.write(cached_audio)
+                self._play_audio_file(audio_path)
+            finally:
+                try:
+                    os.remove(audio_path)
+                except OSError:
+                    pass
+            return
+
         fd, audio_path = tempfile.mkstemp(prefix="sign_glove_tts_", suffix=".mp3")
         os.close(fd)
         try:
@@ -234,6 +265,14 @@ class TTSService:
                 loop,
             )
             future.result()
+
+            # Store in cache
+            try:
+                with open(audio_path, "rb") as f:
+                    self._cache.set(cache_key, f.read())
+            except Exception as e:
+                self._logger.warning("Failed to cache TTS audio: %s", e)
+
             self._play_audio_file(audio_path)
         finally:
             try:
@@ -492,6 +531,10 @@ class TTSService:
     def stop(self) -> None:
         """Stop the TTS service."""
         self._stop_event.set()
+        try:
+            self._cache.close()
+        except Exception:
+            pass
         self._set_status("waiting", "local", "")
         try:
             self._local_requests.put_nowait(None)
