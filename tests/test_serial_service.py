@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from config import BAUD_RATE
 from gui.services.serial_service import SerialService, SerialSettings
 
 
@@ -38,7 +39,7 @@ def test_connect_reuses_existing_open_connection(monkeypatch) -> None:
     monkeypatch.setattr("gui.services.serial_service.serial.Serial", fake_serial)
 
     service = SerialService()
-    settings = SerialSettings(port="COM3", baud_rate=115200, timeout=0.2)
+    settings = SerialSettings(port="COM3", baud_rate=BAUD_RATE, timeout=0.2)
 
     assert service.connect(settings) is True
     assert service.connect(settings) is False
@@ -67,8 +68,8 @@ def test_reconnect_with_different_settings_opens_new_connection(monkeypatch) -> 
     monkeypatch.setattr("gui.services.serial_service.serial.Serial", fake_serial)
 
     service = SerialService()
-    settings_a = SerialSettings(port="COM3", baud_rate=115200, timeout=0.2)
-    settings_b = SerialSettings(port="COM4", baud_rate=115200, timeout=0.2)
+    settings_a = SerialSettings(port="COM3", baud_rate=BAUD_RATE, timeout=0.2)
+    settings_b = SerialSettings(port="COM4", baud_rate=BAUD_RATE, timeout=0.2)
 
     service.connect(settings_a)
     service.connect(settings_b)

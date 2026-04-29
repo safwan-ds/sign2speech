@@ -11,6 +11,7 @@ import threading
 import serial
 import serial.tools.list_ports
 
+from config import BAUD_RATE
 from utils.serial_utils import detect_glove_ports, parse_sensor_data
 
 
@@ -19,7 +20,7 @@ class SerialSettings:
     """Connection parameters for the glove device."""
 
     port: str
-    baud_rate: int = 115200
+    baud_rate: int = BAUD_RATE
     timeout: float = 0.2
 
 
@@ -178,9 +179,7 @@ class SerialService:
                 except queue.Empty:
                     pass
 
-    def read_sensor_row(
-        self, timeout: float = 0.2
-    ) -> dict[str, float] | None:
+    def read_sensor_row(self, timeout: float = 0.2) -> dict[str, float] | None:
         """Block up to ``timeout`` seconds for the next parsed sensor row."""
         with self._lock:
             connection = self._connection
