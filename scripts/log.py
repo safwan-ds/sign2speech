@@ -1,12 +1,12 @@
-import serial
-import time
 import csv
-import os
-import threading
-import keyboard
-from datetime import datetime
-import sys
 import logging
+import os
+import sys
+import threading
+import time
+
+import keyboard
+import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
@@ -16,7 +16,6 @@ from config import (
     LOGS_DIR,
     SERIAL_CONNECTION_DELAY,
     KEYBOARD_DEBOUNCE_DELAY,
-    KEYBOARD_POLL_INTERVAL,
     setup_logging,
 )
 
@@ -204,8 +203,8 @@ def main():
                                 f"{gesture_label} samples: {len(os.listdir(gesture_dir))}"
                             )
 
-            if ser.in_waiting:
-                try:
+            try:
+                if ser.in_waiting:
                     line = ser.readline().decode("utf-8", errors="ignore")
                     sensor_dict = parse_sensor_data(line)
 
@@ -219,9 +218,11 @@ def main():
                             row = [t_ms] + [sensor_dict[k] for k in SENSOR_COLUMNS]
                             csv_writer.writerow(row)
                             print(".", end="", flush=True)
-
-                except Exception as e:
-                    logger.error(f"Error reading line: {e}")
+            except (serial.SerialException, OSError) as e:
+                logger.error(f"Serial connection lost: {e}")
+                break
+            except Exception as e:
+                logger.error(f"Error reading line: {e}")
 
     except KeyboardInterrupt:
         pass

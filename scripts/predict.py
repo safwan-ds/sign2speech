@@ -1,14 +1,14 @@
+import logging
 import math
 import os
 import sys
-import time
 import threading
+import time
 from collections import deque
 from typing import Sequence
-import logging
 
-import serial
 import numpy as np
+import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (
@@ -189,156 +189,156 @@ def main():
 
     try:
         while True:
-            if ser.in_waiting > 0:
-                line = ser.readline().decode("utf-8", errors="ignore")
-                sensor_dict = parse_sensor_data(line)
+            try:
+                if ser.in_waiting > 0:
+                    line = ser.readline().decode("utf-8", errors="ignore")
+                    sensor_dict = parse_sensor_data(line)
+                else:
+                    time.sleep(0.001)
+                    continue
+            except (serial.SerialException, OSError) as e:
+                logger.error(f"Serial connection lost: {e}")
+                break
+            except Exception as e:
+                logger.error(f"Error reading serial: {e}")
+                continue
 
-                if sensor_dict:  # Got complete reading in one line
-                    # Calculate motion magnitude
-                    motion = calculate_motion_magnitude(sensor_dict)
-                    motion_samples.append(motion)
-                    predictor.add_sensor_dict(sensor_dict)
+            if sensor_dict:  # Got complete reading in one line
+                # Calculate motion magnitude
+                motion = calculate_motion_magnitude(sensor_dict)
+                motion_samples.append(motion)
+                predictor.add_sensor_dict(sensor_dict)
 
-                    # Try to predict
-                    if predictor.can_predict():
-                        gesture, confidence, confidence_gap, all_probs = (
-                            predictor.predict()
-                        )
+                # Try to predict
+                if predictor.can_predict():
+                    gesture, confidence, confidence_gap, all_probs = predictor.predict()
 
-                        # Add to prediction history for temporal stability
-                        prediction_history.append((gesture, confidence, confidence_gap))
+                    # Add to prediction history for temporal stability
+                    prediction_history.append((gesture, confidence, confidence_gap))
 
-                        if gesture:
-                            # Show all probabilities in debug mode
-                            if PREDICTION_DEBUG_MODE and all_probs:
-                                sorted_probs = sorted(
-                                    all_probs.items(), key=lambda x: x[1], reverse=True
-                                )
-                                probs_str = ", ".join(
-                                    [
-                                        f"{name}: {prob:.1%}"
-                                        for name, prob in sorted_probs
-                                    ]
-                                )
-                                logger.debug(f"All predictions: {probs_str}")
+                    if gesture:
+                        # Show all probabilities in debug mode
+                        if PREDICTION_DEBUG_MODE and all_probs:
+                            sorted_probs = sorted(
+                                all_probs.items(), key=lambda x: x[1], reverse=True
+                            )
+                            probs_str = ", ".join(
+                                [f"{name}: {prob:.1%}" for name, prob in sorted_probs]
+                            )
+                            logger.debug(f"All predictions: {probs_str}")
 
-                            # Multi-level validation for non-REST gestures
-                            is_rest = gesture.upper() == "REST"
-                            original_gesture = gesture  # Store original prediction
+                        # Multi-level validation for non-REST gestures
+                        is_rest = gesture.upper() == "REST"
+                        original_gesture = gesture  # Store original prediction
 
-                            if not is_rest:
-                                # Cheapest checks first, short-circuit on failure
-                                valid = (
+                        if not is_rest:
+                            # Cheapest checks first, short-circuit on failure
+                            valid = (
+                                confidence is not None
+                                and confidence_gap is not None
+                                and confidence >= CONFIDENCE_THRESHOLD
+                                and confidence_gap >= PREDICTION_MIN_CONFIDENCE_GAP
+                            )
+
+                            if PREDICTION_DEBUG_MODE and not valid:
+                                if (
                                     confidence is not None
-                                    and confidence_gap is not None
-                                    and confidence >= CONFIDENCE_THRESHOLD
-                                    and confidence_gap >= PREDICTION_MIN_CONFIDENCE_GAP
+                                    and confidence < CONFIDENCE_THRESHOLD
+                                ):
+                                    logger.debug(
+                                        f"Filtered {original_gesture}: confidence {confidence:.2%} < {CONFIDENCE_THRESHOLD:.2%}"
+                                    )
+                                elif (
+                                    confidence_gap is not None
+                                    and confidence_gap < PREDICTION_MIN_CONFIDENCE_GAP
+                                ):
+                                    logger.debug(
+                                        f"Filtered {original_gesture}: confidence gap {confidence_gap:.2%} < {PREDICTION_MIN_CONFIDENCE_GAP:.2%}"
+                                    )
+
+                            # Check temporal consensus (consistent predictions)
+                            if (
+                                valid
+                                and len(prediction_history)
+                                >= PREDICTION_CONSENSUS_FRAMES
+                            ):
+                                valid = all(
+                                    g == gesture for g, _, _ in prediction_history
                                 )
-
                                 if PREDICTION_DEBUG_MODE and not valid:
-                                    if (
-                                        confidence is not None
-                                        and confidence < CONFIDENCE_THRESHOLD
-                                    ):
-                                        logger.debug(
-                                            f"Filtered {original_gesture}: confidence {confidence:.2%} < {CONFIDENCE_THRESHOLD:.2%}"
-                                        )
-                                    elif (
-                                        confidence_gap is not None
-                                        and confidence_gap
-                                        < PREDICTION_MIN_CONFIDENCE_GAP
-                                    ):
-                                        logger.debug(
-                                            f"Filtered {original_gesture}: confidence gap {confidence_gap:.2%} < {PREDICTION_MIN_CONFIDENCE_GAP:.2%}"
-                                        )
-
-                                # Check temporal consensus (consistent predictions)
-                                if (
-                                    valid
-                                    and len(prediction_history)
-                                    >= PREDICTION_CONSENSUS_FRAMES
-                                ):
-                                    valid = all(
-                                        g == gesture for g, _, _ in prediction_history
+                                    logger.debug(
+                                        f"Filtered {original_gesture}: failed temporal consensus"
                                     )
-                                    if PREDICTION_DEBUG_MODE and not valid:
-                                        logger.debug(
-                                            f"Filtered {original_gesture}: failed temporal consensus"
-                                        )
 
-                                # ALWAYS check motion for non-REST gestures
-                                if valid:
-                                    valid = validate_motion_consistency(motion_samples)
-                                    if PREDICTION_DEBUG_MODE and not valid:
-                                        logger.debug(
-                                            f"Filtered {original_gesture}: failed motion validation"
-                                        )
-
-                                if not valid:
-                                    # Force to REST when gesture validation fails
-                                    gesture = "REST"
-                                    confidence = 1.0
-                                    is_rest = True
-
-                            # Re-check after validation
-                            is_rest = gesture.upper() == "REST"
-                            is_new = gesture != last_gesture
-
-                            if is_rest:
-                                consecutive_rest_frames += 1
-
-                                # Trigger QWEN exactly once after sustained REST
-                                if (
-                                    consecutive_rest_frames == MIN_CONSECUTIVE_REST
-                                    and len(collected_gestures) >= MIN_GESTURES_FOR_LLM
-                                    and not llm_busy
-                                ):
-                                    logger.info("REST (confidence: 1.00)")
-
-                                    gesture_names = [
-                                        name for name, _ in collected_gestures
-                                    ]
-                                    translated_gestures = translate_gestures(
-                                        gesture_names, translations
+                            # ALWAYS check motion for non-REST gestures
+                            if valid:
+                                valid = validate_motion_consistency(motion_samples)
+                                if PREDICTION_DEBUG_MODE and not valid:
+                                    logger.debug(
+                                        f"Filtered {original_gesture}: failed motion validation"
                                     )
-                                    gesture_text = " ".join(translated_gestures)
 
-                                    if llm is not None:
+                            if not valid:
+                                # Force to REST when gesture validation fails
+                                gesture = "REST"
+                                confidence = 1.0
+                                is_rest = True
 
-                                        def _run_llm(
-                                            text: str = gesture_text,
-                                        ) -> None:
-                                            nonlocal llm_busy
-                                            try:
-                                                reply = generate_turkish_reply(
-                                                    llm, text
-                                                )
-                                                if reply:
-                                                    logger.info(f"QWEN: {reply}")
-                                            finally:
-                                                llm_busy = False
+                        # Re-check after validation
+                        is_rest = gesture.upper() == "REST"
+                        is_new = gesture != last_gesture
 
-                                        llm_busy = True
-                                        threading.Thread(
-                                            target=_run_llm, daemon=True
-                                        ).start()
+                        if is_rest:
+                            consecutive_rest_frames += 1
 
-                                    collected_gestures.clear()
-                                    last_added_gesture = None
-                                    consecutive_rest_frames = 0
-                            elif is_new and confidence is not None:
-                                # New gesture detected (not REST) - reset REST counter
+                            # Trigger QWEN exactly once after sustained REST
+                            if (
+                                consecutive_rest_frames == MIN_CONSECUTIVE_REST
+                                and len(collected_gestures) >= MIN_GESTURES_FOR_LLM
+                                and not llm_busy
+                            ):
+                                logger.info("REST (confidence: 1.00)")
+
+                                gesture_names = [name for name, _ in collected_gestures]
+                                translated_gestures = translate_gestures(
+                                    gesture_names, translations
+                                )
+                                gesture_text = " ".join(translated_gestures)
+
+                                if llm is not None:
+
+                                    def _run_llm(
+                                        text: str = gesture_text,
+                                    ) -> None:
+                                        nonlocal llm_busy
+                                        try:
+                                            reply = generate_turkish_reply(llm, text)
+                                            if reply:
+                                                logger.info(f"QWEN: {reply}")
+                                        finally:
+                                            llm_busy = False
+
+                                    llm_busy = True
+                                    threading.Thread(
+                                        target=_run_llm, daemon=True
+                                    ).start()
+
+                                collected_gestures.clear()
+                                last_added_gesture = None
                                 consecutive_rest_frames = 0
+                        elif is_new and confidence is not None:
+                            # New gesture detected (not REST) - reset REST counter
+                            consecutive_rest_frames = 0
 
-                                # Only add if it's different from the last gesture that was added
-                                if gesture != last_added_gesture:
-                                    # Print gesture immediately
-                                    gesture_display = gesture.replace("_", " ")
-                                    logger.info(f"{gesture_display} ({confidence:.2%})")
-                                    collected_gestures.append((gesture, confidence))
-                                    last_added_gesture = gesture
+                            # Only add if it's different from the last gesture that was added
+                            if gesture != last_added_gesture:
+                                # Print gesture immediately
+                                gesture_display = gesture.replace("_", " ")
+                                logger.info(f"{gesture_display} ({confidence:.2%})")
+                                collected_gestures.append((gesture, confidence))
+                                last_added_gesture = gesture
 
-                            last_gesture = gesture
+                        last_gesture = gesture
 
     except KeyboardInterrupt:
         logger.info("\n\nStopping...")

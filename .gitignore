@@ -19,3 +19,7 @@ build/
 *.egg-info/
 
 .DS_Store
+*.bat
+launcher.cpp
+*.exe
+*.ttf

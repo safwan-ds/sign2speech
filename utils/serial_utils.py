@@ -67,18 +67,16 @@ def select_serial_port(preferred_port: str | None = None):
         if preferred_port in available_ports:
             return preferred_port
 
-    # Try single port
-    if len(ports) == 1:
-        return ports[0].device
-
     # Prefer known device types
-    preferred_keywords = ["bluetooth", "arduino", "usb serial", "ch340", "cp210"]
+    preferred_keywords = ["arduino", "usb serial", "ch340", "cp210", "usb-serial"]
+
+    # Iterate through all ports and find the first one that matches our keywords
     for port in ports:
         haystack = f"{port.description} {port.manufacturer}".lower()
         if any(keyword in haystack for keyword in preferred_keywords):
             return port.device
 
-    return ports[0].device
+    return None
 
 
 def detect_glove_ports(
