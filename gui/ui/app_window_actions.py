@@ -221,6 +221,7 @@ class AppWindowActionsMixin:
         self._set_model_badge(self._t("model_loading"), "loading")
         self._model_loaded = False
         self.load_btn.setEnabled(False)
+        self.model_load_progress.setVisible(True)
         self._refresh_action_states()
 
         def _load() -> None:
@@ -243,6 +244,7 @@ class AppWindowActionsMixin:
         self.model_sequence_value.setText(str(metadata.sequence_length))
         self.model_input_value.setText(metadata.input_shape)
         self.model_loaded_value.setText(metadata.loaded_at)
+        self.model_load_progress.setVisible(False)
         self.model_class_filter.clear()
         self._filter_model_classes("")
         self._model_loaded = True

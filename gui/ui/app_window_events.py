@@ -40,6 +40,16 @@ class AppWindowEventMixin:
                 self._gesture_translations,
                 target_language=self.ui_language,
             )
+
+        # Skip updating the UI if the prediction is REST or UNKNOWN/UNCERTAIN.
+        # This keeps the last valid prediction visible until a new one arrives.
+        if (
+            raw_gesture.upper() in {"REST", "UNKNOWN"}
+            or display_gesture == self._t("uncertain")
+            or display_gesture == self._t("unknown")
+        ):
+            return
+
         history_gesture = display_gesture
 
         self.prediction_card.setText(display_upper(display_gesture, self.ui_language))
@@ -221,6 +231,7 @@ class AppWindowEventMixin:
                         self._model_loaded = False
                         self._set_model_badge(self._t("model_error"), "error")
                         self.load_btn.setEnabled(True)
+                        self.model_load_progress.setVisible(False)
                         self._refresh_action_states()
                     self._append_log("ERROR", message, source="ui")
                 elif event_type == "log":

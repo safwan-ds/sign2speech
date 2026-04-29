@@ -10,8 +10,8 @@ teacher - hoca
 thank_you - teşekkür ederim
 welcome - hoş geldiniz
 glove - eldiven
-how - nasıl
-good - iyi 
+good - iyi
+bad - kötü
 wolf - kurt
 ok - tamam
 one - bir
@@ -24,3 +24,16 @@ seven - yedi
 eight - sekiz
 nine - dokuz
 ten - on
+what - ne
+where - nerede
+why - neden
+how - nasıl
+want - istemek
+help - yardım
+go - gitmek
+finish - bitti
+name - isim
+university - üniversite
+engineering - mühendislik
+yes - evet
+no - hayır

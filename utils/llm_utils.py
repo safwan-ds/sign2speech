@@ -74,6 +74,9 @@ def generate_reply(llm, gesture_text: str, language: str = "tr") -> str | None:
             "Örnek 2:\n"
             "Kelimeler: sen proje yapmak\n"
             "Yanıt: Sen proje yaptın."
+            "Örnek 3:\n"
+            "Kelimeler: ben yemek alişveri̇ş yapmak ben eksi̇k yok tamam"
+            "Yanıt: Yemek için alışverişi yaptım, hiç eksik yok. Her şey tamam."
         )
         user_label = "Kelimeler"
 

@@ -336,6 +336,16 @@ def build_dashboard_stylesheet(theme: str | None = None) -> str:
             }}
             QGroupBox {{ font-weight: 600; margin-top: 8px; border: 1px solid {palette['group_border']}; border-radius: 8px; }}
             QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
+            QProgressBar {{
+                background: {palette['input_bg']};
+                border: 1px solid {palette['input_border']};
+                border-radius: 4px;
+                text-align: center;
+            }}
+            QProgressBar::chunk {{
+                background-color: {palette['accent']};
+                border-radius: 4px;
+            }}
             """
 
 
@@ -397,6 +407,16 @@ def build_data_manager_stylesheet(theme: str | None = None) -> str:
             QLabel#panelTitle {{ font-size: 20px; font-weight: 700; }}
             QGroupBox {{ font-weight: 600; margin-top: 8px; border: 1px solid {palette['group_border']}; border-radius: 8px; }}
             QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 3px; }}
+            QProgressBar {{
+                background: {palette['input_bg']};
+                border: 1px solid {palette['input_border']};
+                border-radius: 4px;
+                text-align: center;
+            }}
+            QProgressBar::chunk {{
+                background-color: {palette['accent']};
+                border-radius: 4px;
+            }}
             """
 
 

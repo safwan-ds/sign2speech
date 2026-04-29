@@ -296,6 +296,14 @@ class AppWindowLayoutMixin:
         model_btns.addWidget(self.load_btn)
         model_layout.addLayout(model_btns)
 
+        self.model_load_progress = QProgressBar()
+        self.model_load_progress.setObjectName("modelLoadProgress")
+        self.model_load_progress.setRange(0, 0)
+        self.model_load_progress.setTextVisible(False)
+        self.model_load_progress.setVisible(False)
+        self.model_load_progress.setFixedHeight(4)
+        model_layout.addWidget(self.model_load_progress)
+
         model_stats = QGridLayout()
         model_stats.setHorizontalSpacing(6)
         model_stats.setVerticalSpacing(6)
