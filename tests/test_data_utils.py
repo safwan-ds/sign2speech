@@ -132,3 +132,171 @@ class TestComputeRollingStatistics:
         stats = compute_rolling_statistics(seq, window_size=5)
         assert np.allclose(stats["mean"], 3.0)
         assert np.allclose(stats["std"], 0.0)
+
+
+class TestConvertToSnakeCase:
+    def test_spaces_become_underscores(self):
+        from utils.data_utils import convert_to_snake_case
+
+        assert convert_to_snake_case("hello world") == "hello_world"
+
+    def test_no_spaces_unchanged(self):
+        from utils.data_utils import convert_to_snake_case
+
+        assert convert_to_snake_case("hello") == "hello"
+
+    def test_multiple_spaces(self):
+        from utils.data_utils import convert_to_snake_case
+
+        assert convert_to_snake_case("a b c") == "a_b_c"
+
+
+class TestNormalizeDataframe:
+    def _make_df(self):
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                "flex0": [28, 126, 224],
+                "flex1": [28, 126, 224],
+                "flex2": [28, 126, 224],
+                "flex3": [28, 126, 224],
+                "flex4": [28, 126, 224],
+                "accelX": [-32768, 0, 32767],
+                "accelY": [-32768, 0, 32767],
+                "accelZ": [-32768, 0, 32767],
+                "gyroX": [-32768, 0, 32767],
+                "gyroY": [-32768, 0, 32767],
+                "gyroZ": [-32768, 0, 32767],
+            }
+        )
+
+    def test_adds_normalized_columns(self):
+        from utils.data_utils import normalize_dataframe
+
+        df = self._make_df()
+        result = normalize_dataframe(df)
+        assert "flex0_norm" in result.columns
+        assert "accelX_norm" in result.columns
+        assert "gyroZ_norm" in result.columns
+
+    def test_original_columns_unchanged(self):
+        from utils.data_utils import normalize_dataframe
+
+        df = self._make_df()
+        result = normalize_dataframe(df)
+        assert "flex0" in result.columns
+
+    def test_normalized_values_in_range(self):
+        from utils.data_utils import normalize_dataframe
+
+        df = self._make_df()
+        result = normalize_dataframe(df)
+        assert result["flex0_norm"].between(0.0, 1.0).all()
+        assert result["accelX_norm"].between(0.0, 1.0).all()
+
+
+class TestExtractNormalizedFeatures:
+    def test_returns_array_with_correct_shape(self):
+        import pandas as pd
+        from utils.data_utils import normalize_dataframe, extract_normalized_features
+
+        df = pd.DataFrame(
+            {
+                "flex0": [100, 200],
+                "flex1": [100, 200],
+                "flex2": [100, 200],
+                "flex3": [100, 200],
+                "flex4": [100, 200],
+                "accelX": [0, 100],
+                "accelY": [0, 100],
+                "accelZ": [0, 100],
+                "gyroX": [0, 100],
+                "gyroY": [0, 100],
+                "gyroZ": [0, 100],
+            }
+        )
+        df = normalize_dataframe(df)
+        features = extract_normalized_features(df)
+        assert features.shape == (2, 11)
+        assert features.dtype == np.float32
+
+    def test_raises_on_missing_columns(self):
+        import pandas as pd
+        from utils.data_utils import extract_normalized_features
+
+        df = pd.DataFrame({"flex0_norm": [0.5, 0.6]})
+        with pytest.raises(ValueError, match="Missing expected normalized columns"):
+            extract_normalized_features(df)
+
+
+class TestComputeMagnitude:
+    def test_output_shape_is_column_vector(self):
+        from utils.data_utils import compute_magnitude
+
+        seq = np.ones((10, 6), dtype=np.float32)
+        mag = compute_magnitude(seq, [3, 4, 5])
+        assert mag.shape == (10, 1)
+
+    def test_magnitude_of_unit_vector(self):
+        from utils.data_utils import compute_magnitude
+
+        seq = np.zeros((5, 3), dtype=np.float32)
+        seq[:, 0] = 1.0  # only x component
+        mag = compute_magnitude(seq, [0, 1, 2])
+        assert np.allclose(mag, 1.0)
+
+    def test_raises_for_single_axis(self):
+        from utils.data_utils import compute_magnitude
+
+        with pytest.raises(ValueError, match="at least 2 axes"):
+            compute_magnitude(np.ones((5, 3), dtype=np.float32), [0])
+
+
+class TestExtractEnhancedFeatures:
+    def test_with_derivatives_doubles_features(self):
+        from utils.data_utils import extract_enhanced_features
+
+        seq = np.random.randn(20, 11).astype(np.float32)
+        result = extract_enhanced_features(
+            seq, include_derivatives=True, include_stats=False
+        )
+        # base + vel + accel = 3 * 11 = 33
+        assert result.shape == (20, 33)
+
+    def test_with_stats_only_adds_mean_and_std(self):
+        from utils.data_utils import extract_enhanced_features
+
+        seq = np.random.randn(20, 11).astype(np.float32)
+        result = extract_enhanced_features(
+            seq, include_derivatives=False, include_stats=True
+        )
+        # base + mean + std = 3 * 11 = 33
+        assert result.shape == (20, 33)
+
+    def test_output_dtype_is_float32(self):
+        from utils.data_utils import extract_enhanced_features
+
+        seq = np.ones((10, 5), dtype=np.float64)
+        result = extract_enhanced_features(seq)
+        assert result.dtype == np.float32
+
+
+class TestExtractFrequencyFeatures:
+    def test_returns_dict_with_expected_keys(self):
+        from utils.data_utils import extract_frequency_features
+
+        seq = np.random.randn(50, 3).astype(np.float32)
+        freq = extract_frequency_features(seq, sampling_rate=100)
+        assert "feature_0_dominant_freq" in freq
+        assert "feature_0_spectral_energy" in freq
+        assert "feature_0_spectral_entropy" in freq
+
+    def test_key_count_matches_feature_count(self):
+        from utils.data_utils import extract_frequency_features
+
+        n_features = 4
+        seq = np.random.randn(50, n_features).astype(np.float32)
+        freq = extract_frequency_features(seq, sampling_rate=100)
+        # 3 metrics per feature
+        assert len(freq) == 3 * n_features

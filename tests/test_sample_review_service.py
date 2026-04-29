@@ -66,3 +66,63 @@ def test_quarantine_and_restore_move_meta_sidecar(tmp_path: Path) -> None:
     assert restored.exists()
     assert restored.with_suffix(".meta.json").exists()
     assert not quarantined.exists()
+
+
+def test_quarantine_without_meta_sidecar(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    service = SampleReviewService(raw_root)
+
+    # Write sample but remove the meta file
+    sample = _write_sample(raw_root, "ok", "ok_nometa")
+    sample.with_suffix(".meta.json").unlink()
+
+    quarantined = service.quarantine_sample(sample)
+    assert quarantined.exists()
+    assert not quarantined.with_suffix(".meta.json").exists()
+
+
+def test_quarantine_already_quarantined_is_idempotent(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    service = SampleReviewService(raw_root)
+
+    sample = _write_sample(raw_root, "ok", "ok_2")
+    quarantined = service.quarantine_sample(sample)
+    # Calling again on already-quarantined path should return it unchanged
+    result = service.quarantine_sample(quarantined)
+    assert result == quarantined
+
+
+def test_restore_non_quarantined_is_idempotent(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    service = SampleReviewService(raw_root)
+
+    sample = _write_sample(raw_root, "ok", "ok_3")
+    # Not quarantined – restore should return path unchanged
+    result = service.restore_sample(sample)
+    assert result == sample.resolve()
+
+
+def test_list_samples_returns_raw_records(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    service = SampleReviewService(raw_root)
+
+    _write_sample(raw_root, "hello", "hello_1")
+    _write_sample(raw_root, "hello", "hello_2")
+
+    records = service.list_samples(include_quarantine=False)
+    assert len(records) == 2
+    assert all(r.source == "raw" for r in records)
+    assert all(r.gesture == "hello" for r in records)
+
+
+def test_sample_record_without_meta_has_default_orientation(tmp_path: Path) -> None:
+    raw_root = tmp_path / "raw"
+    service = SampleReviewService(raw_root)
+
+    sample = _write_sample(raw_root, "hello", "hello_nometa")
+    sample.with_suffix(".meta.json").unlink()
+
+    records = service.list_samples()
+    assert len(records) == 1
+    assert records[0].orientation == "unspecified"
+    assert records[0].meta_path is None

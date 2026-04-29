@@ -23,3 +23,41 @@ def test_sentence_assembler_debounces_repeated_token() -> None:
     assert assembler.try_append("hello") is False
     assert assembler.try_append("me") is True
     assert assembler.text() == "hello me"
+
+
+def test_majority_vote_returns_none_for_empty_window() -> None:
+    assert majority_vote(deque()) is None
+
+
+def test_prediction_smoother_reset_clears_window() -> None:
+    smoother = PredictionSmoother(window_size=3)
+    smoother.update("hello")
+    smoother.update("hello")
+    smoother.reset()
+    # After reset the window is empty; next token should return itself
+    result = smoother.update("me")
+    assert result == "me"
+
+
+def test_sentence_assembler_clear_resets_state() -> None:
+    assembler = SentenceAssembler(debounce_window=2)
+    assembler.try_append("hello")
+    assembler.try_append("me")
+    assembler.clear()
+    assert assembler.text() == ""
+    # After clear, same token should be accepted again
+    assert assembler.try_append("hello") is True
+
+
+def test_sentence_assembler_empty_token_not_appended() -> None:
+    assembler = SentenceAssembler()
+    assert assembler.try_append("") is False
+    assert assembler.text() == ""
+
+
+def test_sentence_assembler_text_joins_with_space() -> None:
+    assembler = SentenceAssembler(debounce_window=1)
+    assembler.try_append("a")
+    assembler.try_append("b")
+    assembler.try_append("c")
+    assert assembler.text() == "a b c"
