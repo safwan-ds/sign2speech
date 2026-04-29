@@ -7,6 +7,7 @@ import threading
 import time
 from dataclasses import dataclass
 from queue import Queue
+from typing import TYPE_CHECKING
 
 from config import MIN_CONSECUTIVE_REST, MIN_GESTURES_FOR_LLM
 from core.inference.gesture_translations import (
@@ -14,10 +15,12 @@ from core.inference.gesture_translations import (
     translate_gesture,
     translate_gestures,
 )
-from gui.services.model_service import ModelService
 from gui.services.serial_service import SerialService, SerialSettings
 from gui.utils.formatting import now_hms
 from gui.utils.smoothing import PredictionSmoother, SentenceAssembler
+
+if TYPE_CHECKING:
+    from gui.services.model_service import ModelService
 
 
 @dataclass(slots=True)
@@ -70,7 +73,7 @@ class StreamWorker(threading.Thread):
 
     def __init__(
         self,
-        model_service: ModelService,
+        model_service: "ModelService",
         serial_service: SerialService,
         event_queue: Queue[dict],
         logger: logging.Logger,
