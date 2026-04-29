@@ -1,7 +1,7 @@
 asttokens
 colorama
 comm
-comtypes
+comtypes; sys_platform == "win32"
 contourpy
 PySide6
 QT-PyQt-PySide-Custom-Widgets
@@ -43,12 +43,12 @@ psutil
 pure_eval
 Pygments
 pyparsing
-pypiwin32
+pypiwin32; sys_platform == "win32"
 pyserial
 pytest
 python-dateutil
 pyttsx3
-pywin32
+pywin32; sys_platform == "win32"
 pyzmq
 scikit-learn
 scipy
