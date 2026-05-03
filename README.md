@@ -2,7 +2,7 @@
 
 A production-grade system for real-time sign language gesture recognition using a smart glove with flex sensors and IMU data. Leverages deep learning (LSTM with attention) and optional LLM refinement for accurate, context-aware translation.
 
-## 🌟 Features
+## Features
 
 - **Real-time Gesture Recognition**: 11+ gestures (REST, hello, goodbye, numbers, etc.) via LSTM-based inference
 - **Smart Glove Hardware**: 5 flex sensors + IMU (accelerometer/gyroscope) data streaming over serial
@@ -20,7 +20,7 @@ A production-grade system for real-time sign language gesture recognition using 
 - **Comprehensive Logging**: Structured logs with levels, file rotation, and GUI log viewer
 - **Model Management**: Multiple model versions, easy model selection, automatic metadata tracking
 
-## 📦 What's Inside
+## What's Inside
 
 ```text
 sign_language_glove/
@@ -40,7 +40,7 @@ sign_language_glove/
 └── requirements.txt        # Frozen dependencies
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -128,7 +128,7 @@ python scripts/predict.py
 
 Batch prediction on test data with confidence scores and confusion matrix.
 
-## ⚙️ Configuration
+## Configuration
 
 All configuration is centralized in `config.py` and can be overridden via environment variables (see `.env.example`).
 
@@ -169,7 +169,7 @@ All configuration is centralized in `config.py` and can be overridden via enviro
 
 See [config.py](config.py) for all ~100 configurable parameters.
 
-## 📊 Data Format
+## Data Format
 
 ### Raw Data Structure
 
@@ -203,7 +203,7 @@ New recordings keep the sensor CSV numeric-only. Any capture metadata such as or
 
 See [docs/data_collection_protocol.md](docs/data_collection_protocol.md) for the capture rules used by the unified LSTM pipeline.
 
-## 🧪 Testing
+## Testing
 
 Run pytest from project root:
 
@@ -213,7 +213,7 @@ pytest tests/test_data_utils.py -v              # Specific test file
 pytest tests/ -k "augmentation" --tb=short      # Filter tests
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ### Training Pipeline
 
@@ -253,15 +253,15 @@ Serial Stream (glove hardware)
 3. **Commits**: Use conventional format (`feat:`, `fix:`, `docs:`, `chore:`)
 4. **Config changes**: Update `config.py` and `.env.example` together
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
-## 👥 Contributors
+## Contributors
 
 - Safwan (Creator)
 
-## 📞 Support
+## Support
 
 For issues, questions, or feature requests, open a GitHub issue.
 
