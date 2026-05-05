@@ -213,6 +213,13 @@ class TestNormalizeYawRotation:
         result = normalize_yaw_rotation(seq)
         assert np.array_equal(result, seq)
 
+    def test_passthrough_on_empty_sequence(self):
+        from utils.data_utils import normalize_yaw_rotation
+
+        seq = np.empty((0, 11), dtype=np.float32)
+        result = normalize_yaw_rotation(seq)
+        assert result.shape == (0, 11)
+
 
 class TestConvertToSnakeCase:
     def test_spaces_become_underscores(self):

@@ -73,7 +73,7 @@ def normalize_yaw_rotation(
         Yaw-normalized sequence of the same shape and dtype
     """
     n_features = sequence.shape[1]
-    if n_features <= max(accel_x_idx, accel_y_idx, gyro_x_idx, gyro_y_idx):
+    if sequence.shape[0] == 0 or n_features <= max(accel_x_idx, accel_y_idx, gyro_x_idx, gyro_y_idx):
         return sequence
 
     # Use only the leading rest frames to estimate the facing direction,
