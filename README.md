@@ -264,9 +264,3 @@ This project is licensed under the MIT License.
 ## Support
 
 For issues, questions, or feature requests, open a GitHub issue.
-
----
-
-**Last Updated**: April 27, 2026  
-**Python Version**: 3.11+  
-**Framework**: PyTorch 2.0+, PySide6
