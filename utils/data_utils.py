@@ -23,6 +23,7 @@ from config import (
     SEQUENCE_OVERLAP,
     MOTION_PADDING_RATIO,
     NORMALIZE_YAW_ROTATION,
+    YAW_REFERENCE_FRAMES,
     ACCEL_X_IDX,
     ACCEL_Y_IDX,
     GYRO_X_IDX,
@@ -43,14 +44,20 @@ def normalize_yaw_rotation(
     accel_y_idx: int = ACCEL_Y_IDX,
     gyro_x_idx: int = GYRO_X_IDX,
     gyro_y_idx: int = GYRO_Y_IDX,
+    reference_frames: int = YAW_REFERENCE_FRAMES,
 ) -> np.ndarray:
     """
-    Remove the yaw (vertical-axis rotation) component from IMU data.
+    Normalize the yaw (vertical-axis rotation) component from IMU data.
 
     Estimates the user's facing direction from the mean horizontal acceleration
-    of the sequence and counter-rotates accelX/Y and gyroX/Y into a canonical
-    frame.  This makes gesture features invariant to which direction the user
-    is facing when performing a gesture.
+    of the first ``reference_frames`` frames of the sequence — captured while
+    the hand is still at rest before the gesture starts — and counter-rotates
+    accelX/Y and gyroX/Y into a canonical frame.
+
+    Using only the leading rest frames rather than the full-sequence mean avoids
+    contaminating the yaw estimate with dynamic motion (arm swings, wrist flicks)
+    that would make the estimate noisy and gesture-dependent.  accelZ and gyroZ
+    are left completely unchanged so dynamic vertical-axis features are preserved.
 
     Args:
         sequence: numpy array of shape (n_samples, n_features)
@@ -58,6 +65,9 @@ def normalize_yaw_rotation(
         accel_y_idx: Index of accelY in the feature vector
         gyro_x_idx: Index of gyroX in the feature vector
         gyro_y_idx: Index of gyroY in the feature vector
+        reference_frames: Number of leading frames used to estimate the yaw
+            reference.  If the sequence is shorter than this value, all
+            available frames are used.
 
     Returns:
         Yaw-normalized sequence of the same shape and dtype
@@ -66,9 +76,12 @@ def normalize_yaw_rotation(
     if n_features <= max(accel_x_idx, accel_y_idx, gyro_x_idx, gyro_y_idx):
         return sequence
 
-    # Compute the mean horizontal acceleration to estimate facing direction
-    mean_ax = np.mean(sequence[:, accel_x_idx])
-    mean_ay = np.mean(sequence[:, accel_y_idx])
+    # Use only the leading rest frames to estimate the facing direction,
+    # avoiding contamination from dynamic gesture motion.
+    n_ref = min(reference_frames, len(sequence))
+    ref = sequence[:n_ref]
+    mean_ax = np.mean(ref[:, accel_x_idx])
+    mean_ay = np.mean(ref[:, accel_y_idx])
 
     # Counter-rotation angle that cancels out the mean yaw
     yaw = np.arctan2(mean_ay, mean_ax)

@@ -47,6 +47,7 @@ training:
 
   preprocessing:
     normalize_yaw_rotation: true
+    yaw_reference_frames: 5
 
   regularization:
     use_weighted_loss: true

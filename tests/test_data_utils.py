@@ -168,7 +168,9 @@ class TestNormalizeYawRotation:
         seq = rng.randn(30, 11).astype(np.float32)
 
         # Rotate accelX/Y and gyroX/Y by 90 degrees (pi/2) to simulate
-        # the user facing a different direction
+        # the user facing a different direction.  All frames are rotated
+        # uniformly, including the leading reference frames used for yaw
+        # estimation, so the estimate correctly captures the offset.
         angle = np.pi / 2
         cos_a, sin_a = np.cos(angle), np.sin(angle)
 
@@ -184,6 +186,24 @@ class TestNormalizeYawRotation:
         norm_rotated = normalize_yaw_rotation(rotated)
 
         assert np.allclose(norm_orig, norm_rotated, atol=1e-5)
+
+    def test_reference_frames_larger_than_sequence_uses_all_frames(self):
+        """When reference_frames exceeds sequence length, all frames are used (no error)."""
+        from utils.data_utils import normalize_yaw_rotation
+
+        seq = np.random.RandomState(7).randn(3, 11).astype(np.float32)
+        # reference_frames=100 >> sequence length 3 — must not raise
+        result = normalize_yaw_rotation(seq, reference_frames=100)
+        assert result.shape == seq.shape
+
+    def test_single_reference_frame(self):
+        """A single rest frame is sufficient to estimate yaw without error."""
+        from utils.data_utils import normalize_yaw_rotation
+
+        seq = np.random.RandomState(99).randn(10, 11).astype(np.float32)
+        result = normalize_yaw_rotation(seq, reference_frames=1)
+        assert result.shape == seq.shape
+        assert result.dtype == np.float32
 
     def test_passthrough_when_sequence_has_too_few_features(self):
         from utils.data_utils import normalize_yaw_rotation

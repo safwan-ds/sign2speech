@@ -90,6 +90,12 @@ NORMALIZE_YAW_ROTATION = True
 # to cancel the user's facing direction before training and inference.  This makes
 # gesture recognition invariant to which way the user is facing.
 
+YAW_REFERENCE_FRAMES = 5
+# Number of leading frames used to estimate the facing-direction (yaw) reference.
+# These frames are captured before the gesture begins, when the hand is at rest,
+# so that only gravity projection — not dynamic motion — is used as the reference.
+# If the sequence is shorter than this value, all available frames are used.
+
 
 USE_WEIGHTED_LOSS = True
 USE_LABEL_SMOOTHING = True
