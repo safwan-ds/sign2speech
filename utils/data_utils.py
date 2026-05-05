@@ -22,6 +22,11 @@ from config import (
     MOTION_DETECTION_SMOOTHING_WINDOW,
     SEQUENCE_OVERLAP,
     MOTION_PADDING_RATIO,
+    NORMALIZE_YAW_ROTATION,
+    ACCEL_X_IDX,
+    ACCEL_Y_IDX,
+    GYRO_X_IDX,
+    GYRO_Y_IDX,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,6 +35,61 @@ logger = logging.getLogger(__name__)
 def convert_to_snake_case(label: str) -> str:
     """Convert gesture label to snake case (spaces to underscores)."""
     return label.replace(" ", "_")
+
+
+def normalize_yaw_rotation(
+    sequence: np.ndarray,
+    accel_x_idx: int = ACCEL_X_IDX,
+    accel_y_idx: int = ACCEL_Y_IDX,
+    gyro_x_idx: int = GYRO_X_IDX,
+    gyro_y_idx: int = GYRO_Y_IDX,
+) -> np.ndarray:
+    """
+    Remove the yaw (vertical-axis rotation) component from IMU data.
+
+    Estimates the user's facing direction from the mean horizontal acceleration
+    of the sequence and counter-rotates accelX/Y and gyroX/Y into a canonical
+    frame.  This makes gesture features invariant to which direction the user
+    is facing when performing a gesture.
+
+    Args:
+        sequence: numpy array of shape (n_samples, n_features)
+        accel_x_idx: Index of accelX in the feature vector
+        accel_y_idx: Index of accelY in the feature vector
+        gyro_x_idx: Index of gyroX in the feature vector
+        gyro_y_idx: Index of gyroY in the feature vector
+
+    Returns:
+        Yaw-normalized sequence of the same shape and dtype
+    """
+    n_features = sequence.shape[1]
+    if n_features <= max(accel_x_idx, accel_y_idx, gyro_x_idx, gyro_y_idx):
+        return sequence
+
+    # Compute the mean horizontal acceleration to estimate facing direction
+    mean_ax = np.mean(sequence[:, accel_x_idx])
+    mean_ay = np.mean(sequence[:, accel_y_idx])
+
+    # Counter-rotation angle that cancels out the mean yaw
+    yaw = np.arctan2(mean_ay, mean_ax)
+    cos_yaw = np.cos(-yaw)
+    sin_yaw = np.sin(-yaw)
+
+    result = sequence.copy()
+
+    # Rotate accelerometer XY
+    ax = sequence[:, accel_x_idx]
+    ay = sequence[:, accel_y_idx]
+    result[:, accel_x_idx] = cos_yaw * ax - sin_yaw * ay
+    result[:, accel_y_idx] = sin_yaw * ax + cos_yaw * ay
+
+    # Rotate gyroscope XY
+    gx = sequence[:, gyro_x_idx]
+    gy = sequence[:, gyro_y_idx]
+    result[:, gyro_x_idx] = cos_yaw * gx - sin_yaw * gy
+    result[:, gyro_y_idx] = sin_yaw * gx + cos_yaw * gy
+
+    return result.astype(np.float32)
 
 
 def normalize_value(name: str, value: float) -> float | None:
@@ -239,6 +299,10 @@ def segment_sequences(
         df = normalize_dataframe(df)
 
     sequence = extract_normalized_features(df)
+
+    # Apply yaw normalization to make features invariant to facing direction
+    if NORMALIZE_YAW_ROTATION:
+        sequence = normalize_yaw_rotation(sequence)
 
     if len(sequence) < sequence_length:
         logger.warning(f"Sequence too short ({len(sequence)} < {sequence_length})")
@@ -499,6 +563,11 @@ def segment_sequences_with_enhanced_features(
         df = normalize_dataframe(df)
 
     sequence = extract_normalized_features(df)
+
+    # Apply yaw normalization on base features before any feature engineering,
+    # so that derived features (velocity, rolling stats) are also yaw-invariant
+    if NORMALIZE_YAW_ROTATION:
+        sequence = normalize_yaw_rotation(sequence)
 
     # Add enhanced features if requested
     if use_enhanced_features:

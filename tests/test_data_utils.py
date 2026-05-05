@@ -134,6 +134,66 @@ class TestComputeRollingStatistics:
         assert np.allclose(stats["std"], 0.0)
 
 
+class TestNormalizeYawRotation:
+    def test_output_shape_unchanged(self):
+        from utils.data_utils import normalize_yaw_rotation
+
+        seq = np.random.randn(30, 11).astype(np.float32)
+        result = normalize_yaw_rotation(seq)
+        assert result.shape == seq.shape
+
+    def test_output_dtype_is_float32(self):
+        from utils.data_utils import normalize_yaw_rotation
+
+        seq = np.random.randn(30, 11).astype(np.float64)
+        result = normalize_yaw_rotation(seq)
+        assert result.dtype == np.float32
+
+    def test_flex_sensors_unchanged(self):
+        from utils.data_utils import normalize_yaw_rotation
+
+        rng = np.random.RandomState(0)
+        seq = rng.randn(30, 11).astype(np.float32)
+        result = normalize_yaw_rotation(seq)
+        # Flex sensors (indices 0–4) and accelZ/gyroZ (indices 7, 10) must not change
+        assert np.allclose(result[:, :5], seq[:, :5])
+        assert np.allclose(result[:, 7], seq[:, 7])   # accelZ
+        assert np.allclose(result[:, 10], seq[:, 10])  # gyroZ
+
+    def test_yaw_invariance(self):
+        """Same gesture at two different yaw angles must produce the same output."""
+        from utils.data_utils import normalize_yaw_rotation
+
+        rng = np.random.RandomState(42)
+        seq = rng.randn(30, 11).astype(np.float32)
+
+        # Rotate accelX/Y and gyroX/Y by 90 degrees (pi/2) to simulate
+        # the user facing a different direction
+        angle = np.pi / 2
+        cos_a, sin_a = np.cos(angle), np.sin(angle)
+
+        rotated = seq.copy()
+        ax, ay = seq[:, 5].copy(), seq[:, 6].copy()
+        rotated[:, 5] = cos_a * ax - sin_a * ay
+        rotated[:, 6] = sin_a * ax + cos_a * ay
+        gx, gy = seq[:, 8].copy(), seq[:, 9].copy()
+        rotated[:, 8] = cos_a * gx - sin_a * gy
+        rotated[:, 9] = sin_a * gx + cos_a * gy
+
+        norm_orig = normalize_yaw_rotation(seq)
+        norm_rotated = normalize_yaw_rotation(rotated)
+
+        assert np.allclose(norm_orig, norm_rotated, atol=1e-5)
+
+    def test_passthrough_when_sequence_has_too_few_features(self):
+        from utils.data_utils import normalize_yaw_rotation
+
+        # Feature vector too short to contain all IMU indices — returned as-is
+        seq = np.ones((10, 3), dtype=np.float32)
+        result = normalize_yaw_rotation(seq)
+        assert np.array_equal(result, seq)
+
+
 class TestConvertToSnakeCase:
     def test_spaces_become_underscores(self):
         from utils.data_utils import convert_to_snake_case

@@ -45,6 +45,9 @@ training:
       - time_shifting
       - rotation
 
+  preprocessing:
+    normalize_yaw_rotation: true
+
   regularization:
     use_weighted_loss: true
     use_label_smoothing: true

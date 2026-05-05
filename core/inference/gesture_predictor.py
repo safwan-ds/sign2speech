@@ -24,12 +24,14 @@ from config import (
     ROLLING_WINDOW_SIZE,
     USE_ENSEMBLE,
     ENSEMBLE_SIZE,
+    NORMALIZE_YAW_ROTATION,
 )
 from utils.data_utils import (
     normalize_value,
     compute_velocity,
     compute_acceleration,
     compute_rolling_statistics,
+    normalize_yaw_rotation,
 )
 from core.models.lstm_model import build_lstm_model
 
@@ -97,6 +99,7 @@ class LSTMGesturePredictor:
         self.include_rolling_stats = INCLUDE_ROLLING_STATS
         self.rolling_window_size = ROLLING_WINDOW_SIZE
         self.use_ensemble = USE_ENSEMBLE
+        self.normalize_yaw = NORMALIZE_YAW_ROTATION
 
         self.norm_mean = None
         self.norm_std = None
@@ -330,6 +333,11 @@ class LSTMGesturePredictor:
             return None, None, None, None
 
         sequence = np.array(list(self.buffer), dtype=np.float32)
+
+        # Apply yaw normalization on base features so the model is invariant
+        # to the user's facing direction (vertical-axis / yaw rotation)
+        if self.normalize_yaw:
+            sequence = normalize_yaw_rotation(sequence)
 
         if self.use_enhanced_features and (
             self.include_velocity

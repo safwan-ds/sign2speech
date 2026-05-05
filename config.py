@@ -85,6 +85,11 @@ INCLUDE_ACCELERATION = True
 INCLUDE_ROLLING_STATS = True
 ROLLING_WINDOW_SIZE = 5
 
+NORMALIZE_YAW_ROTATION = True
+# When True, each sequence is rotated in the horizontal (accelX/Y, gyroX/Y) plane
+# to cancel the user's facing direction before training and inference.  This makes
+# gesture recognition invariant to which way the user is facing.
+
 
 USE_WEIGHTED_LOSS = True
 USE_LABEL_SMOOTHING = True
