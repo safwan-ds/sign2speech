@@ -1,4 +1,4 @@
-# Sign Language Glove - Real-time Gesture Recognition
+# Sign2Speech - Real-time Gesture Recognition
 
 A production-grade system for real-time sign language gesture recognition using a smart glove with flex sensors and IMU data. Leverages deep learning (LSTM with attention) and optional LLM refinement for accurate, context-aware translation.
 
