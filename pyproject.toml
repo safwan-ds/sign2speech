@@ -8,24 +8,25 @@ version = "0.1.0"
 description = "Sign2Speech - Real-time gesture recognition with LSTM and attention"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "scikit-learn",
-    "torch",
-    "matplotlib",
-    "seaborn",
-    "pyserial",
-    "keyboard",
-    "PySide6",
-    "QT-PyQt-PySide-Custom-Widgets",
-    "llama-cpp-python",
-    "edge-tts",
-    "pyttsx3",
+    "numpy>=2.4,<3",
+    "pandas>=3.0,<4",
+    "scipy>=1.17,<2",
+    "scikit-learn>=1.8,<2",
+    "torch==2.11.0",
+    "torchvision>=0.16,<1",
+    "matplotlib>=3.10,<4",
+    "seaborn>=0.13,<1",
+    "pyserial>=3.5,<4",
+    "keyboard>=0.13,<1",
+    "PySide6>=6.11,<7",
+    "QT-PyQt-PySide-Custom-Widgets>=2.1,<3",
+    "llama-cpp-python>=0.3,<0.4",
+    "edge-tts>=7.2,<8",
+    "pyttsx3>=2.99,<3",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "torchviz"]
+dev = ["pytest>=8,<9", "torchviz"]
 
 [project.scripts]
 sign-glove-gui = "main:main"

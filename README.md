@@ -1,21 +1,24 @@
 # Sign2Speech - Real-time Gesture Recognition
 
-A production-grade system for real-time sign language gesture recognition using a smart glove with flex sensors and IMU data. Leverages deep learning (LSTM with attention) and optional LLM refinement for accurate, context-aware translation.
+A production-grade system for real-time sign language gesture recognition using a smart glove with flex sensors and IMU
+data. Leverages deep learning (LSTM with attention) and optional LLM refinement for accurate, context-aware translation.
 
 ## Features
 
 - **Real-time Gesture Recognition**: 11+ gestures (REST, hello, goodbye, numbers, etc.) via LSTM-based inference
-- **Smart Glove Hardware**: 5 flex sensors + IMU (accelerometer/gyroscope) data streaming over serial
+- **Smart Glove Hardware**: five flex sensors + IMU (accelerometer/gyroscope) data streaming over serial
 - **Advanced ML Pipeline**:
-  - LSTM with bidirectional, attention, and batch normalization layers
-  - Data augmentation (time warping, magnitude warping, noise injection)
-  - Weighted loss and label smoothing for imbalanced classes
-  - Cosine annealing + learning rate plateau scheduling
-  - Ensemble training support
-- **Production GUI (PySide6)**: Non-blocking threaded pipeline with real-time prediction cards, confidence bars, and sentence assembly
+    - LSTM with bidirectional, attention, and batch normalization layers
+    - Data augmentation (time warping, magnitude warping, noise injection)
+    - Weighted loss and label smoothing for imbalanced classes
+    - Cosine annealing and learning rate plateau scheduling
+    - Ensemble training support
+- **Production GUI (PySide6)**: Non-blocking threaded pipeline with real-time prediction cards, confidence bars, and
+  sentence assembly
 - **QtGraphs Trace Previews**: Dataset manager trace panels use PySide6 QtGraphs with automatic matplotlib fallback
 - **Startup Quality-of-Life**: Automatically loads `models/latest` on launch
-- **Smart Port UX**: Lists all serial ports, auto-selects CH340 when available, and validates input stream with startup timeout
+- **Smart Port UX**: Lists all serial ports, auto-selects CH340 when available, and validates input stream with startup
+  timeout
 - **Optional LLM Refinement**: QWEN 2.5 model integration for contextual sentence generation
 - **Comprehensive Logging**: Structured logs with levels, file rotation, and GUI log viewer
 - **Model Management**: Multiple model versions, easy model selection, automatic metadata tracking
@@ -50,6 +53,8 @@ sign_language_glove/
 
 ### Installation
 
+**Requirements:** Python 3.11 or 3.12
+
 ```bash
 # Clone repository
 cd sign_language_glove
@@ -57,28 +62,42 @@ cd sign_language_glove
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+```
 
-# Install dependencies
-pip install -r requirements.txt
+**GPU Support (CUDA 12.6, recommended):**
 
-# Or use pyproject.toml
+```bash
+pip install -e . --extra-index-url https://download.pytorch.org/whl/cu126
+```
+
+**CPU-only (fallback):**
+
+```bash
 pip install -e .
+```
+
+**Development (includes pytest, torchviz):**
+
+```bash
+pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cu126
+```
+
+**Reproducible install (from lock file):**
+
+```bash
+pip install -r requirements.txt
 ```
 
 ### Running the GUI
 
 ```bash
 python main.py
-# or using the installed script
-sign-glove-gui
 ```
 
 ### Running the Dataset Manager GUI
 
 ```bash
 python data_manager_gui.py
-# or using the installed script
-sign-glove-manager
 ```
 
 This manager GUI is focused on data lifecycle tasks:
@@ -96,9 +115,9 @@ This manager GUI is focused on data lifecycle tasks:
 
 **Startup Behavior:**
 
-- GUI auto-loads the latest model from `models/latest`
+- GUI autoloads the latest model from `models/latest`
 - Port list shows device names and one COM identifier (example: `USB-SERIAL CH340 (COM9)`)
-- If a selected port does not send valid glove data after start, stream auto-stops with a warning
+- If a selected port does not send valid glove data after start, the stream auto-stops with a warning
 
 ### Training a Model
 
@@ -165,7 +184,8 @@ All configuration is centralized in `config.py` and can be overridden via enviro
 
 **Evaluation Plot Backend:**
 
-- `EVALUATION_PLOT_BACKEND`: Plot backend for evaluation exports (`matplotlib` default, `qtgraphs` experimental and requires an active Qt app)
+- `EVALUATION_PLOT_BACKEND`: Plot backend for evaluation exports (`matplotlib` default, `qtgraphs` experimental and
+  requires an active Qt app)
 
 See [config.py](config.py) for all ~100 configurable parameters.
 
@@ -192,20 +212,23 @@ Stored as `.npz` files (NumPy compressed):
 
 ```python
 import numpy as np
+
 data = np.load('data/processed/sequences_hello.npz')
 sequences = data['sequences']  # Shape: (num_samples, 30, 11)
-labels = data['labels']        # Shape: (num_samples,)
+labels = data['labels']  # Shape: (num_samples,)
 ```
 
 ### Recording Protocol
 
-New recordings keep the sensor CSV numeric-only. Any capture metadata such as orientation is written to a sidecar `.meta.json` file with the same sample stem, so tensor preparation stays compatible with NumPy and PyTorch.
+New recordings keep the sensor CSV numeric-only. Any capture metadata such as orientation is written to a sidecar
+`.meta.json` file with the same sample stem, so tensor preparation stays compatible with NumPy and PyTorch.
 
-See [docs/data_collection_protocol.md](docs/data_collection_protocol.md) for the capture rules used by the unified LSTM pipeline.
+See [docs/data_collection_protocol.md](docs/data_collection_protocol.md) for the capture rules used by the unified LSTM
+pipeline.
 
 ## Testing
 
-Run pytest from project root:
+Run pytest from the project root:
 
 ```bash
 pytest tests/
@@ -241,17 +264,15 @@ Serial Stream (glove hardware)
 
 ### GUI Architecture
 
-- **Non-blocking I/O**: Separate thread for serial + model inference
+- **Non-blocking I/O**: Separate thread for serial and model inference
 - **Queue-based communication**: Thread-safe data passing
 - **Qt timers + queue polling**: Responsive UI updates
 - **Log streaming**: Real-time log viewer with file rotation
 
 ## 🔧 Development Workflow
 
-1. **Branch naming**: `feature/xyz`, `fix/xyz`, `docs/xyz`
-2. **Testing**: Write tests before committing to `main`
-3. **Commits**: Use conventional format (`feat:`, `fix:`, `docs:`, `chore:`)
-4. **Config changes**: Update `config.py` and `.env.example` together
+1. **Testing**: Write tests before committing to `main`
+2. **Config changes**: Update `config.py` and `.env.example` together
 
 ## License
 
@@ -260,7 +281,3 @@ This project is licensed under the MIT License.
 ## Contributors
 
 - Safwan (Creator)
-
-## Support
-
-For issues, questions, or feature requests, open a GitHub issue.
