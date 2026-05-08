@@ -22,6 +22,47 @@ class _FakeSerialService:
         return None
 
 
+def test_recording_uses_repeated_zero_warning_threshold(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeMonitor:
+        def __init__(
+            self,
+            logger,
+            *,
+            min_consecutive_samples: int = 0,
+            min_interval_seconds: float = 0.0,
+            emit=None,
+        ) -> None:
+            captured["min_consecutive_samples"] = min_consecutive_samples
+            captured["emit"] = emit
+
+        def check(self, sensor_row):
+            return ()
+
+    monkeypatch.setattr(
+        "gui.services.recording_service.FlexZeroWarningMonitor",
+        _FakeMonitor,
+    )
+    monkeypatch.setattr(
+        "gui.services.recording_service.select_serial_port",
+        lambda preferred_port: "COM11",
+    )
+
+    event_queue: Queue[dict] = Queue()
+    serial_service = _FakeSerialService()
+    service = RecordingService(
+        logger=logging.getLogger("test.recording.monitor"),
+        event_queue=event_queue,
+        serial_service=serial_service,
+    )
+    service._stop_event.set()
+
+    service._run(RecordingConfig(gesture_label="HELLO"))
+
+    assert captured["min_consecutive_samples"] == 2
+
+
 def test_recording_prefers_selected_port(monkeypatch) -> None:
     preferred: list[str | None] = []
 

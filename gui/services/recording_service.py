@@ -17,7 +17,7 @@ from utils.recording_utils import (
     save_recording_metadata,
     save_rows_to_csv,
 )
-from utils.serial_utils import select_serial_port
+from utils.serial_utils import FlexZeroWarningMonitor, select_serial_port
 
 
 @dataclass(slots=True)
@@ -75,6 +75,13 @@ class RecordingService:
         selected_port: str | None = None
         rows: list[dict[str, float | int]] = []
         started_at = time.perf_counter()
+        flex_zero_monitor = FlexZeroWarningMonitor(
+            self._logger,
+            min_consecutive_samples=2,
+            emit=lambda message: self._event_queue.put(
+                {"type": "record_warning", "message": message}
+            ),
+        )
         try:
             preferred_port = config.port.strip() if isinstance(config.port, str) else ""
             selected_port = select_serial_port(preferred_port or COM_PORT)
@@ -110,6 +117,8 @@ class RecordingService:
 
                 if sensor_row is None:
                     continue
+
+                flex_zero_monitor.check(sensor_row)
 
                 elapsed = time.perf_counter() - started_at
                 elapsed_ms = int(elapsed * 1000)

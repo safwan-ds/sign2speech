@@ -652,6 +652,12 @@ class DataManagerWindow(QMainWindow):
                 self.recording_status_label.setText("Recording status: error")
                 continue
 
+            if event_type == "record_warning":
+                message = str(event.get("message", "")).strip()
+                if message:
+                    self._set_status(message, "WARNING")
+                continue
+
             if event_type == "record_ready_for_review":
                 gesture = str(event.get("gesture", ""))
                 orientation = str(event.get("orientation", "unspecified"))

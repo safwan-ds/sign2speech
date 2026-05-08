@@ -18,6 +18,7 @@ from core.inference.gesture_translations import (
 from gui.services.serial_service import SerialService, SerialSettings
 from gui.utils.formatting import now_hms
 from gui.utils.smoothing import PredictionSmoother, SentenceAssembler
+from utils.serial_utils import FlexZeroWarningMonitor
 
 if TYPE_CHECKING:
     from gui.services.model_service import ModelService
@@ -90,6 +91,13 @@ class StreamWorker(threading.Thread):
         self._sentence = SentenceAssembler()
         self._translations = load_gesture_translations()
         self._lock_state = GestureLockState()
+        self._flex_zero_monitor = FlexZeroWarningMonitor(
+            logger,
+            min_consecutive_samples=2,
+            emit=lambda message: self._event_queue.put(
+                {"type": "warning", "message": message}
+            ),
+        )
 
     def stop(self) -> None:
         """Request worker shutdown."""
@@ -127,6 +135,8 @@ class StreamWorker(threading.Thread):
                 sensor = self._serial_service.read_sensor_row(timeout=0.2)
                 if sensor is None:
                     continue
+
+                self._flex_zero_monitor.check(sensor)
 
                 if not stream_input_emitted:
                     self._event_queue.put(

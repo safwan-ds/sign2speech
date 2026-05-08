@@ -234,6 +234,10 @@ class AppWindowEventMixin:
                         self.model_load_progress.setVisible(False)
                         self._refresh_action_states()
                     self._append_log("ERROR", message, source="ui")
+                elif event_type == "warning":
+                    message = str(event.get("message", "")).strip()
+                    if message:
+                        self._set_status(message, "WARNING")
                 elif event_type == "log":
                     self._append_log(
                         str(event.get("level", "INFO")),

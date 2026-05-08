@@ -2,12 +2,105 @@
 
 from __future__ import annotations
 
+import logging
 import time
+from collections.abc import Callable, Mapping
 
 import serial
 import serial.tools.list_ports
 
 from config import BAUD_RATE, EXPECTED_SENSOR_COUNT
+
+FLEX_SENSOR_NAMES = ("flex0", "flex1", "flex2", "flex3", "flex4")
+SENSOR_NAMES = (
+    *FLEX_SENSOR_NAMES,
+    "accelX",
+    "accelY",
+    "accelZ",
+    "gyroX",
+    "gyroY",
+    "gyroZ",
+)
+
+
+def flex_zero_sensors(sensor_row: Mapping[str, float]) -> tuple[str, ...]:
+    """Return flex sensor names whose current reading is exactly zero."""
+    return tuple(
+        name for name in FLEX_SENSOR_NAMES if float(sensor_row.get(name, -1.0)) == 0.0
+    )
+
+
+def build_flex_zero_warning(zero_sensors: tuple[str, ...]) -> str:
+    """Build a concise operator warning for zero-valued flex sensors."""
+    if len(zero_sensors) == 1:
+        return (
+            f"Warning: {zero_sensors[0]} is reading 0. "
+            "Check the flex sensor connection or calibration."
+        )
+    sensors = ", ".join(zero_sensors)
+    return (
+        f"Warning: flex sensors {sensors} are reading 0. "
+        "Check the flex sensor connections or calibration."
+    )
+
+
+class FlexZeroWarningMonitor:
+    """Warn when flex sensors stay at zero without flooding high-rate streams."""
+
+    def __init__(
+        self,
+        logger: logging.Logger | None = None,
+        *,
+        min_consecutive_samples: int = 2,
+        min_interval_seconds: float = 5.0,
+        emit: Callable[[str], None] | None = None,
+    ) -> None:
+        if min_consecutive_samples < 1:
+            raise ValueError("min_consecutive_samples must be at least 1")
+        self._logger = logger
+        self._min_consecutive_samples = min_consecutive_samples
+        self._min_interval_seconds = min_interval_seconds
+        self._emit = emit
+        self._last_warning_at: float | None = None
+        self._zero_streak_counts = {name: 0 for name in FLEX_SENSOR_NAMES}
+
+    def check(self, sensor_row: Mapping[str, float]) -> tuple[str, ...]:
+        """Inspect one row and emit a throttled warning after repeated zero readings."""
+        zero_sensors = flex_zero_sensors(sensor_row)
+        if not zero_sensors:
+            for name in FLEX_SENSOR_NAMES:
+                self._zero_streak_counts[name] = 0
+            return ()
+
+        zero_sensor_set = set(zero_sensors)
+        for name in FLEX_SENSOR_NAMES:
+            if name in zero_sensor_set:
+                self._zero_streak_counts[name] += 1
+            else:
+                self._zero_streak_counts[name] = 0
+
+        persistent_zero_sensors = tuple(
+            name
+            for name in zero_sensors
+            if self._zero_streak_counts[name] >= self._min_consecutive_samples
+        )
+        now = time.monotonic()
+        should_warn = (
+            bool(persistent_zero_sensors)
+            and (
+                self._last_warning_at is None
+                or now - self._last_warning_at >= self._min_interval_seconds
+            )
+        )
+        if should_warn:
+            message = build_flex_zero_warning(zero_sensors)
+            if self._logger is not None:
+                self._logger.warning(message)
+            if self._emit is not None:
+                self._emit(message)
+            self._last_warning_at = now
+
+        return zero_sensors
 
 
 def parse_sensor_data(line: str) -> dict[str, float] | None:
@@ -25,21 +118,8 @@ def parse_sensor_data(line: str) -> dict[str, float] | None:
         try:
             values = line[1:].split(",")
             if len(values) == EXPECTED_SENSOR_COUNT:
-                sensor_names = [
-                    "flex0",
-                    "flex1",
-                    "flex2",
-                    "flex3",
-                    "flex4",
-                    "accelX",
-                    "accelY",
-                    "accelZ",
-                    "gyroX",
-                    "gyroY",
-                    "gyroZ",
-                ]
                 return {
-                    name: float(val.strip()) for name, val in zip(sensor_names, values)
+                    name: float(val.strip()) for name, val in zip(SENSOR_NAMES, values)
                 }
         except (ValueError, IndexError):
             pass

@@ -19,7 +19,11 @@ from config import (
     setup_logging,
 )
 
-from utils.serial_utils import parse_sensor_data, select_serial_port
+from utils.serial_utils import (
+    FlexZeroWarningMonitor,
+    parse_sensor_data,
+    select_serial_port,
+)
 from utils.plotting import plot_recording
 from utils.recording_utils import (
     SENSOR_COLUMNS,
@@ -141,6 +145,7 @@ def main():
     filename = None
     csv_file = None
     csv_writer = None
+    flex_zero_monitor = FlexZeroWarningMonitor(logger)
 
     gesture_dir = os.path.join(LOGS_DIR, gesture_label)
     try:
@@ -209,6 +214,7 @@ def main():
                     sensor_dict = parse_sensor_data(line)
 
                     if sensor_dict:
+                        flex_zero_monitor.check(sensor_dict)
                         if (
                             is_recording
                             and csv_writer

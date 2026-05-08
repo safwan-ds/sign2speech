@@ -29,6 +29,7 @@ from utils.data_utils import (
     segment_sequences_with_enhanced_features,
 )
 from utils.recording_utils import SENSOR_COLUMNS
+from utils.serial_utils import FLEX_SENSOR_NAMES, build_flex_zero_warning
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,16 @@ def load_log_file(filepath: str) -> pd.DataFrame | None:
         if numeric_df.empty:
             logger.error(f"Error loading {filepath}: no valid numeric sensor rows")
             return None
+
+        zero_sensors = tuple(
+            name for name in FLEX_SENSOR_NAMES if (numeric_df[name] == 0.0).any()
+        )
+        if zero_sensors:
+            logger.warning(
+                "%s in %s",
+                build_flex_zero_warning(zero_sensors),
+                os.path.basename(filepath),
+            )
 
         logger.info(f"Loaded: {os.path.basename(filepath)} ({len(numeric_df)} samples)")
         return numeric_df

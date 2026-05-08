@@ -29,7 +29,7 @@ from config import (
     MIN_GESTURES_FOR_LLM,
     setup_logging,
 )
-from utils.serial_utils import parse_sensor_data
+from utils.serial_utils import FlexZeroWarningMonitor, parse_sensor_data
 from core.inference.gesture_predictor import (
     LSTMGesturePredictor,
     MODEL_PATH,
@@ -186,6 +186,7 @@ def main():
     prediction_history: deque = deque(maxlen=PREDICTION_CONSENSUS_FRAMES)
     consecutive_rest_frames = 0
     llm_busy = False  # Guard against overlapping LLM calls
+    flex_zero_monitor = FlexZeroWarningMonitor(logger)
 
     try:
         while True:
@@ -204,6 +205,7 @@ def main():
                 continue
 
             if sensor_dict:  # Got complete reading in one line
+                flex_zero_monitor.check(sensor_dict)
                 # Calculate motion magnitude
                 motion = calculate_motion_magnitude(sensor_dict)
                 motion_samples.append(motion)

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from utils.serial_utils import parse_sensor_data
+from utils.serial_utils import (
+    FlexZeroWarningMonitor,
+    build_flex_zero_warning,
+    flex_zero_sensors,
+    parse_sensor_data,
+)
 
 
 class TestParseSensorData:
@@ -79,3 +84,82 @@ class TestParseSensorData:
         result = parse_sensor_data(line)
         assert result is not None
         assert result["flex0"] == pytest.approx(100.0)
+
+
+def test_flex_zero_sensors_returns_only_zero_flex_values() -> None:
+    row = {
+        "flex0": 0.0,
+        "flex1": 110.0,
+        "flex2": 0,
+        "flex3": 130.0,
+        "flex4": 140.0,
+        "accelX": 0.0,
+    }
+
+    assert flex_zero_sensors(row) == ("flex0", "flex2")
+
+
+def test_build_flex_zero_warning_mentions_sensor_and_connection() -> None:
+    warning = build_flex_zero_warning(("flex1",))
+
+    assert "flex1 is reading 0" in warning
+    assert "connection or calibration" in warning
+
+
+def test_flex_zero_warning_monitor_ignores_the_first_zero_sample() -> None:
+    messages: list[str] = []
+    monitor = FlexZeroWarningMonitor(
+        min_consecutive_samples=2,
+        min_interval_seconds=60.0,
+        emit=messages.append,
+    )
+    row = {"flex0": 0.0}
+
+    assert monitor.check(row) == ("flex0",)
+
+    assert messages == []
+
+
+def test_flex_zero_warning_monitor_warns_after_two_consecutive_zero_samples() -> None:
+    messages: list[str] = []
+    monitor = FlexZeroWarningMonitor(
+        min_consecutive_samples=2,
+        min_interval_seconds=60.0,
+        emit=messages.append,
+    )
+
+    monitor.check({"flex0": 0.0})
+    monitor.check({"flex0": 0.0, "flex2": 0.0})
+
+    assert len(messages) == 1
+    assert "flex0, flex2" in messages[0]
+
+
+def test_flex_zero_warning_monitor_does_not_mix_sensor_streaks() -> None:
+    messages: list[str] = []
+    monitor = FlexZeroWarningMonitor(
+        min_consecutive_samples=2,
+        min_interval_seconds=60.0,
+        emit=messages.append,
+    )
+
+    monitor.check({"flex0": 0.0})
+    monitor.check({"flex2": 0.0})
+
+    assert messages == []
+
+
+def test_flex_zero_warning_monitor_resets_after_recovery() -> None:
+    messages: list[str] = []
+    monitor = FlexZeroWarningMonitor(
+        min_consecutive_samples=2,
+        min_interval_seconds=60.0,
+        emit=messages.append,
+    )
+
+    monitor.check({"flex0": 0.0})
+    monitor.check({"flex0": 100.0})
+    monitor.check({"flex0": 0.0})
+    monitor.check({"flex0": 0.0})
+
+    assert len(messages) == 1
