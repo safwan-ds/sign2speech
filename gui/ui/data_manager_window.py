@@ -7,10 +7,10 @@ import queue
 import re
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QKeySequence
+from PySide6.QtGui import QAction, QBrush, QKeySequence, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,

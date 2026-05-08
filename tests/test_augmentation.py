@@ -1,7 +1,6 @@
 """Unit tests for augmentation module"""
 
 import numpy as np
-import pytest
 
 from utils.augmentation import TimeSeriesAugmenter, create_augmented_dataset
 

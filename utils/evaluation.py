@@ -3,8 +3,8 @@ Enhanced evaluation utilities for model performance analysis
 Includes ROC curves, visualization, and detailed metrics
 """
 
-import numpy as np
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
@@ -27,8 +27,6 @@ from pathlib import Path
 from config import (
     EVALUATION_CLASS_WEIGHT_EPSILON,
     EVALUATION_DPI,
-    CONFUSION_MATRIX_FIGSIZE,
-    ROC_CURVE_FIGSIZE,
 )
 
 logger = logging.getLogger(__name__)

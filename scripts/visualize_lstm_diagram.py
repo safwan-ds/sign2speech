@@ -3,9 +3,10 @@ Generate a PDF architecture diagram for the project's LSTM model using torchviz.
 """
 
 import argparse
+import logging
 import os
 import sys
-import logging
+
 import numpy as np
 import torch
 from torchviz import make_dot

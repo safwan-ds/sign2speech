@@ -6,10 +6,7 @@ import csv
 import json
 from pathlib import Path
 
-import pytest
-
 from utils.recording_utils import (
-    SENSOR_COLUMNS,
     CSV_COLUMNS,
     sanitize_gesture_label,
     gesture_output_dir,
