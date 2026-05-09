@@ -8,9 +8,10 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QPointF, QUrl
+from PySide6.QtCore import QPointF, Qt, QUrl
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
 from gui.ui.theme_manager import get_plot_palette
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ class TracePreviewWidget(QWidget):
             self._backend.set_plot_palette(self._plot_palette)  # type: ignore[attr-defined]
 
     def plot_rows(self, rows: list[dict[str, float | int]]) -> None:
-        """Render trace preview from a list of row dictionaries."""
+        """Render a trace preview from a list of row dictionaries."""
         if not rows:
             self.clear_plot()
             return
@@ -203,6 +204,13 @@ class _QtGraphsLinePanel(QWidget):
         self._title_label = QLabel(title)
         self._title_label.setObjectName("tracePanelTitle")
         layout.addWidget(self._title_label)
+
+        # Legend label showing series color swatches and names
+        self._legend_label = QLabel()
+        self._legend_label.setObjectName("tracePanelLegend")
+        self._legend_label.setWordWrap(True)
+        self._legend_label.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(self._legend_label)
 
         self._quick_widget = QQuickWidget(self)
         self._quick_widget.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -321,6 +329,16 @@ GraphsView {{
             series = self._series_map[key]
             series.setColor(QColor(line_colors[idx % len(line_colors)]))
             series.setWidth(1.6)
+
+        # Build a robust rich-text legend using colored bullets and series names.
+        legend_parts: list[str] = []
+        for idx, key in enumerate(self._series_keys):
+            color = line_colors[idx % len(line_colors)]
+            legend_parts.append(
+                f'<span style="color:{color}; font-weight:700;">●</span> {key}'
+            )
+        self._legend_label.setText("   ".join(legend_parts))
+        self._legend_label.setStyleSheet(f"color: {self._plot_palette['text']};")
 
     def plot_dataframe(self, frame: pd.DataFrame) -> None:
         if frame.empty:
@@ -451,9 +469,19 @@ class _MatplotlibTracePreview(QWidget):
                     dtype=float
                 )
                 ax1.plot(
-                    values, linewidth=1.4, color=line_colors[idx % len(line_colors)]
+                    values,
+                    linewidth=1.4,
+                    color=line_colors[idx % len(line_colors)],
+                    label=col,
                 )
         ax1.set_title("Flex Sensors", color=self._plot_palette["text"])
+        handles, labels = ax1.get_legend_handles_labels()
+        if handles:
+            leg = ax1.legend(loc="upper right", fontsize=8)
+            leg.get_frame().set_facecolor(self._plot_palette["axes_bg"])
+            leg.get_frame().set_edgecolor(self._plot_palette["spine"])
+            for text in leg.get_texts():
+                text.set_color(self._plot_palette["text"])
 
         for idx, col in enumerate(ACCEL_AXES):
             if col in frame.columns:
@@ -461,9 +489,19 @@ class _MatplotlibTracePreview(QWidget):
                     dtype=float
                 )
                 ax2.plot(
-                    values, linewidth=1.4, color=line_colors[idx % len(line_colors)]
+                    values,
+                    linewidth=1.4,
+                    color=line_colors[idx % len(line_colors)],
+                    label=col,
                 )
         ax2.set_title("Accelerometer", color=self._plot_palette["text"])
+        handles, labels = ax2.get_legend_handles_labels()
+        if handles:
+            leg = ax2.legend(loc="upper right", fontsize=8)
+            leg.get_frame().set_facecolor(self._plot_palette["axes_bg"])
+            leg.get_frame().set_edgecolor(self._plot_palette["spine"])
+            for text in leg.get_texts():
+                text.set_color(self._plot_palette["text"])
 
         for idx, col in enumerate(GYRO_AXES):
             if col in frame.columns:
@@ -471,9 +509,19 @@ class _MatplotlibTracePreview(QWidget):
                     dtype=float
                 )
                 ax3.plot(
-                    values, linewidth=1.4, color=line_colors[idx % len(line_colors)]
+                    values,
+                    linewidth=1.4,
+                    color=line_colors[idx % len(line_colors)],
+                    label=col,
                 )
         ax3.set_title("Gyroscope", color=self._plot_palette["text"])
+        handles, labels = ax3.get_legend_handles_labels()
+        if handles:
+            leg = ax3.legend(loc="upper right", fontsize=8)
+            leg.get_frame().set_facecolor(self._plot_palette["axes_bg"])
+            leg.get_frame().set_edgecolor(self._plot_palette["spine"])
+            for text in leg.get_texts():
+                text.set_color(self._plot_palette["text"])
 
         self._figure.tight_layout()
         self._canvas.draw_idle()

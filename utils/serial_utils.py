@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from collections.abc import Callable, Mapping
 
@@ -21,6 +22,46 @@ SENSOR_NAMES = (
     "gyroY",
     "gyroZ",
 )
+
+try:
+    import winsound
+except ImportError:  # pragma: no cover - non-Windows fallback
+    winsound = None
+
+
+class ContinuousWarningBeeper:
+    """Play a continuous warning beep while active."""
+
+    def __init__(self, *, frequency_hz: int = 1200, beep_ms: int = 250) -> None:
+        self._frequency_hz = frequency_hz
+        self._beep_ms = beep_ms
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+
+    def start(self) -> None:
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._stop_event.clear()
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+
+    def stop(self) -> None:
+        thread: threading.Thread | None = None
+        with self._lock:
+            self._stop_event.set()
+            thread = self._thread
+            self._thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=(self._beep_ms / 1000.0) + 0.3)
+
+    def _run(self) -> None:
+        while not self._stop_event.is_set():
+            if winsound is not None:
+                winsound.Beep(self._frequency_hz, self._beep_ms)
+            else:
+                self._stop_event.wait(self._beep_ms / 1000.0)
 
 
 def flex_zero_sensors(sensor_row: Mapping[str, float]) -> tuple[str, ...]:

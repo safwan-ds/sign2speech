@@ -17,7 +17,11 @@ from utils.recording_utils import (
     save_recording_metadata,
     save_rows_to_csv,
 )
-from utils.serial_utils import FlexZeroWarningMonitor, select_serial_port
+from utils.serial_utils import (
+    ContinuousWarningBeeper,
+    FlexZeroWarningMonitor,
+    select_serial_port,
+)
 
 
 @dataclass(slots=True)
@@ -75,6 +79,7 @@ class RecordingService:
         selected_port: str | None = None
         rows: list[dict[str, float | int]] = []
         started_at = time.perf_counter()
+        warning_beeper = ContinuousWarningBeeper()
         flex_zero_monitor = FlexZeroWarningMonitor(
             self._logger,
             min_consecutive_samples=2,
@@ -118,7 +123,11 @@ class RecordingService:
                 if sensor_row is None:
                     continue
 
-                flex_zero_monitor.check(sensor_row)
+                zero_sensors = flex_zero_monitor.check(sensor_row)
+                if zero_sensors:
+                    warning_beeper.start()
+                else:
+                    warning_beeper.stop()
 
                 elapsed = time.perf_counter() - started_at
                 elapsed_ms = int(elapsed * 1000)
@@ -151,6 +160,7 @@ class RecordingService:
             self._logger.exception("[record] Recording failed: %s", exc)
             self._event_queue.put({"type": "record_error", "message": str(exc)})
         finally:
+            warning_beeper.stop()
             with self._lock:
                 self._thread = None
 

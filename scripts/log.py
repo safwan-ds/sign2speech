@@ -20,6 +20,7 @@ from config import (
 )
 
 from utils.serial_utils import (
+    ContinuousWarningBeeper,
     FlexZeroWarningMonitor,
     parse_sensor_data,
     select_serial_port,
@@ -145,6 +146,7 @@ def main():
     filename = None
     csv_file = None
     csv_writer = None
+    warning_beeper = ContinuousWarningBeeper()
     flex_zero_monitor = FlexZeroWarningMonitor(logger)
 
     gesture_dir = os.path.join(LOGS_DIR, gesture_label)
@@ -214,7 +216,11 @@ def main():
                     sensor_dict = parse_sensor_data(line)
 
                     if sensor_dict:
-                        flex_zero_monitor.check(sensor_dict)
+                        zero_sensors = flex_zero_monitor.check(sensor_dict)
+                        if zero_sensors:
+                            warning_beeper.start()
+                        else:
+                            warning_beeper.stop()
                         if (
                             is_recording
                             and csv_writer
@@ -233,6 +239,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        warning_beeper.stop()
         if csv_file:
             csv_file.close()
         ser.close()

@@ -16,6 +16,7 @@ from utils.serial_utils import (
     select_serial_port,
     connect_serial,
     FlexZeroWarningMonitor,
+    ContinuousWarningBeeper,
     build_flex_zero_warning,
     parse_sensor_data,
 )
@@ -37,6 +38,7 @@ class SerialDebugWindow(QMainWindow):
         self.flex_zero_monitor = FlexZeroWarningMonitor(logger)
         self.zero_feedback_active = False
         self.last_zero_message = ""
+        self._warning_beeper = ContinuousWarningBeeper()
 
         # UI Setup
         central_widget = QWidget()
@@ -54,7 +56,7 @@ class SerialDebugWindow(QMainWindow):
 
     def _show_zero_feedback(self, warning_message: str):
         if not self.zero_feedback_active:
-            QApplication.beep()
+            self._warning_beeper.start()
             self.zero_feedback_active = True
             self.setWindowTitle(self.alert_window_title)
             self.statusBar().setStyleSheet(
@@ -70,9 +72,9 @@ class SerialDebugWindow(QMainWindow):
             return
         self.zero_feedback_active = False
         self.last_zero_message = ""
+        self._warning_beeper.stop()
         self.setWindowTitle(self.default_window_title)
         self.statusBar().setStyleSheet("")
-        self.statusBar().showMessage("Monitoring sensor stream...")
 
     def update_data(self):
         if not self.ser or not self.ser.is_open:
@@ -108,6 +110,7 @@ class SerialDebugWindow(QMainWindow):
             print(f"\nError reading serial: {e}")
 
     def closeEvent(self, event):
+        self._warning_beeper.stop()
         if self.ser and self.ser.is_open:
             self.ser.close()
             print("\nSerial connection closed.")

@@ -18,7 +18,7 @@ from core.inference.gesture_translations import (
 from gui.services.serial_service import SerialService, SerialSettings
 from gui.utils.formatting import now_hms
 from gui.utils.smoothing import PredictionSmoother, SentenceAssembler
-from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import ContinuousWarningBeeper, FlexZeroWarningMonitor
 
 if TYPE_CHECKING:
     from gui.services.model_service import ModelService
@@ -91,6 +91,7 @@ class StreamWorker(threading.Thread):
         self._sentence = SentenceAssembler()
         self._translations = load_gesture_translations()
         self._lock_state = GestureLockState()
+        self._warning_beeper = ContinuousWarningBeeper()
         self._flex_zero_monitor = FlexZeroWarningMonitor(
             logger,
             min_consecutive_samples=2,
@@ -136,7 +137,11 @@ class StreamWorker(threading.Thread):
                 if sensor is None:
                     continue
 
-                self._flex_zero_monitor.check(sensor)
+                zero_sensors = self._flex_zero_monitor.check(sensor)
+                if zero_sensors:
+                    self._warning_beeper.start()
+                else:
+                    self._warning_beeper.stop()
 
                 if not stream_input_emitted:
                     self._event_queue.put(
@@ -249,6 +254,7 @@ class StreamWorker(threading.Thread):
                 }
             )
         finally:
+            self._warning_beeper.stop()
             self._event_queue.put({"type": "connected", "value": False})
             self._event_queue.put({"type": "stopped"})
             self._logger.info("Streaming stopped")
