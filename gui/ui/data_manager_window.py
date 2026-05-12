@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 
 from config import LOGS_DIR, LOGS_OUTPUT_DIR
@@ -68,7 +69,6 @@ class DataManagerWindow(QMainWindow):
         self.samples: list[SampleRecord] = []
         self._task_active = False
         self._task_name = ""
-        self._session_recorded_samples = 0
         self._process_total_gestures = 0
         self._process_seen_gestures: set[str] = set()
         self._process_current_gesture = ""
@@ -159,6 +159,8 @@ class DataManagerWindow(QMainWindow):
         layout = QVBoxLayout(tab)
         layout.setSpacing(10)
 
+        record_port = QHBoxLayout()
+
         self.record_group = QGroupBox("Record New Samples")
         form = QFormLayout(self.record_group)
 
@@ -169,10 +171,10 @@ class DataManagerWindow(QMainWindow):
         )
         form.addRow("Gesture", self.record_gesture_combo)
 
-        layout.addWidget(self.record_group)
+        record_port.addWidget(self.record_group)
 
         self.record_port_group = QGroupBox("Serial Port Management")
-        port_layout = QVBoxLayout(self.record_port_group)
+        port_layout = QHBoxLayout(self.record_port_group)
         port_layout.setSpacing(6)
 
         self.record_port_combo = QComboBox()
@@ -180,18 +182,24 @@ class DataManagerWindow(QMainWindow):
         port_layout.addWidget(self.record_port_combo)
 
         self.record_refresh_ports_btn = QPushButton("Refresh Ports")
+        self.record_refresh_ports_btn.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed
+        )
         self.record_refresh_ports_btn.clicked.connect(self.refresh_record_ports)
         port_layout.addWidget(self.record_refresh_ports_btn)
 
-        layout.addWidget(self.record_port_group)
+        record_port.addWidget(self.record_port_group)
+        layout.addLayout(record_port)
 
         action_row = QHBoxLayout()
         self.record_btn = QPushButton("Start Recording")
+        self.record_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.record_btn.clicked.connect(self.start_recording)
         self.record_btn.setToolTip("Start recording (Ctrl+R)")
         action_row.addWidget(self.record_btn)
 
         self.record_stop_btn = QPushButton("Stop")
+        self.record_stop_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.record_stop_btn.clicked.connect(self.stop_recording)
         self.record_stop_btn.setToolTip(
             "Stop recording and review before save (Ctrl+T)"
@@ -199,17 +207,14 @@ class DataManagerWindow(QMainWindow):
         self.record_stop_btn.setEnabled(False)
         action_row.addWidget(self.record_stop_btn)
 
-        action_row.addStretch(1)
-        layout.addLayout(action_row)
+        record_port.addLayout(action_row)
+        layout.addLayout(record_port)
 
         self.recording_status_label = QLabel("Recording status: idle")
         layout.addWidget(self.recording_status_label)
 
         self.record_row_count_label = QLabel("Rows captured: 0")
         layout.addWidget(self.record_row_count_label)
-
-        self.recorded_session_counter_label = QLabel("Recorded in this session: 0")
-        layout.addWidget(self.recorded_session_counter_label)
 
         self.record_stats_label = QLabel("Samples for selected gesture: 0")
         layout.addWidget(self.record_stats_label)
@@ -689,10 +694,6 @@ class DataManagerWindow(QMainWindow):
                         orientation=orientation,
                         rows=rows,
                         elapsed_seconds=elapsed_seconds,
-                    )
-                    self._session_recorded_samples += 1
-                    self.recorded_session_counter_label.setText(
-                        f"Recorded in this session: {self._session_recorded_samples}"
                     )
                     self.refresh_samples()
                     self._refresh_record_count()
