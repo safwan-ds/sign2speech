@@ -1,9 +1,10 @@
-"""Shared plotting utilities for Sign Language Glove project"""
+"""Shared plotting utilities for Sign2Speech project"""
 
-import os
 import csv
-import matplotlib.pyplot as plt
 import logging
+import os
+
+import matplotlib.pyplot as plt
 
 from config import (
     PLOT_FIGURE_WIDTH,

@@ -90,7 +90,7 @@ class DataManagerWindow(QMainWindow):
         )
         self.sample_service = SampleReviewService(self.raw_data_root)
 
-        self.setWindowTitle("Sign Language Glove - Dataset Manager")
+        self.setWindowTitle("Sign2Speech - Dataset Manager")
         self.resize(1560, 940)
         self.setMinimumSize(1220, 760)
 

@@ -1,10 +1,11 @@
 """
-Data processing and normalization utilities for Sign Language Glove project
+Data processing and normalization utilities for Sign2Speech project
 """
+
+import logging
 
 import numpy as np
 import pandas as pd
-import logging
 
 from config import (
     FLEX_SENSOR_RANGES,

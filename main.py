@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Must run before any project imports so utils/core/etc. are always resolvable,
 # regardless of whether this file is invoked as a script or as part of the package.
@@ -25,7 +25,7 @@ except ImportError:
 
 def main() -> None:
     """Start the desktop dashboard."""
-    print("Initializing Sign Language Glove GUI...", flush=True)
+    print("Initializing Sign2Speech GUI...", flush=True)
     project_root = Path(__file__).resolve().parent
     print(f"Project root: {project_root}", flush=True)
     print("Starting dashboard...", flush=True)

@@ -1,10 +1,12 @@
+import importlib.util
+import logging
 import os
 import time
 from collections import deque
-import logging
 
 import numpy as np
 import torch
+from core.models.lstm_model import build_lstm_model
 
 from config import (
     MODELS_DIR,
@@ -31,7 +33,6 @@ from utils.data_utils import (
     compute_acceleration,
     compute_rolling_statistics,
 )
-from core.models.lstm_model import build_lstm_model
 
 logger = logging.getLogger(__name__)
 
@@ -228,9 +229,18 @@ class LSTMGesturePredictor:
         self.last_prediction_time = 0.0
 
     def _maybe_compile_models(self, input_size: int) -> None:
+        flag = os.environ.get("SIGN2SPEECH_TORCH_COMPILE", "1").strip().lower()
+        if flag in {"0", "false", "no", "off"}:
+            return
+
         compile_fn = getattr(torch, "compile", None)
         if compile_fn is None:
             return
+
+        if importlib.util.find_spec("triton") is None:
+            logger.info("torch.compile skipped (Triton not available)")
+            return
+
         try:
             if self.use_ensemble:
                 self.ensemble_models = [
@@ -254,7 +264,9 @@ class LSTMGesturePredictor:
                     self.model(dummy)
             logger.info("torch.compile warmup complete")
         except Exception as e:
-            logger.warning(f"torch.compile unavailable or failed; running uncompiled: {e}")
+            logger.warning(
+                f"torch.compile unavailable or failed; running uncompiled: {e}"
+            )
 
     def _select_features(self, input_size: int) -> list[str]:
         base_features = [
@@ -355,7 +367,9 @@ class LSTMGesturePredictor:
 
             sequence = np.concatenate(enhanced_sequence, axis=1)
 
-        sequence_tensor = torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(DEVICE)
+        sequence_tensor = (
+            torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(DEVICE)
+        )
         if self._norm_mean_t is not None:
             sequence_tensor = (sequence_tensor - self._norm_mean_t) / self._norm_std_t
 

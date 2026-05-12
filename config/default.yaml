@@ -1,4 +1,4 @@
-# Sign Language Glove Default Configuration
+# Sign2Speech Default Configuration
 # This file contains default settings. Override via:
 # 1. Environment variables (.env file)
 # 2. config.py programmatic constants

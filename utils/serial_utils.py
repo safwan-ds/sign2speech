@@ -1,4 +1,4 @@
-"""Serial communication utilities for Sign Language Glove project."""
+"""Serial communication utilities for Sign2Speech project."""
 
 from __future__ import annotations
 
@@ -126,12 +126,9 @@ class FlexZeroWarningMonitor:
             if self._zero_streak_counts[name] >= self._min_consecutive_samples
         )
         now = time.monotonic()
-        should_warn = (
-            bool(persistent_zero_sensors)
-            and (
-                self._last_warning_at is None
-                or now - self._last_warning_at >= self._min_interval_seconds
-            )
+        should_warn = bool(persistent_zero_sensors) and (
+            self._last_warning_at is None
+            or now - self._last_warning_at >= self._min_interval_seconds
         )
         if should_warn:
             message = build_flex_zero_warning(zero_sensors)

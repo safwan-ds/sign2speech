@@ -1,9 +1,8 @@
 """
-Shared configuration and constants for Sign Language Glove project
+Shared configuration and constants for Sign2Speech project
 """
 
 import os
-
 
 COM_PORT = "COM9"
 BAUD_RATE = 115200
