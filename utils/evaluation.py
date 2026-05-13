@@ -614,6 +614,7 @@ def evaluate_transition_regions(
             "top_boundary_confusions": [],
         }
 
+    # Indices immediately after each true class boundary.
     transition_points = np.where(y_true_arr[1:] != y_true_arr[:-1])[0] + 1
     boundary_mask = np.zeros(y_true_arr.shape[0], dtype=bool)
     for idx in transition_points:

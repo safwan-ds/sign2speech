@@ -80,3 +80,11 @@ def test_load_per_class_thresholds_reads_uppercase_keys(tmp_path) -> None:
 def test_validate_motion_consistency_rejects_low_motion() -> None:
     low_motion = deque([10.0] * 30, maxlen=30)
     assert validate_motion_consistency(low_motion) is False
+
+
+def test_validate_motion_consistency_accepts_strong_varied_motion() -> None:
+    high_motion = deque(
+        [1200.0 if idx % 2 == 0 else 1600.0 for idx in range(30)],
+        maxlen=30,
+    )
+    assert validate_motion_consistency(high_motion) is True

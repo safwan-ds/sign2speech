@@ -121,6 +121,13 @@ def _load_per_class_thresholds(model_dir: Path | None) -> dict[str, dict[str, fl
     return {}
 
 
+def _extract_class_list(predictor: object) -> list[str]:
+    predictor_classes = getattr(predictor, "classes", [])
+    if hasattr(predictor_classes, "tolist"):
+        return [str(c) for c in predictor_classes.tolist()]
+    return [str(c) for c in predictor_classes]
+
+
 @dataclass(slots=True)
 class TransitionHysteresis:
     """Asymmetric transition policy with uncertain fallback."""
@@ -366,11 +373,7 @@ class StreamWorker(threading.Thread):
             last_llm_text: str | None = None
             motion_samples: deque[float] = deque(maxlen=SEQUENCE_LENGTH)
 
-            predictor_classes = getattr(predictor, "classes", [])
-            if hasattr(predictor_classes, "tolist"):
-                class_list = [str(c) for c in predictor_classes.tolist()]
-            else:
-                class_list = [str(c) for c in predictor_classes]
+            class_list = _extract_class_list(predictor)
             self._decoder = SequenceDecoder(class_list or ["REST"])
 
             while not self._stop_event.is_set():
@@ -429,8 +432,9 @@ class StreamWorker(threading.Thread):
                 probabilities = {
                     str(key): float(value) for key, value in (all_probs or {}).items()
                 }
+                base_confidence = float(confidence)
                 effective_confidence = float(
-                    probabilities.get(smooth_token, float(confidence))
+                    probabilities.get(smooth_token, base_confidence)
                 )
                 effective_gap = (
                     _confidence_gap_for_token(probabilities, smooth_token)

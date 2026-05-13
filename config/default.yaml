@@ -68,8 +68,8 @@ inference:
     rest_weight: 0.75
     sequence_decoder:
       enabled: false
-      switch_penalty: 0.35
-      rest_switch_penalty: 0.20
+      switch_penalty: 0.35 # penalty for non-REST class switches
+      rest_switch_penalty: 0.20 # penalty for REST<->gesture switches
     min_consecutive_rest: 5
 
 llm:

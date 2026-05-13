@@ -48,6 +48,8 @@ class PredictionSmoother:
                 token_weight *= self.rest_weight
             weighted_scores[token] = weighted_scores.get(token, 0.0) + token_weight
 
+        if not weighted_scores:
+            return None
         return max(weighted_scores.items(), key=lambda item: item[1])[0]
 
     def reset(self) -> None:
