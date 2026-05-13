@@ -643,6 +643,7 @@ def evaluate_transition_regions(
         confusion_counts[key] = confusion_counts.get(key, 0) + 1
 
     ranked = sorted(confusion_counts.items(), key=lambda item: item[1], reverse=True)
+    top_limit = max(0, int(top_n))
     top_confusions = [
         {
             "true": class_names[true_idx]
@@ -653,7 +654,7 @@ def evaluate_transition_regions(
             else str(pred_idx),
             "count": int(count),
         }
-        for (true_idx, pred_idx), count in ranked[: max(1, int(top_n))]
+        for (true_idx, pred_idx), count in ranked[:top_limit]
     ]
 
     return {
@@ -681,7 +682,7 @@ def derive_per_class_thresholds(
     y_pred = np.argmax(probs, axis=1).astype(int)
     sorted_probs = np.sort(probs, axis=1)
     top1 = sorted_probs[:, -1]
-    top2 = sorted_probs[:, -2] if sorted_probs.shape[1] > 1 else np.zeros_like(top1)
+    top2 = sorted_probs[:, -2] if sorted_probs.shape[1] > 1 else top1.copy()
     gaps = top1 - top2
     correct_mask = y_pred == y_true_arr
 

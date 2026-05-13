@@ -22,6 +22,7 @@ class PredictionSmoother:
     """Maintain a rolling window and return weighted-vote predictions."""
 
     window_size: int
+    # Relative vote weight for REST tokens; lower values reduce REST influence.
     rest_weight: float = 0.75
     _window: Deque[tuple[str, float, bool]] = field(init=False)
 

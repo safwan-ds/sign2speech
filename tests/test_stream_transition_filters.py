@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from collections import deque
 
+import pytest
+
 from gui.services.stream_service import (
     SequenceDecoder,
     TransitionHysteresis,
@@ -55,7 +57,7 @@ def test_calculate_motion_magnitude_uses_accel_and_gyro() -> None:
     magnitude = calculate_motion_magnitude(
         {"accelX": 3, "accelY": 4, "accelZ": 0, "gyroX": 0, "gyroY": 0, "gyroZ": 5}
     )
-    assert magnitude > 9.9
+    assert magnitude == pytest.approx(10.0)
 
 
 def test_load_per_class_thresholds_reads_uppercase_keys(tmp_path) -> None:
