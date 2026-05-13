@@ -19,19 +19,37 @@ def majority_vote(window: Deque[str]) -> str | None:
 
 @dataclass(slots=True)
 class PredictionSmoother:
-    """Maintain a rolling window and return majority-vote predictions."""
+    """Maintain a rolling window and return weighted-vote predictions."""
 
     window_size: int
-    _window: Deque[str] = field(init=False)
+    rest_weight: float = 0.75
+    _window: Deque[tuple[str, float, bool]] = field(init=False)
 
     def __post_init__(self) -> None:
         self._window = deque(maxlen=max(1, int(self.window_size)))
 
-    def update(self, token: str) -> str:
-        """Push a token and return the smoothed token."""
-        self._window.append(token)
-        voted = majority_vote(self._window)
+    def update(self, token: str, confidence: float = 1.0, is_rest: bool = False) -> str:
+        """Push a token and return confidence+recency weighted vote."""
+        clipped_conf = max(0.0, min(1.0, float(confidence)))
+        self._window.append((token, clipped_conf, bool(is_rest)))
+        voted = self._weighted_vote(token)
         return voted if voted is not None else token
+
+    def _weighted_vote(self, fallback: str) -> str | None:
+        if not self._window:
+            return None
+
+        weighted_scores: dict[str, float] = {}
+        for idx, (token, confidence, is_rest) in enumerate(self._window):
+            recency_weight = float(idx + 1)
+            token_weight = recency_weight * confidence
+            if is_rest:
+                token_weight *= self.rest_weight
+            weighted_scores[token] = weighted_scores.get(token, 0.0) + token_weight
+
+        if not weighted_scores:
+            return fallback
+        return max(weighted_scores.items(), key=lambda item: item[1])[0]
 
     def reset(self) -> None:
         """Clear smoothing state."""

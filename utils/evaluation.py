@@ -594,6 +594,128 @@ def plot_training_history(history: dict, save_path: str | None = None):
     plt.close()
 
 
+def evaluate_transition_regions(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    class_names: list[str],
+    boundary_window: int = 2,
+    top_n: int = 5,
+) -> dict[str, object]:
+    """Compute transition-focused metrics around true class boundaries."""
+    y_true_arr = np.asarray(y_true)
+    y_pred_arr = np.asarray(y_pred)
+
+    if y_true_arr.size == 0 or y_true_arr.shape != y_pred_arr.shape:
+        return {
+            "boundary_window": int(boundary_window),
+            "boundary_frame_count": 0,
+            "boundary_accuracy": 0.0,
+            "boundary_error_rate": 0.0,
+            "top_boundary_confusions": [],
+        }
+
+    transition_points = np.where(y_true_arr[1:] != y_true_arr[:-1])[0] + 1
+    boundary_mask = np.zeros(y_true_arr.shape[0], dtype=bool)
+    for idx in transition_points:
+        left = max(0, int(idx) - int(boundary_window))
+        right = min(y_true_arr.shape[0], int(idx) + int(boundary_window) + 1)
+        boundary_mask[left:right] = True
+
+    boundary_count = int(np.sum(boundary_mask))
+    if boundary_count == 0:
+        return {
+            "boundary_window": int(boundary_window),
+            "boundary_frame_count": 0,
+            "boundary_accuracy": 0.0,
+            "boundary_error_rate": 0.0,
+            "top_boundary_confusions": [],
+        }
+
+    boundary_true = y_true_arr[boundary_mask]
+    boundary_pred = y_pred_arr[boundary_mask]
+    boundary_acc = float(np.mean(boundary_true == boundary_pred))
+
+    confusion_counts: dict[tuple[int, int], int] = {}
+    for true_idx, pred_idx in zip(boundary_true.tolist(), boundary_pred.tolist()):
+        if int(true_idx) == int(pred_idx):
+            continue
+        key = (int(true_idx), int(pred_idx))
+        confusion_counts[key] = confusion_counts.get(key, 0) + 1
+
+    ranked = sorted(confusion_counts.items(), key=lambda item: item[1], reverse=True)
+    top_confusions = [
+        {
+            "true": class_names[true_idx]
+            if 0 <= true_idx < len(class_names)
+            else str(true_idx),
+            "predicted": class_names[pred_idx]
+            if 0 <= pred_idx < len(class_names)
+            else str(pred_idx),
+            "count": int(count),
+        }
+        for (true_idx, pred_idx), count in ranked[: max(1, int(top_n))]
+    ]
+
+    return {
+        "boundary_window": int(boundary_window),
+        "boundary_frame_count": boundary_count,
+        "boundary_accuracy": boundary_acc,
+        "boundary_error_rate": float(1.0 - boundary_acc),
+        "top_boundary_confusions": top_confusions,
+    }
+
+
+def derive_per_class_thresholds(
+    y_true: np.ndarray,
+    y_pred_probs: np.ndarray,
+    class_names: list[str],
+    min_samples: int = 5,
+) -> dict[str, dict[str, float]]:
+    """Derive class-wise confidence/gap thresholds from correct predictions."""
+    probs = np.asarray(y_pred_probs, dtype=float)
+    y_true_arr = np.asarray(y_true, dtype=int)
+
+    if probs.ndim != 2 or probs.shape[0] == 0:
+        return {}
+
+    y_pred = np.argmax(probs, axis=1).astype(int)
+    sorted_probs = np.sort(probs, axis=1)
+    top1 = sorted_probs[:, -1]
+    top2 = sorted_probs[:, -2] if sorted_probs.shape[1] > 1 else np.zeros_like(top1)
+    gaps = top1 - top2
+    correct_mask = y_pred == y_true_arr
+
+    fallback_conf = (
+        float(np.percentile(top1[correct_mask], 25))
+        if np.any(correct_mask)
+        else float(np.percentile(top1, 50))
+    )
+    fallback_gap = (
+        float(np.percentile(gaps[correct_mask], 25))
+        if np.any(correct_mask)
+        else float(np.percentile(gaps, 50))
+    )
+
+    thresholds: dict[str, dict[str, float]] = {}
+    for class_idx, class_name in enumerate(class_names):
+        class_mask = (y_true_arr == class_idx) & correct_mask
+        sample_count = int(np.sum(class_mask))
+        if sample_count >= max(1, int(min_samples)):
+            conf_thr = float(np.percentile(top1[class_mask], 25))
+            gap_thr = float(np.percentile(gaps[class_mask], 25))
+        else:
+            conf_thr = fallback_conf
+            gap_thr = fallback_gap
+
+        thresholds[str(class_name)] = {
+            "confidence": float(np.clip(conf_thr, 0.0, 1.0)),
+            "gap": float(np.clip(gap_thr, 0.0, 1.0)),
+            "samples": float(sample_count),
+        }
+
+    return thresholds
+
+
 def comprehensive_evaluation(
     model: torch.nn.Module,
     X_test: np.ndarray,
@@ -655,6 +777,20 @@ def comprehensive_evaluation(
     logger.info("Classification Report")
     logger.info("\n" + classification_report(y_test, y_pred, labels=all_labels, target_names=class_names, zero_division=0))  # type: ignore
 
+    transition_metrics = evaluate_transition_regions(
+        y_true=np.asarray(y_test),
+        y_pred=np.asarray(y_pred),
+        class_names=class_names,
+        boundary_window=2,
+        top_n=5,
+    )
+    per_class_thresholds = derive_per_class_thresholds(
+        y_true=np.asarray(y_test),
+        y_pred_probs=np.asarray(y_pred_probs),
+        class_names=class_names,
+        min_samples=5,
+    )
+
     # Create visualizations
     if save_dir:
         # Confusion matrix
@@ -679,6 +815,30 @@ def comprehensive_evaluation(
         # Per-class metrics
         metrics_path = os.path.join(save_dir, f"per_class_metrics_{dataset_name}.pdf")
         plot_per_class_metrics(y_test, y_pred, class_names, save_path=metrics_path)
+
+        transition_report_path = os.path.join(
+            save_dir, f"transition_metrics_{dataset_name}.txt"
+        )
+        with open(transition_report_path, "w", encoding="utf-8") as report:
+            report.write("TRANSITION-FOCUSED METRICS\n")
+            report.write("-" * 60 + "\n")
+            report.write(
+                f"Boundary window: ±{transition_metrics['boundary_window']} frames\n"
+            )
+            report.write(
+                f"Boundary frames: {transition_metrics['boundary_frame_count']}\n"
+            )
+            report.write(
+                f"Boundary accuracy: {transition_metrics['boundary_accuracy']:.4f}\n"
+            )
+            report.write(
+                f"Boundary error rate: {transition_metrics['boundary_error_rate']:.4f}\n\n"
+            )
+            report.write("Top boundary confusions:\n")
+            for entry in transition_metrics["top_boundary_confusions"]:
+                report.write(
+                    f"- {entry['true']} -> {entry['predicted']}: {entry['count']}\n"
+                )
     else:
         roc_auc = None
 
@@ -692,6 +852,8 @@ def comprehensive_evaluation(
         "predictions": y_pred,
         "probabilities": y_pred_probs,
         "roc_auc": roc_auc,
+        "transition_metrics": transition_metrics,
+        "per_class_thresholds": per_class_thresholds,
     }
 
     return metrics
