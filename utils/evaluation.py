@@ -670,7 +670,7 @@ def derive_per_class_thresholds(
     y_pred_probs: np.ndarray,
     class_names: list[str],
     min_samples: int = 5,
-) -> dict[str, dict[str, float]]:
+) -> dict[str, dict[str, float | int]]:
     """Derive class-wise confidence/gap thresholds from correct predictions."""
     probs = np.asarray(y_pred_probs, dtype=float)
     y_true_arr = np.asarray(y_true, dtype=int)
@@ -696,7 +696,7 @@ def derive_per_class_thresholds(
         else float(np.percentile(gaps, 50))
     )
 
-    thresholds: dict[str, dict[str, float]] = {}
+    thresholds: dict[str, dict[str, float | int]] = {}
     for class_idx, class_name in enumerate(class_names):
         class_mask = (y_true_arr == class_idx) & correct_mask
         sample_count = int(np.sum(class_mask))
@@ -710,7 +710,7 @@ def derive_per_class_thresholds(
         thresholds[str(class_name)] = {
             "confidence": float(np.clip(conf_thr, 0.0, 1.0)),
             "gap": float(np.clip(gap_thr, 0.0, 1.0)),
-            "samples": float(sample_count),
+            "samples": sample_count,
         }
 
     return thresholds

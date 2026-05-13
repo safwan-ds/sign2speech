@@ -315,7 +315,8 @@ class StreamWorker(threading.Thread):
         self._lock_state = GestureLockState()
         self._transition_hysteresis = TransitionHysteresis()
         self._warning_beeper = ContinuousWarningBeeper()
-        model_dir = getattr(getattr(model_service, "metadata", None), "model_dir", None)
+        metadata = getattr(model_service, "metadata", None)
+        model_dir = getattr(metadata, "model_dir", None) if metadata else None
         self._per_class_thresholds = _load_per_class_thresholds(model_dir)
         self._decoder: SequenceDecoder | None = None
         self._flex_zero_monitor = FlexZeroWarningMonitor(
@@ -440,7 +441,7 @@ class StreamWorker(threading.Thread):
                 conf_threshold, gap_threshold = self._thresholds_for(smooth_token)
                 is_confident = effective_confidence >= conf_threshold
                 has_gap = effective_gap >= gap_threshold
-                motion_ok = True if is_rest else validate_motion_consistency(motion_samples)
+                motion_ok = is_rest or validate_motion_consistency(motion_samples)
                 filtered_token = self._transition_hysteresis.resolve(
                     smooth_token,
                     valid=(is_confident and has_gap and motion_ok),

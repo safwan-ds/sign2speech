@@ -32,10 +32,10 @@ class PredictionSmoother:
         """Push a token and return confidence+recency weighted vote."""
         clipped_conf = max(0.0, min(1.0, float(confidence)))
         self._window.append((token, clipped_conf, bool(is_rest)))
-        voted = self._weighted_vote(token)
+        voted = self._weighted_vote()
         return voted if voted is not None else token
 
-    def _weighted_vote(self, fallback: str) -> str | None:
+    def _weighted_vote(self) -> str | None:
         if not self._window:
             return None
 
@@ -47,8 +47,6 @@ class PredictionSmoother:
                 token_weight *= self.rest_weight
             weighted_scores[token] = weighted_scores.get(token, 0.0) + token_weight
 
-        if not weighted_scores:
-            return fallback
         return max(weighted_scores.items(), key=lambda item: item[1])[0]
 
     def reset(self) -> None:
