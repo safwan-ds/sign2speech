@@ -146,6 +146,22 @@ PREDICTION_MIN_CONFIDENCE_GAP = 0.15
 PREDICTION_DEBUG_MODE = False
 MIN_CONSECUTIVE_REST = 5
 MIN_GESTURES_FOR_LLM = 2
+# Extra consensus frames required before switching from one gesture to another.
+PREDICTION_SWITCH_CONSENSUS_FRAMES = 3
+# Consensus frames required to lock the very first non-REST gesture.
+PREDICTION_INITIAL_CONSENSUS_FRAMES = 2
+# Keep last stable class this many invalid frames before emitting UNKNOWN.
+PREDICTION_KEEP_LAST_STABLE_FRAMES = 2
+# Raw token emitted for transition/uncertain periods in stream inference.
+PREDICTION_UNCERTAIN_TOKEN = "UNKNOWN"
+# Relative vote weight for REST in weighted smoothing (lower reduces REST spikes).
+PREDICTION_REST_WEIGHT = 0.75
+# Optional online Viterbi-like decoder with transition penalties.
+ENABLE_SEQUENCE_DECODER = False
+# Penalty for switching between two non-REST classes in decoder.
+SEQUENCE_DECODER_SWITCH_PENALTY = 0.35
+# Penalty for REST<->gesture switching in decoder.
+SEQUENCE_DECODER_REST_SWITCH_PENALTY = 0.2
 
 
 NORM_MIN = 0.0

@@ -129,7 +129,7 @@ pygments==2.20.0
     # via rich
 pyparsing==3.3.2
     # via matplotlib
-pypiwin32==223
+pypiwin32==223; sys_platform == "win32"
     # via pyttsx3
 pyserial==3.5
     # via sign-lang-glove (pyproject.toml)
@@ -147,7 +147,7 @@ python-dateutil==2.9.0.post0
     #   pandas
 pyttsx3==2.99
     # via sign-lang-glove (pyproject.toml)
-pywin32==311
+pywin32==311; sys_platform == "win32"
     # via
     #   pypiwin32
     #   pyttsx3

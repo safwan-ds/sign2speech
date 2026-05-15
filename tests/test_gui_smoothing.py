@@ -10,10 +10,10 @@ def test_majority_vote_returns_most_common_token() -> None:
     assert majority_vote(window) == "hello"
 
 
-def test_prediction_smoother_applies_majority_over_window() -> None:
+def test_prediction_smoother_applies_weighted_recency_over_window() -> None:
     smoother = PredictionSmoother(window_size=3)
     assert smoother.update("hello") == "hello"
-    assert smoother.update("me") == "hello"
+    assert smoother.update("me") == "me"
     assert smoother.update("hello") == "hello"
 
 
@@ -37,6 +37,19 @@ def test_prediction_smoother_reset_clears_window() -> None:
     # After reset the window is empty; next token should return itself
     result = smoother.update("me")
     assert result == "me"
+
+
+def test_prediction_smoother_uses_confidence_weighting() -> None:
+    smoother = PredictionSmoother(window_size=3)
+    assert smoother.update("hello", confidence=0.95) == "hello"
+    assert smoother.update("me", confidence=0.05) == "hello"
+
+
+def test_prediction_smoother_downweights_rest_votes() -> None:
+    smoother = PredictionSmoother(window_size=3, rest_weight=0.1)
+    smoother.update("REST", confidence=1.0, is_rest=True)
+    result = smoother.update("hello", confidence=0.9, is_rest=False)
+    assert result == "hello"
 
 
 def test_sentence_assembler_clear_resets_state() -> None:
