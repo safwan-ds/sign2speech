@@ -121,6 +121,7 @@ def evaluate_lstm_model(
             "f1_score": float(val_metrics["f1_score"]),  # type: ignore
             "confusion_matrix": np.asarray(val_metrics["confusion_matrix"]).tolist(),  # type: ignore
             "class_names": list(label_encoder.classes_),
+            "transition_metrics": val_metrics.get("transition_metrics", {}),
         },
     }
 
@@ -132,7 +133,15 @@ def evaluate_lstm_model(
             "f1_score": float(test_metrics["f1_score"]),  # type: ignore
             "confusion_matrix": np.asarray(test_metrics["confusion_matrix"]).tolist(),  # type: ignore
             "class_names": list(label_encoder.classes_),
+            "transition_metrics": test_metrics.get("transition_metrics", {}),
         }
+
+    per_class_thresholds = val_metrics.get("per_class_thresholds", {})
+    if isinstance(per_class_thresholds, dict) and per_class_thresholds:
+        thresholds_path = os.path.join(eval_dir, "per_class_thresholds.json")
+        with open(thresholds_path, "w", encoding="utf-8") as f:
+            json.dump(per_class_thresholds, f, indent=2)
+        logger.info(f"Per-class thresholds saved to: {thresholds_path}")
 
     metrics_json_path = os.path.join(eval_dir, "metrics.json")
     with open(metrics_json_path, "w") as f:

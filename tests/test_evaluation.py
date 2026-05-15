@@ -10,7 +10,11 @@ import pytest
 # and skip the entire file when that happens.
 try:
     import torch
-    from utils.evaluation import compute_class_weights
+    from utils.evaluation import (
+        compute_class_weights,
+        derive_per_class_thresholds,
+        evaluate_transition_regions,
+    )
     _evaluation_available = True
 except Exception:
     _evaluation_available = False
@@ -52,3 +56,46 @@ class TestComputeClassWeights:
         num_classes = 3
         weights = compute_class_weights(y, num_classes=num_classes)
         assert float(weights.sum()) == pytest.approx(num_classes, abs=1e-4)
+
+
+class TestTransitionFocusedEvaluation:
+    def test_transition_region_metrics_include_boundary_accuracy(self) -> None:
+        y_true = np.array([0, 0, 0, 1, 1, 1, 2, 2])
+        y_pred = np.array([0, 0, 1, 1, 1, 2, 2, 2])
+        metrics = evaluate_transition_regions(
+            y_true=y_true,
+            y_pred=y_pred,
+            class_names=["REST", "HELLO", "ME"],
+            boundary_window=1,
+            top_n=3,
+        )
+
+        assert metrics["boundary_frame_count"] > 0
+        assert 0.0 <= float(metrics["boundary_accuracy"]) <= 1.0
+        assert isinstance(metrics["top_boundary_confusions"], list)
+
+    def test_per_class_thresholds_are_derived(self) -> None:
+        y_true = np.array([0, 0, 1, 1, 2, 2])
+        y_probs = np.array(
+            [
+                [0.9, 0.05, 0.05],
+                [0.85, 0.1, 0.05],
+                [0.1, 0.8, 0.1],
+                [0.2, 0.7, 0.1],
+                [0.1, 0.1, 0.8],
+                [0.15, 0.1, 0.75],
+            ],
+            dtype=float,
+        )
+        thresholds = derive_per_class_thresholds(
+            y_true=y_true,
+            y_pred_probs=y_probs,
+            class_names=["REST", "HELLO", "ME"],
+            min_samples=1,
+        )
+
+        assert "REST" in thresholds
+        assert "HELLO" in thresholds
+        assert "ME" in thresholds
+        assert 0.0 <= thresholds["REST"]["confidence"] <= 1.0
+        assert 0.0 <= thresholds["HELLO"]["gap"] <= 1.0

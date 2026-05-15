@@ -61,7 +61,15 @@ inference:
   prediction:
     min_confidence: 0.80
     consensus_frames: 2
+    switch_consensus_frames: 3
     confidence_gap_threshold: 0.15
+    keep_last_stable_frames: 2
+    uncertain_token: UNKNOWN
+    rest_weight: 0.75
+    sequence_decoder:
+      enabled: false
+      switch_penalty: 0.35 # penalty for non-REST class switches
+      rest_switch_penalty: 0.20 # penalty for REST<->gesture switches
     min_consecutive_rest: 5
 
 llm:

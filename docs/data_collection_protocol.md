@@ -23,6 +23,14 @@ This protocol defines how new gesture recordings should be captured for the unif
 - Include dynamic return-to-baseline sequences after gesture completion.
 - Keep REST as a learned class, not only as a runtime fallback.
 
+## Transition Boundary Rules
+
+- Record explicit inter-gesture transitions (gesture A -> gesture B) for commonly confused pairs.
+- Keep each transition clip centered around the boundary so pre/post frames are both represented.
+- Label short partial motions and aborted starts as hard negatives when they are not valid gestures.
+- Balance transition coverage across classes; avoid collecting only "easy" transitions.
+- Include realistic hand repositioning between gestures so the model learns uncertain boundary behavior.
+
 ## Metadata Handling
 
 - Use sidecar metadata for orientation, posture, sample ID, and session context.
