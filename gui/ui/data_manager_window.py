@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import queue
 import re
+import time
 from pathlib import Path
 
 import numpy as np
@@ -78,6 +79,8 @@ class DataManagerWindow(QMainWindow):
         self._train_metrics: dict[str, str] = {}
         self._train_model_dir = ""  # Track latest model dir for metrics loading
         self._theme_name = "dark"
+        self._last_record_preview_update = 0.0
+        self._record_preview_update_interval = 0.05
 
         self.event_queue: queue.Queue[dict] = queue.Queue()
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
@@ -104,7 +107,8 @@ class DataManagerWindow(QMainWindow):
         self._refresh_record_count()
 
         self.event_timer = QTimer(self)
-        self.event_timer.setInterval(100)
+        self.event_timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.event_timer.setInterval(50)
         self.event_timer.timeout.connect(self._poll_events)
         self.event_timer.start()
 
@@ -183,7 +187,7 @@ class DataManagerWindow(QMainWindow):
 
         self.record_refresh_ports_btn = QPushButton("Refresh Ports")
         self.record_refresh_ports_btn.setSizePolicy(
-            QSizePolicy.Fixed, QSizePolicy.Fixed
+            QSizePolicy.Fixed, QSizePolicy.Preferred
         )
         self.record_refresh_ports_btn.clicked.connect(self.refresh_record_ports)
         port_layout.addWidget(self.record_refresh_ports_btn)
@@ -193,13 +197,13 @@ class DataManagerWindow(QMainWindow):
 
         action_row = QHBoxLayout()
         self.record_btn = QPushButton("Start Recording")
-        self.record_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.record_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.record_btn.clicked.connect(self.start_recording)
         self.record_btn.setToolTip("Start recording (Ctrl+R)")
         action_row.addWidget(self.record_btn)
 
         self.record_stop_btn = QPushButton("Stop")
-        self.record_stop_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.record_stop_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.record_stop_btn.clicked.connect(self.stop_recording)
         self.record_stop_btn.setToolTip(
             "Stop recording and review before save (Ctrl+T)"
@@ -225,7 +229,7 @@ class DataManagerWindow(QMainWindow):
         self.record_hint_label.setWordWrap(True)
         layout.addWidget(self.record_hint_label)
 
-        preview_group = QGroupBox("Latest Capture Preview")
+        preview_group = QGroupBox("Live Capture Preview")
         preview_layout = QVBoxLayout(preview_group)
         preview_layout.setContentsMargins(8, 8, 8, 8)
         preview_layout.setSpacing(6)
@@ -627,6 +631,8 @@ class DataManagerWindow(QMainWindow):
             self._set_status("Ready", "INFO")
 
     def _poll_events(self) -> None:
+        live_preview_rows: list[dict[str, float | int]] | None = None
+
         while True:
             try:
                 event = self.event_queue.get_nowait()
@@ -648,10 +654,14 @@ class DataManagerWindow(QMainWindow):
                 self.recording_status_label.setText(
                     f"Recording status: capturing ({elapsed_seconds:.1f}s)"
                 )
+                rows = event.get("rows")
+                if isinstance(rows, list) and rows:
+                    live_preview_rows = rows
                 continue
 
             if event_type == "record_error":
                 message = str(event.get("message", "Recording failed"))
+                live_preview_rows = None
                 self._set_task_state(False)
                 self._set_status(f"Recording failed: {message}", "ERROR")
                 self.recording_status_label.setText("Recording status: error")
@@ -674,12 +684,14 @@ class DataManagerWindow(QMainWindow):
                 self.record_row_count_label.setText(f"Rows captured: {row_count}")
 
                 if not isinstance(rows, list) or not rows:
+                    live_preview_rows = None
                     self._set_status(
                         "No valid sensor rows captured. Recording discarded.", "WARNING"
                     )
                     self.recording_status_label.setText("Recording status: discarded")
                     continue
 
+                live_preview_rows = None
                 self._plot_recording_preview(rows)
                 decision = QMessageBox.question(
                     self,
@@ -755,6 +767,9 @@ class DataManagerWindow(QMainWindow):
                 self._set_task_state(False)
                 self.refresh_samples()
                 self._refresh_record_count()
+
+        if live_preview_rows is not None:
+            self._plot_recording_preview(live_preview_rows, force=False)
 
     def _load_gesture_options(self) -> None:
         gestures = load_gesture_names(self.project_root)
@@ -854,6 +869,8 @@ class DataManagerWindow(QMainWindow):
         if not self.recording_service.start(config):
             self._set_status("Could not start recording. Recorder is busy.", "WARNING")
             return
+        self._last_record_preview_update = 0.0
+        self.record_preview_plot.clear_plot()
         self.record_row_count_label.setText("Rows captured: 0")
         self.recording_status_label.setText("Recording status: starting")
         self._set_task_state(True, "record_sample")
@@ -872,8 +889,22 @@ class DataManagerWindow(QMainWindow):
         self.serial_service.disconnect()
         event.accept()
 
-    def _plot_recording_preview(self, rows: list[dict[str, float | int]]) -> None:
+    def _plot_recording_preview(
+        self,
+        rows: list[dict[str, float | int]],
+        *,
+        force: bool = True,
+    ) -> None:
+        now = time.monotonic()
+        if (
+            not force
+            and now - self._last_record_preview_update
+            < self._record_preview_update_interval
+        ):
+            return
+
         self.record_preview_plot.plot_rows(rows)
+        self._last_record_preview_update = now
 
     def _reset_process_ui(self) -> None:
         self._process_total_gestures = 0

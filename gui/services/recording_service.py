@@ -23,6 +23,9 @@ from utils.serial_utils import (
     select_serial_port,
 )
 
+LIVE_PREVIEW_ROW_LIMIT = 600
+RECORD_PROGRESS_INTERVAL_SECONDS = 0.05
+
 
 @dataclass(slots=True)
 class RecordingConfig:
@@ -135,12 +138,13 @@ class RecordingService:
                 row.update(sensor_row)
                 rows.append(row)
 
-                if elapsed - last_emit >= 0.1:
+                if elapsed - last_emit >= RECORD_PROGRESS_INTERVAL_SECONDS:
                     self._event_queue.put(
                         {
                             "type": "record_progress",
                             "row_count": len(rows),
                             "elapsed_seconds": elapsed,
+                            "rows": list(rows[-LIVE_PREVIEW_ROW_LIMIT:]),
                         }
                     )
                     last_emit = elapsed

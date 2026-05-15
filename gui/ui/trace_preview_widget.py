@@ -354,25 +354,28 @@ GraphsView {{
 
         for key in self._series_keys:
             series = self._series_map[key]
-            series.clear()
 
             if key not in frame.columns:
+                series.clear()
                 continue
 
             values = pd.to_numeric(frame[key], errors="coerce").to_numpy(dtype=float)
             if values.size == 0:
+                series.clear()
                 continue
 
             valid_indices = np.flatnonzero(np.isfinite(values))
             if valid_indices.size == 0:
+                series.clear()
                 continue
 
             x_max = max(x_max, int(values.size - 1))
             y_min = min(y_min, float(np.nanmin(values)))
             y_max = max(y_max, float(np.nanmax(values)))
 
-            for idx in valid_indices.tolist():
-                series.append(QPointF(float(idx), float(values[idx])))
+            x_values = valid_indices.astype(float, copy=False)
+            y_values = values[valid_indices].astype(float, copy=False)
+            self._replace_series_points(series, x_values, y_values)
 
         self._axis_x.setRange(0.0, float(x_max))
         self._axis_x.setTickInterval(max(1.0, float(x_max) / 4.0))
@@ -395,6 +398,36 @@ GraphsView {{
 
         if max(abs(lower), abs(upper)) >= 1000:
             self._axis_y.setLabelFormat("%.0f")
+
+    @staticmethod
+    def _replace_series_points(
+        series: QLineSeries,
+        x_values: np.ndarray,
+        y_values: np.ndarray,
+    ) -> None:
+        replace_np = getattr(series, "replaceNp", None)
+        if callable(replace_np):
+            try:
+                replace_np(x_values, y_values)
+                return
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+        points = [
+            QPointF(float(x_value), float(y_value))
+            for x_value, y_value in zip(x_values, y_values, strict=True)
+        ]
+        replace = getattr(series, "replace", None)
+        if callable(replace):
+            try:
+                replace(points)
+                return
+            except (RuntimeError, TypeError, ValueError):
+                pass
+
+        series.clear()
+        for point in points:
+            series.append(point)
 
     def clear_plot(self) -> None:
         for series in self._series_map.values():
