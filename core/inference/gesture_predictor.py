@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from core.models.lstm_model import build_lstm_model
 
-from config import (
+from config.config import (
     MODELS_DIR,
     SEQUENCE_LENGTH,
     PREDICTION_INTERVAL,

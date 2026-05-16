@@ -9,13 +9,13 @@ from the training package:
 - training.ensemble: Ensemble training
 """
 
-import sys
-import os
-from datetime import datetime
 import logging
+import os
+import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import USE_ENSEMBLE, MODELS_DIR, setup_logging
+from config.config import USE_ENSEMBLE, MODELS_DIR, setup_logging
 
 logger = logging.getLogger(__name__)
 

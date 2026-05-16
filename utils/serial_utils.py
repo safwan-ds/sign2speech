@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 import serial
 import serial.tools.list_ports
 
-from config import BAUD_RATE, EXPECTED_SENSOR_COUNT
+from config.config import BAUD_RATE, EXPECTED_SENSOR_COUNT
 
 FLEX_SENSOR_NAMES = ("flex0", "flex1", "flex2", "flex3", "flex4")
 SENSOR_NAMES = (

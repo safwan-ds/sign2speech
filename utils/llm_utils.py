@@ -1,9 +1,9 @@
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
-from config import (
+from config.config import (
     USE_QWEN_LLM,
     QWEN_MODEL_PATH,
     QWEN_N_CTX,

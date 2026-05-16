@@ -8,7 +8,7 @@ import threading
 from dataclasses import dataclass
 from queue import Queue
 
-from config import QWEN_N_GPU_LAYERS
+from config.config import QWEN_N_GPU_LAYERS
 from utils.llm_utils import generate_reply, load_qwen_model
 
 

@@ -7,7 +7,7 @@ import serial
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
-from config import (
+from config.config import (
     BAUD_RATE,
 )
 from gui.ui.trace_preview_widget import TracePreviewWidget
@@ -90,9 +90,7 @@ class SerialDebugWindow(QMainWindow):
                 if parsed_data:
                     zero_sensors = self.flex_zero_monitor.check(parsed_data)
                     if zero_sensors:
-                        self._show_zero_feedback(
-                            build_flex_zero_warning(zero_sensors)
-                        )
+                        self._show_zero_feedback(build_flex_zero_warning(zero_sensors))
                     else:
                         self._clear_zero_feedback()
                     self.data_history.append(parsed_data)

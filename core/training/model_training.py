@@ -1,15 +1,17 @@
 """Core LSTM model training logic"""
 
+import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import TensorDataset, DataLoader
+from core.models.lstm_model import build_lstm_model
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-import logging
+from torch.utils.data import TensorDataset, DataLoader
 
-from config import (
+from config.config import (
     RANDOM_STATE,
     USE_TEST_SPLIT,
     TEST_SIZE,
@@ -46,8 +48,6 @@ from config import (
     DEFAULT_VALIDATION_SIZE,
     MIN_VALIDATION_SAMPLES_PER_CLASS,
 )
-
-from core.models.lstm_model import build_lstm_model
 from utils.augmentation import create_augmented_dataset
 from utils.evaluation import compute_class_weights
 

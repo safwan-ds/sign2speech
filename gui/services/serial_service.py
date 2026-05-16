@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import queue
 import re
 import threading
+from dataclasses import dataclass
 
 import serial
 import serial.tools.list_ports
 
-from config import BAUD_RATE
+from config.config import BAUD_RATE
 from utils.serial_utils import detect_glove_ports, parse_sensor_data
 
 

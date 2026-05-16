@@ -1,13 +1,14 @@
 """Model evaluation utilities"""
 
-import os
 import json
-import numpy as np
-from datetime import datetime
-import torch
 import logging
+import os
+from datetime import datetime
 
-from config import MODELS_DIR
+import numpy as np
+import torch
+
+from config.config import MODELS_DIR
 from utils.evaluation import (
     comprehensive_evaluation,
     analyze_misclassifications,

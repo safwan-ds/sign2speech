@@ -1,12 +1,13 @@
 """Model persistence utilities (saving/loading)"""
 
+import logging
 import os
+from datetime import datetime
+
 import numpy as np
 import torch
-from datetime import datetime
-import logging
 
-from config import MODELS_DIR, ENSEMBLE_SIZE
+from config.config import MODELS_DIR, ENSEMBLE_SIZE
 
 logger = logging.getLogger(__name__)
 

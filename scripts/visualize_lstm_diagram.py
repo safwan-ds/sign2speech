@@ -12,7 +12,7 @@ import torch
 from torchviz import make_dot
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from config import (
+from config.config import (
     MODELS_DIR,
     SEQUENCE_LENGTH,
     LSTM_UNITS,

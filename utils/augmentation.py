@@ -3,13 +3,14 @@ Data augmentation utilities for time series sensor data
 Implements various augmentation techniques to improve model generalization
 """
 
-import numpy as np
 import logging
 from typing import Callable
+
+import numpy as np
 from scipy.interpolate import interp1d  # type: ignore
 from scipy.ndimage import gaussian_filter1d  # type: ignore
 
-from config import (
+from config.config import (
     ACCEL_X_IDX,
     ACCEL_Y_IDX,
     GYRO_X_IDX,

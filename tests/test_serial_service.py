@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from config import BAUD_RATE
+from config.config import BAUD_RATE
 from gui.services.serial_service import SerialService, SerialSettings
 
 

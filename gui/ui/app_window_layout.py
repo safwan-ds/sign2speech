@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config import BAUD_RATE, CONFIDENCE_THRESHOLD
+from config.config import BAUD_RATE, CONFIDENCE_THRESHOLD
 from gui.ui.theme_manager import build_dashboard_stylesheet
 
 

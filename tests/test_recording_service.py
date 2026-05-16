@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from queue import Queue
 
-from config import COM_PORT
+from config.config import COM_PORT
 from gui.services.recording_service import RecordingConfig, RecordingService
 
 

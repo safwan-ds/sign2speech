@@ -9,7 +9,7 @@ import keyboard
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import (
+from config.config import (
     COM_PORT,
     BAUD_RATE,
     TIMEOUT,

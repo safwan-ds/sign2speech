@@ -24,7 +24,7 @@ import logging
 import urllib.parse
 from pathlib import Path
 
-from config import (
+from config.config import (
     EVALUATION_CLASS_WEIGHT_EPSILON,
     EVALUATION_DPI,
 )
@@ -647,12 +647,16 @@ def evaluate_transition_regions(
     top_limit = max(0, int(top_n))
     top_confusions = [
         {
-            "true": class_names[true_idx]
-            if 0 <= true_idx < len(class_names)
-            else str(true_idx),
-            "predicted": class_names[pred_idx]
-            if 0 <= pred_idx < len(class_names)
-            else str(pred_idx),
+            "true": (
+                class_names[true_idx]
+                if 0 <= true_idx < len(class_names)
+                else str(true_idx)
+            ),
+            "predicted": (
+                class_names[pred_idx]
+                if 0 <= pred_idx < len(class_names)
+                else str(pred_idx)
+            ),
             "count": int(count),
         }
         for (true_idx, pred_idx), count in ranked[:top_limit]

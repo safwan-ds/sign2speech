@@ -187,7 +187,7 @@ All configuration is centralized in `config.py` and can be overridden via enviro
 - `EVALUATION_PLOT_BACKEND`: Plot backend for evaluation exports (`matplotlib` default, `qtgraphs` experimental and
   requires an active Qt app)
 
-See [config.py](config.py) for all ~100 configurable parameters.
+See [config.py](config/config.py) for all ~100 configurable parameters.
 
 ## Data Format
 

@@ -1,12 +1,13 @@
 """Ensemble model training utilities"""
 
+import logging
 import os
+from datetime import datetime
+
 import numpy as np
 import torch
-from datetime import datetime
-import logging
 
-from config import (
+from config.config import (
     MODELS_DIR,
     RANDOM_STATE,
     ENSEMBLE_SIZE,
@@ -26,9 +27,8 @@ from config import (
     LEARNING_RATE,
     WEIGHT_DECAY,
 )
-
-from .model_training import train_lstm_model
 from .model_evaluation import evaluate_lstm_model
+from .model_training import train_lstm_model
 from .model_utils import save_lstm_model
 
 logger = logging.getLogger(__name__)

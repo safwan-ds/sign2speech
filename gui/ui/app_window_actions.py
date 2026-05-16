@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
 )
 
-from config import LOGS_OUTPUT_DIR, MODELS_DIR
+from config.config import LOGS_OUTPUT_DIR, MODELS_DIR
 from gui.services.model_service import ModelMetadata
 from gui.services.serial_service import SerialService, SerialSettings
 from gui.services.stream_service import StreamConfig, StreamWorker

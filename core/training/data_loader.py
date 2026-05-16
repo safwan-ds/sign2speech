@@ -1,11 +1,12 @@
 """Data loading utilities for training sequences"""
 
-import os
 import glob
-import numpy as np
 import logging
+import os
 
-from config import PROCESSED_DIR, TEST_DATA_DIR, TEST_SIZE, USE_TEST_SPLIT
+import numpy as np
+
+from config.config import PROCESSED_DIR, TEST_DATA_DIR, TEST_SIZE, USE_TEST_SPLIT
 
 logger = logging.getLogger(__name__)
 

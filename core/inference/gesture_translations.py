@@ -1,6 +1,7 @@
-import os
 import logging
-from config import BASE_DIR
+import os
+
+from config.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 

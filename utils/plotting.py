@@ -6,7 +6,7 @@ import os
 
 import matplotlib.pyplot as plt
 
-from config import (
+from config.config import (
     PLOT_FIGURE_WIDTH,
     PLOT_FIGURE_HEIGHT,
     PLOT_NUM_ROWS,

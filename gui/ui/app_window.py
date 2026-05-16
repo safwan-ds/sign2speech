@@ -9,12 +9,13 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from config import (
+from config.config import (
     DEFAULT_UI_LANGUAGE,
     LOGS_OUTPUT_DIR,
     MODELS_DIR,
     SUPPORTED_UI_LANGUAGES,
 )
+from core.inference.gesture_translations import load_gesture_translations
 from gui.services.llm_service import LLMService
 from gui.services.logging_service import configure_gui_logger
 from gui.services.model_service import ModelService
@@ -30,7 +31,6 @@ from gui.ui.theme_manager import (
     get_model_badge_style,
     get_status_banner_style,
 )
-from core.inference.gesture_translations import load_gesture_translations
 from gui.utils.formatting import percent
 
 

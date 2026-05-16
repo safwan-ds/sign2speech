@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
 import logging
 import threading
 import time
+from dataclasses import dataclass
+from datetime import datetime
 from queue import Queue
 
-from config import BAUD_RATE, COM_PORT, LOGS_DIR, SERIAL_CONNECTION_DELAY, TIMEOUT
+from config.config import (
+    BAUD_RATE,
+    COM_PORT,
+    LOGS_DIR,
+    SERIAL_CONNECTION_DELAY,
+    TIMEOUT,
+)
 from gui.services.serial_service import SerialService, SerialSettings
 from utils.recording_utils import (
     build_recording_file_path,

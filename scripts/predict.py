@@ -11,7 +11,7 @@ import numpy as np
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import (
+from config.config import (
     COM_PORT,
     BAUD_RATE,
     TIMEOUT,
@@ -139,7 +139,7 @@ def main():
 
     llm = load_qwen_model()
     if llm is not None:
-        from config import QWEN_N_GPU_LAYERS
+        from config.config import QWEN_N_GPU_LAYERS
 
         logger.info(f"Qwen GGUF loaded with GPU offload (layers: {QWEN_N_GPU_LAYERS})")
 

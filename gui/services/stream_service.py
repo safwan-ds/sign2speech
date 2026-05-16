@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from config import (
+from config.config import (
     ENABLE_SEQUENCE_DECODER,
     MIN_CONSECUTIVE_REST,
     MIN_GESTURES_FOR_LLM,
@@ -237,7 +237,9 @@ class SequenceDecoder:
         else:
             next_scores: dict[str, float] = {}
             for next_cls in self.classes:
-                emit = math.log(max(epsilon, float(probabilities.get(next_cls, epsilon))))
+                emit = math.log(
+                    max(epsilon, float(probabilities.get(next_cls, epsilon)))
+                )
                 best_prev = max(
                     (
                         self._scores.get(prev_cls, -1e9)
@@ -339,7 +341,9 @@ class StreamWorker(threading.Thread):
         conf_threshold = self._config.confidence_threshold
         gap_threshold = PREDICTION_MIN_CONFIDENCE_GAP
         if per_class:
-            conf_threshold = max(conf_threshold, float(per_class.get("confidence", 0.0)))
+            conf_threshold = max(
+                conf_threshold, float(per_class.get("confidence", 0.0))
+            )
             gap_threshold = max(gap_threshold, float(per_class.get("gap", 0.0)))
         return conf_threshold, gap_threshold
 

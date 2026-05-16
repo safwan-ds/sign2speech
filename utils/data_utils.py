@@ -7,7 +7,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from config import (
+from config.config import (
     FLEX_SENSOR_RANGES,
     FLEX_SENSOR_DEFAULT_RANGE,
     MIN_ACCEL_VALUE,

@@ -19,10 +19,9 @@ import tempfile
 import threading
 import time
 import uuid
-import diskcache
-
 from dataclasses import dataclass
 
+import diskcache
 import edge_tts
 
 try:
@@ -81,11 +80,13 @@ class TTSService:
 
         # Initialize diskcache for Edge TTS audio
         if cache_dir is None:
-            from config import BASE_DIR
+            from config.config import BASE_DIR
 
             cache_dir = os.path.join(BASE_DIR, "data", "cache", "tts")
         os.makedirs(cache_dir, exist_ok=True)
-        self._cache = diskcache.Cache(cache_dir, size_limit=100 * 1024 * 1024)  # 100MB limit
+        self._cache = diskcache.Cache(
+            cache_dir, size_limit=100 * 1024 * 1024
+        )  # 100MB limit
 
         self._local_requests: queue.Queue[TTSRequest | None] = queue.Queue(maxsize=6)
         self._edge_requests: queue.Queue[TTSRequest | None] = queue.Queue(maxsize=2)

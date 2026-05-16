@@ -9,7 +9,6 @@ BAUD_RATE = 115200
 TIMEOUT = 1
 SERIAL_CONNECTION_DELAY = 2
 
-
 FLEX_SENSOR_RANGES = {
     0: (28, 224),
     1: (56, 293),
@@ -26,11 +25,9 @@ MAX_ACCEL_VALUE = 32767
 MIN_GYRO_VALUE = -32768
 MAX_GYRO_VALUE = 32767
 
-
 NUM_FLEX_SENSORS = 5
 NUM_IMU_AXES = 6
 EXPECTED_SENSOR_COUNT = 11
-
 
 ACCEL_X_IDX = NUM_FLEX_SENSORS
 ACCEL_Y_IDX = NUM_FLEX_SENSORS + 1
@@ -39,14 +36,12 @@ GYRO_X_IDX = NUM_FLEX_SENSORS + 3
 GYRO_Y_IDX = NUM_FLEX_SENSORS + 4
 GYRO_Z_IDX = NUM_FLEX_SENSORS + 5
 
-
 DETECT_GESTURE_MOTION = True
 MOTION_THRESHOLD = 0.02
 MOTION_DETECTION_MIN_DURATION = 5
 MOTION_DETECTION_SMOOTHING_WINDOW = 3
 SEQUENCE_OVERLAP = 0.5
 MOTION_PADDING_RATIO = 0.2
-
 
 LSTM_UNITS = 64
 LSTM_LAYERS = 2
@@ -56,13 +51,11 @@ EPOCHS = 150
 LEARNING_RATE = 0.0005
 SEQUENCE_LENGTH = 30
 
-
 MODEL_TYPE = "advanced"
 USE_BIDIRECTIONAL = True
 USE_ATTENTION = True
 USE_BATCH_NORM = True
 WEIGHT_DECAY = 5e-4
-
 
 USE_AUGMENTATION = True
 AUGMENTATION_FACTOR = 2
@@ -77,18 +70,15 @@ SCALE_RANGE = (0.9, 1.1)
 TIME_SHIFT_RANGE = 0.1
 ROTATION_MAX_ANGLE = 10
 
-
 USE_ENHANCED_FEATURES = True
 INCLUDE_VELOCITY = True
 INCLUDE_ACCELERATION = True
 INCLUDE_ROLLING_STATS = True
 ROLLING_WINDOW_SIZE = 5
 
-
 USE_WEIGHTED_LOSS = True
 USE_LABEL_SMOOTHING = True
 LABEL_SMOOTHING_FACTOR = 0.1
-
 
 USE_COSINE_ANNEALING = True
 COSINE_T_0 = 10
@@ -102,38 +92,31 @@ USE_WARMUP = True
 WARMUP_EPOCHS = 5
 WARMUP_START_FACTOR = 0.1
 
-
 EARLY_STOPPING_PATIENCE = 15
 MIN_DELTA = 1e-4
 
-
 GRADIENT_CLIP_VALUE = 1.0
 
-
 MIN_VALIDATION_SAMPLES_PER_CLASS = 5
-
 
 USE_ENSEMBLE = False
 ENSEMBLE_SIZE = 3
 
-
 PREDICTION_INTERVAL = 0.08
 
-
 RANDOM_STATE = 42
-USE_TEST_SPLIT = False  # If False, all data is used for training (no holdout test set)
+USE_TEST_SPLIT = False
 TEST_SIZE = 0.1
 TEST_DATA_SPLIT_PERCENTAGE = 0.15
 MIN_STRATIFY_SAMPLES = 2
 DEFAULT_VALIDATION_SIZE = 0.1
 
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(CONFIG_DIR)
 LOGS_DIR = os.path.join(BASE_DIR, "data", "raw")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 TEST_DATA_DIR = os.path.join(BASE_DIR, "data", "test")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
-
 
 PREDICTION_MOTION_THRESHOLD = 1000
 CONFIDENCE_THRESHOLD = 0.72
@@ -146,33 +129,22 @@ PREDICTION_MIN_CONFIDENCE_GAP = 0.15
 PREDICTION_DEBUG_MODE = False
 MIN_CONSECUTIVE_REST = 5
 MIN_GESTURES_FOR_LLM = 2
-# Extra consensus frames required before switching from one gesture to another.
 PREDICTION_SWITCH_CONSENSUS_FRAMES = 3
-# Consensus frames required to lock the very first non-REST gesture.
 PREDICTION_INITIAL_CONSENSUS_FRAMES = 2
-# Keep last stable class this many invalid frames before emitting UNKNOWN.
 PREDICTION_KEEP_LAST_STABLE_FRAMES = 2
-# Raw token emitted for transition/uncertain periods in stream inference.
 PREDICTION_UNCERTAIN_TOKEN = "UNKNOWN"
-# Relative vote weight for REST in weighted smoothing (lower reduces REST spikes).
 PREDICTION_REST_WEIGHT = 0.75
-# Optional online Viterbi-like decoder with transition penalties.
 ENABLE_SEQUENCE_DECODER = False
-# Penalty for switching between two non-REST classes in decoder.
 SEQUENCE_DECODER_SWITCH_PENALTY = 0.35
-# Penalty for REST<->gesture switching in decoder.
 SEQUENCE_DECODER_REST_SWITCH_PENALTY = 0.2
-
 
 NORM_MIN = 0.0
 NORM_MAX = 1.0
 
-
 MIN_FLEX_VALUE = min(v[0] for v in FLEX_SENSOR_RANGES.values())
 MAX_FLEX_VALUE = max(v[1] for v in FLEX_SENSOR_RANGES.values())
 
-
-USE_QWEN_LLM = True
+USE_QWEN_LLM = False
 QWEN_MODEL_FILENAME = "qwen2.5-3b-instruct-q4_k_m.gguf"
 QWEN_MODEL_PATH = os.path.join(MODELS_DIR, QWEN_MODEL_FILENAME)
 QWEN_N_CTX = 512
@@ -182,7 +154,6 @@ QWEN_FORCE_GPU = True
 QWEN_MAX_TOKENS = 32
 QWEN_INFERENCE_TEMPERATURE = 0.1
 
-
 PLOT_FIGURE_WIDTH = 12
 PLOT_FIGURE_HEIGHT = 10
 PLOT_NUM_ROWS = 3
@@ -191,10 +162,8 @@ PLOT_FONT_SIZE = 14
 PLOT_MARKER_SIZE = 2
 PLOT_GRID_ALPHA = 0.3
 
-
 KEYBOARD_DEBOUNCE_DELAY = 0.3
 KEYBOARD_POLL_INTERVAL = 0.05
-
 
 GUI_MIN_WIDTH = 900
 GUI_MIN_HEIGHT = 600
@@ -211,10 +180,8 @@ GUI_PLOT_TOP = 0.95
 GUI_PLOT_BOTTOM = 0.05
 GUI_THREAD_SLEEP = 0.01
 
-# GUI language defaults
 DEFAULT_UI_LANGUAGE = "tr"
 SUPPORTED_UI_LANGUAGES = ("tr", "en")
-
 
 EVALUATION_DPI = 300
 CONFUSION_MATRIX_FIGSIZE = (10, 8)
@@ -222,25 +189,15 @@ ROC_CURVE_FIGSIZE = (10, 8)
 EVALUATION_CLASS_WEIGHT_EPSILON = 1e-6
 
 
-# ============================================================================
-# LOGGING CONFIGURATION
-# ============================================================================
 import logging
 from datetime import datetime
 
-# Logging directories
 LOGS_OUTPUT_DIR = os.path.join(BASE_DIR, "logs")
 
-# Logging levels
 CONSOLE_LOG_LEVEL = logging.INFO
 FILE_LOG_LEVEL = logging.DEBUG
 
-# Log file naming
-
-# Format strings
-# Console: Clean output without timestamp
 CONSOLE_LOG_FORMAT = "%(levelname)s - %(message)s"
-# File: Detailed output with timestamp
 FILE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -265,27 +222,22 @@ def setup_logging(script_name: str | None = None) -> None:
         log_filename = f"{timestamp}.log"
     log_filepath = os.path.join(LOGS_OUTPUT_DIR, log_filename)
 
-    # Get root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)  # Capture all levels
+    root_logger.setLevel(logging.DEBUG)
 
-    # Clear any existing handlers
     root_logger.handlers.clear()
 
-    # Console handler - clean output without timestamp
     console_handler = logging.StreamHandler()
     console_handler.setLevel(CONSOLE_LOG_LEVEL)
     console_formatter = logging.Formatter(CONSOLE_LOG_FORMAT)
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
 
-    # File handler - detailed output with timestamp
     file_handler = logging.FileHandler(log_filepath, encoding="utf-8")
     file_handler.setLevel(FILE_LOG_LEVEL)
     file_formatter = logging.Formatter(FILE_LOG_FORMAT, datefmt=DATE_FORMAT)
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
 
-    # Log the initialization
     logger = logging.getLogger(__name__)
     logger.info(f"Logging initialized - Log file: {log_filepath}")

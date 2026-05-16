@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 
-from config import LOGS_DIR, LOGS_OUTPUT_DIR
+from config.config import LOGS_DIR, LOGS_OUTPUT_DIR
 from gui.services.logging_service import configure_gui_logger
 from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
