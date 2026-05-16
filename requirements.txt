@@ -127,6 +127,7 @@ pycparser==3.0
     # via cffi
 pygments==2.20.0
     # via rich
+pytest
 pyparsing==3.3.2
     # via matplotlib
 pypiwin32==223; sys_platform == "win32"

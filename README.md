@@ -97,7 +97,7 @@ python main.py
 ### Running the Dataset Manager GUI
 
 ```bash
-python data_manager_gui.py
+python data_manager.py
 ```
 
 This manager GUI is focused on data lifecycle tasks:
