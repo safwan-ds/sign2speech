@@ -45,14 +45,14 @@ ENCODER_PATH = os.path.join(MODELS_DIR, "latest", "encoder.npy")
 NORM_PATH = os.path.join(MODELS_DIR, "latest", "normalization.npz")
 
 
-def _load_model_checkpoint(path: str) -> tuple[dict, dict, int]:
+def _load_model_checkpoint(path: str) -> tuple[dict, dict, int, int | None]:
     """Load model checkpoint with backward compatibility.
 
     Handles both the new format (dict with 'state_dict' + 'arch_params')
     and legacy format (bare state_dict).
 
     Returns:
-        (state_dict, arch_params, input_size)
+        (state_dict, arch_params, input_size, num_classes)
     """
     try:
         checkpoint = torch.load(path, map_location=DEVICE, weights_only=False)
@@ -78,7 +78,26 @@ def _load_model_checkpoint(path: str) -> tuple[dict, dict, int]:
     else:
         raise ValueError(f"Cannot infer input size from model: {path}")
 
-    return state_dict, arch_params, input_size
+    # Infer num_classes
+    num_classes = arch_params.get("num_classes")
+    if num_classes is None:
+        # Try to find last layer output size
+        # Check classifier (Transformer)
+        classifier_weights = [
+            k
+            for k in state_dict.keys()
+            if k.startswith("classifier.") and k.endswith(".weight")
+        ]
+        if classifier_weights:
+            # Sort by index (classifier.N.weight)
+            classifier_weights.sort(key=lambda x: int(x.split(".")[1]), reverse=True)
+            num_classes = state_dict[classifier_weights[0]].shape[0]
+        elif "fc_out.weight" in state_dict:
+            num_classes = state_dict["fc_out.weight"].shape[0]
+        elif "fc.weight" in state_dict:
+            num_classes = state_dict["fc.weight"].shape[0]
+
+    return state_dict, arch_params, input_size, num_classes
 
 
 class LSTMGesturePredictor:
@@ -124,26 +143,45 @@ class LSTMGesturePredictor:
         if self.use_ensemble:
             # Load ensemble models
             self.ensemble_models = []
-            input_size = None
-            for ensemble_idx in range(ENSEMBLE_SIZE):
+            
+            # Auto-detect ensemble models in the directory
+            ensemble_idx = 0
+            while True:
                 ensemble_model_path = os.path.join(
                     model_dir, f"model_{ensemble_idx}.pth"
                 )
                 if not os.path.exists(ensemble_model_path):
-                    logger.warning(
-                        f"Warning: Ensemble model {ensemble_idx} not found at {ensemble_model_path}"
-                    )
-                    continue
-
-                state_dict, arch_params, input_size = _load_model_checkpoint(
-                    ensemble_model_path
+                    break
+                
+                state_dict, arch_params, input_size, inferred_num_classes = (
+                    _load_model_checkpoint(ensemble_model_path)
                 )
                 self.expected_features = self._select_features(input_size)
+
+                # Priority: inferred_num_classes > arch_params > encoder count
+                resolved_num_classes = (
+                    inferred_num_classes or arch_params.get("num_classes") or num_classes
+                )
+
+                if resolved_num_classes != num_classes:
+                    logger.warning(
+                        f"Warning: Model {ensemble_idx} expects {resolved_num_classes} classes but "
+                        f"encoder has {num_classes}. Adjusting classes list to {resolved_num_classes}."
+                    )
+                    if ensemble_idx == 0:
+                        if resolved_num_classes < num_classes:
+                            self.classes = self.classes[:resolved_num_classes]
+                        else:
+                            extra = resolved_num_classes - num_classes
+                            new_names = [f"unknown_{i}" for i in range(extra)]
+                            self.classes = np.concatenate([self.classes, new_names])
+                        # Update num_classes for subsequent ensemble members check
+                        num_classes = len(self.classes)
 
                 resolved_type = arch_params.get("model_type", MODEL_TYPE)
                 model = build_lstm_model(
                     input_size=input_size,
-                    num_classes=num_classes,
+                    num_classes=resolved_num_classes,
                     hidden_size=arch_params.get("hidden_size", LSTM_UNITS),
                     num_layers=arch_params.get("num_layers", LSTM_LAYERS),
                     dropout_rate=arch_params.get("dropout_rate", DROPOUT_RATE),
@@ -156,26 +194,42 @@ class LSTMGesturePredictor:
                 model.load_state_dict(state_dict)
                 model.eval()
                 self.ensemble_models.append(model)
+                ensemble_idx += 1
 
             if not self.ensemble_models:
                 raise ValueError(
-                    "No ensemble models could be loaded. Train ensemble models first."
+                    f"No ensemble models (model_0.pth, etc.) found in {model_dir}. Train ensemble models first."
                 )
 
             logger.info(f"Loaded {len(self.ensemble_models)} ensemble models")
-            if len(self.ensemble_models) != ENSEMBLE_SIZE:
-                logger.warning(
-                    f"Warning: Expected {ENSEMBLE_SIZE} models but loaded {len(self.ensemble_models)}"
-                )
         else:
             # Load single model
-            state_dict, arch_params, input_size = _load_model_checkpoint(model_path)
+            state_dict, arch_params, input_size, inferred_num_classes = (
+                _load_model_checkpoint(model_path)
+            )
             self.expected_features = self._select_features(input_size)
+
+            # Priority: inferred_num_classes > arch_params > encoder count
+            resolved_num_classes = (
+                inferred_num_classes or arch_params.get("num_classes") or num_classes
+            )
+
+            if resolved_num_classes != num_classes:
+                logger.warning(
+                    f"Warning: Model expects {resolved_num_classes} classes but "
+                    f"encoder has {num_classes}. Adjusting classes list to {resolved_num_classes}."
+                )
+                if resolved_num_classes < num_classes:
+                    self.classes = self.classes[:resolved_num_classes]
+                else:
+                    extra = resolved_num_classes - num_classes
+                    new_names = [f"unknown_{i}" for i in range(extra)]
+                    self.classes = np.concatenate([self.classes, new_names])
 
             resolved_type = arch_params.get("model_type", MODEL_TYPE)
             self.model = build_lstm_model(
                 input_size=input_size,
-                num_classes=num_classes,
+                num_classes=resolved_num_classes,
                 hidden_size=arch_params.get("hidden_size", LSTM_UNITS),
                 num_layers=arch_params.get("num_layers", LSTM_LAYERS),
                 dropout_rate=arch_params.get("dropout_rate", DROPOUT_RATE),

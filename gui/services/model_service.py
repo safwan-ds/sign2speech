@@ -33,16 +33,33 @@ class ModelService:
         model_path = model_dir / "model.pth"
         encoder_path = model_dir / "encoder.npy"
         norm_path = model_dir / "normalization.npz"
+        ensemble_first_path = model_dir / "model_0.pth"
+
+        if not encoder_path.exists():
+            raise FileNotFoundError(
+                f"Model directory '{model_dir.name}' is missing encoder.npy"
+            )
 
         if not use_ensemble:
-            if not model_path.exists() or not encoder_path.exists():
+            if not model_path.exists():
+                if ensemble_first_path.exists():
+                    raise FileNotFoundError(
+                        f"Directory '{model_dir.name}' contains an ensemble model. "
+                        "Please enable 'Ensemble Mode' in Settings to load it."
+                    )
                 raise FileNotFoundError(
-                    "Selected model directory must contain model.pth and encoder.npy"
+                    f"Directory '{model_dir.name}' is missing model.pth. "
+                    "If this is an ensemble, please enable 'Ensemble Mode'."
                 )
         else:
-            if not encoder_path.exists():
+            if not ensemble_first_path.exists():
+                if model_path.exists():
+                    raise FileNotFoundError(
+                        f"Directory '{model_dir.name}' contains a single model, not an ensemble. "
+                        "Please disable 'Ensemble Mode' in Settings to load it."
+                    )
                 raise FileNotFoundError(
-                    "Selected model directory must contain encoder.npy for ensemble"
+                    f"Directory '{model_dir.name}' is missing ensemble models (model_0.pth, etc.)"
                 )
 
         predictor_module.NORM_PATH = str(norm_path)

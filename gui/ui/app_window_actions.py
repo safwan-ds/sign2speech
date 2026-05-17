@@ -113,8 +113,20 @@ class AppWindowActionsMixin:
 
     def _on_model_selection_changed(self, _index: int) -> None:
         selected = self.model_dir_combo.currentData()
-        if isinstance(selected, str):
+        if isinstance(selected, str) and selected:
             self.model_path_edit.setText(selected)
+            
+            # Auto-detect if this is an ensemble and update checkbox
+            model_dir = Path(selected)
+            is_ensemble = (model_dir / "model_0.pth").exists()
+            has_single = (model_dir / "model.pth").exists()
+            
+            if is_ensemble and not has_single:
+                if hasattr(self, "ensemble_checkbox"):
+                    self.ensemble_checkbox.setChecked(True)
+            elif has_single and not is_ensemble:
+                if hasattr(self, "ensemble_checkbox"):
+                    self.ensemble_checkbox.setChecked(False)
 
     def _filter_model_classes(self, text: str) -> None:
         query = text.strip().lower()

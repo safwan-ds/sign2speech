@@ -117,6 +117,17 @@ def save_lstm_model(
 
     # Mirror into models/latest/ for quick inference access
     latest_dir = os.path.join(MODELS_DIR, "latest")
+    
+    # Clear latest directory if this is a single model or the first ensemble member
+    # to avoid mixing stale files from previous different run types (e.g. ensemble vs single)
+    if ensemble_idx is None or ensemble_idx == 0:
+        if os.path.exists(latest_dir):
+            try:
+                import shutil
+                shutil.rmtree(latest_dir)
+            except Exception as e:
+                logger.warning(f"Could not clear latest directory: {e}")
+    
     os.makedirs(latest_dir, exist_ok=True)
 
     latest_model_name = (
