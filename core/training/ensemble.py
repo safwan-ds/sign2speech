@@ -34,7 +34,7 @@ from .model_utils import save_lstm_model
 logger = logging.getLogger(__name__)
 
 
-def train_ensemble_models(X, y, test_X, test_y):
+def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_event=None):
     """Train ensemble of models with different random seeds for diversity.
 
     Each model uses a different random seed so it learns slightly different
@@ -45,6 +45,8 @@ def train_ensemble_models(X, y, test_X, test_y):
         y: Training labels
         test_X: Test features (optional)
         test_y: Test labels (optional)
+        epoch_callback: Optional callback for progress reporting
+        cancel_event: Optional threading.Event to abort training
 
     Returns:
         Tuple of (ensemble_models, label_encoder, mean, std)
@@ -62,7 +64,13 @@ def train_ensemble_models(X, y, test_X, test_y):
     model_dir = os.path.join(MODELS_DIR, f"ensemble_{timestamp}")
     os.makedirs(model_dir, exist_ok=True)
 
+    total_ensemble_epochs = ENSEMBLE_SIZE * EPOCHS
+
     for ensemble_idx in range(ENSEMBLE_SIZE):
+        if cancel_event is not None and cancel_event.is_set():
+            logger.info("Ensemble training cancelled between models.")
+            break
+
         logger.info(f"Training Model {ensemble_idx + 1}/{ENSEMBLE_SIZE}")
 
         # Use a different random seed for each ensemble member
@@ -72,6 +80,20 @@ def train_ensemble_models(X, y, test_X, test_y):
         torch.manual_seed(ensemble_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(ensemble_seed)
+
+        def wrapped_callback(epoch, total, t_loss, t_acc, v_loss, v_acc, lr):
+            if epoch_callback:
+                # Offset epoch to show global progress across the whole ensemble
+                global_epoch = ensemble_idx * EPOCHS + epoch
+                epoch_callback(
+                    global_epoch,
+                    total_ensemble_epochs,
+                    t_loss,
+                    t_acc,
+                    v_loss,
+                    v_acc,
+                    lr,
+                )
 
         # Train individual model
         (
@@ -84,7 +106,18 @@ def train_ensemble_models(X, y, test_X, test_y):
             std,
             test_X_norm,
             test_y_norm,
-        ) = train_lstm_model(X, y, test_X, test_y)
+        ) = train_lstm_model(
+            X,
+            y,
+            test_X,
+            test_y,
+            epoch_callback=wrapped_callback,
+            cancel_event=cancel_event,
+        )
+
+        if model is None:  # Cancelled
+            logger.info(f"Model {ensemble_idx + 1} training cancelled.")
+            break
 
         # Evaluate model
         val_accuracy, test_accuracy = evaluate_lstm_model(

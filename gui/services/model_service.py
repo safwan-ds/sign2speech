@@ -28,21 +28,28 @@ class ModelService:
         self.predictor: LSTMGesturePredictor | None = None
         self.metadata: ModelMetadata | None = None
 
-    def load(self, model_dir: Path) -> ModelMetadata:
+    def load(self, model_dir: Path, use_ensemble: bool = False) -> ModelMetadata:
         """Load predictor assets from a model directory."""
         model_path = model_dir / "model.pth"
         encoder_path = model_dir / "encoder.npy"
         norm_path = model_dir / "normalization.npz"
 
-        if not model_path.exists() or not encoder_path.exists():
-            raise FileNotFoundError(
-                "Selected model directory must contain model.pth and encoder.npy"
-            )
+        if not use_ensemble:
+            if not model_path.exists() or not encoder_path.exists():
+                raise FileNotFoundError(
+                    "Selected model directory must contain model.pth and encoder.npy"
+                )
+        else:
+            if not encoder_path.exists():
+                raise FileNotFoundError(
+                    "Selected model directory must contain encoder.npy for ensemble"
+                )
 
         predictor_module.NORM_PATH = str(norm_path)
         self.predictor = LSTMGesturePredictor(
             model_path=str(model_path),
             encoder_path=str(encoder_path),
+            use_ensemble=use_ensemble,
         )
 
         classes = [str(label) for label in self.predictor.classes.tolist()]

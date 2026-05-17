@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import queue
-import re
 import time
 from pathlib import Path
 
@@ -16,6 +15,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QSpinBox,
     QSplitter,
     QStatusBar,
     QTabWidget,
@@ -37,12 +38,20 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 
-from config.config import LOGS_DIR, LOGS_OUTPUT_DIR
+from config.config import (
+    BATCH_SIZE,
+    EARLY_STOPPING_PATIENCE,
+    EPOCHS,
+    LEARNING_RATE,
+    LOGS_DIR,
+    LOGS_OUTPUT_DIR,
+)
+from gui.services.data_processing_service import DataProcessingService
 from gui.services.logging_service import configure_gui_logger
 from gui.services.recording_service import RecordingConfig, RecordingService
 from gui.services.sample_review_service import SampleRecord, SampleReviewService
-from gui.services.script_runner import ScriptRunner
 from gui.services.serial_service import SerialService
+from gui.services.training_service import TrainingOverrides, TrainingService
 from gui.ui.custom_widgets_adapter import apply_custom_widgets_theme
 from gui.ui.theme_manager import (
     build_data_manager_stylesheet,
@@ -84,7 +93,14 @@ class DataManagerWindow(QMainWindow):
 
         self.event_queue: queue.Queue[dict] = queue.Queue()
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
-        self.script_runner = ScriptRunner(project_root=project_root, logger=self.logger)
+        self.data_processing_service = DataProcessingService(
+            logger=self.logger,
+            event_queue=self.event_queue,
+        )
+        self.training_service = TrainingService(
+            logger=self.logger,
+            event_queue=self.event_queue,
+        )
         self.serial_service = SerialService()
         self.recording_service = RecordingService(
             logger=self.logger,
@@ -324,17 +340,61 @@ class DataManagerWindow(QMainWindow):
 
         mainLayout.addWidget(base_group)
 
+        # ========== CONFIG OVERRIDES SECTION ==========
+        override_group = QGroupBox("Training Configuration Overrides")
+        override_form = QFormLayout(override_group)
+        override_form.setSpacing(6)
+
+        self.train_epochs_spin = QSpinBox()
+        self.train_epochs_spin.setRange(1, 2000)
+        self.train_epochs_spin.setValue(EPOCHS)
+        self.train_epochs_spin.setToolTip(f"Max training epochs (config default: {EPOCHS})")
+        override_form.addRow("Max Epochs:", self.train_epochs_spin)
+
+        self.train_lr_spin = QDoubleSpinBox()
+        self.train_lr_spin.setRange(0.00001, 0.1)
+        self.train_lr_spin.setDecimals(6)
+        self.train_lr_spin.setSingleStep(0.0001)
+        self.train_lr_spin.setValue(LEARNING_RATE)
+        self.train_lr_spin.setToolTip(f"Initial learning rate (config default: {LEARNING_RATE})")
+        override_form.addRow("Learning Rate:", self.train_lr_spin)
+
+        self.train_batch_spin = QSpinBox()
+        self.train_batch_spin.setRange(1, 512)
+        self.train_batch_spin.setValue(BATCH_SIZE)
+        self.train_batch_spin.setToolTip(f"Mini-batch size (config default: {BATCH_SIZE})")
+        override_form.addRow("Batch Size:", self.train_batch_spin)
+
+        self.train_patience_spin = QSpinBox()
+        self.train_patience_spin.setRange(1, 200)
+        self.train_patience_spin.setValue(EARLY_STOPPING_PATIENCE)
+        self.train_patience_spin.setToolTip(
+            f"Early stopping patience in epochs (config default: {EARLY_STOPPING_PATIENCE})"
+        )
+        override_form.addRow("Early Stop Patience:", self.train_patience_spin)
+
+        self.train_ensemble_check = QCheckBox("Train as Ensemble")
+        from config.config import USE_ENSEMBLE
+        self.train_ensemble_check.setChecked(USE_ENSEMBLE)
+        self.train_ensemble_check.setToolTip(
+            f"Train an ensemble of multiple models (config default: {USE_ENSEMBLE})"
+        )
+        override_form.addRow("Ensemble Mode:", self.train_ensemble_check)
+
+        mainLayout.addWidget(override_group)
+
         action_row = QHBoxLayout()
         self.train_btn = QPushButton("Start Training")
         self.train_btn.clicked.connect(self.start_training)
         action_row.addWidget(self.train_btn)
+
+        self.train_cancel_btn = QPushButton("Cancel Training")
+        self.train_cancel_btn.clicked.connect(self.cancel_training)
+        self.train_cancel_btn.setEnabled(False)
+        action_row.addWidget(self.train_cancel_btn)
+
         action_row.addStretch(1)
         mainLayout.addLayout(action_row)
-
-        self.train_note = QLabel("Runs scripts/train_model.py with default settings.")
-        self.train_note.setWordWrap(True)
-        self.train_note.setMaximumHeight(30)
-        mainLayout.addWidget(self.train_note)
 
         # ========== PROGRESS SECTION ==========
         self.train_status_label = QLabel("Status: idle")
@@ -549,6 +609,9 @@ class DataManagerWindow(QMainWindow):
         self.samples_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
+        self.samples_table.setSelectionMode(
+            QTableWidget.SelectionMode.ExtendedSelection
+        )
         self.samples_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.samples_table.horizontalHeader().setStretchLastSection(True)
         self.samples_table.itemSelectionChanged.connect(self._on_sample_selected)
@@ -624,6 +687,7 @@ class DataManagerWindow(QMainWindow):
         self.process_btn.setEnabled(enabled)
         self.train_btn.setEnabled(enabled)
         self.record_stop_btn.setEnabled(active and task_name == "record_sample")
+        self.train_cancel_btn.setEnabled(active and task_name == "train_model")
 
         if active:
             self._set_status(f"Running task: {task_name}", "INFO")
@@ -640,6 +704,8 @@ class DataManagerWindow(QMainWindow):
                 break
 
             event_type = event.get("type")
+
+            # ------ Recording events ------
             if event_type == "record_started":
                 port = str(event.get("port", "unknown"))
                 self.recording_status_label.setText(
@@ -717,6 +783,165 @@ class DataManagerWindow(QMainWindow):
                     self.recording_status_label.setText("Recording status: discarded")
                 continue
 
+            # ------ Processing events ------
+            if event_type == "process_started":
+                self.process_status_label.setText("Status: running")
+                continue
+
+            if event_type == "process_total_gestures":
+                total = int(event.get("total", 0))
+                self._process_total_gestures = total
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(0)
+                self.process_progress_bar.setFormat("Progress: 0%")
+                continue
+
+            if event_type == "process_gesture_summary":
+                gesture = str(event.get("gesture", ""))
+                files = int(event.get("files", 0))
+                samples = int(event.get("samples", 0))
+                self._set_process_table_value(gesture, 1, str(files))
+                self._set_process_table_value(gesture, 2, str(samples))
+                continue
+
+            if event_type == "process_gesture_current":
+                gesture = str(event.get("gesture", ""))
+                self._process_current_gesture = gesture
+                self._process_seen_gestures.add(gesture)
+                if self._process_total_gestures > 0:
+                    pct = int(
+                        (len(self._process_seen_gestures) / self._process_total_gestures) * 100
+                    )
+                    self.process_progress_bar.setValue(max(0, min(100, pct)))
+                    self.process_progress_bar.setFormat(f"Progress: {pct}%")
+                self.process_status_label.setText(f"Status: processing {gesture}")
+                self.process_events_box.appendPlainText(f"Processing gesture: '{gesture}'")
+                continue
+
+            if event_type == "process_train_sequences":
+                gesture = str(event.get("gesture", ""))
+                count = int(event.get("count", 0))
+                self._set_process_table_value(gesture, 3, str(count))
+                self.process_events_box.appendPlainText(
+                    f"  Training: {count} sequences"
+                )
+                continue
+
+            if event_type == "process_test_sequences":
+                gesture = str(event.get("gesture", ""))
+                count = int(event.get("count", 0))
+                self._set_process_table_value(gesture, 4, str(count))
+                self.process_events_box.appendPlainText(
+                    f"  Test: {count} sequences"
+                )
+                continue
+
+            if event_type == "process_progress":
+                done = int(event.get("done", 0))
+                total = max(int(event.get("total", 1)), 1)
+                pct = int((done / total) * 100)
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(max(0, min(100, pct)))
+                self.process_progress_bar.setFormat(f"Progress: {pct}%")
+                self.process_status_label.setText(f"Status: processed {done}/{total}")
+                continue
+
+            if event_type == "process_completed":
+                processed = int(event.get("processed", 0))
+                total = int(event.get("total", 0))
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(100)
+                self.process_progress_bar.setFormat("Progress: 100%")
+                self.process_status_label.setText("Status: completed")
+                self._set_status(f"Processing complete: {processed}/{total} gesture(s)", "INFO")
+                self._set_task_state(False)
+                self.refresh_samples()
+                self._refresh_record_count()
+                continue
+
+            if event_type == "process_failed":
+                message = str(event.get("message", "Processing failed"))
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(0)
+                self.process_progress_bar.setFormat("Progress: failed")
+                self.process_status_label.setText("Status: failed")
+                self._set_status(f"Processing failed: {message}", "ERROR")
+                self._set_task_state(False)
+                continue
+
+            if event_type == "process_cancelled":
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(0)
+                self.process_progress_bar.setFormat("Progress: cancelled")
+                self.process_status_label.setText("Status: cancelled")
+                self._set_status("Processing cancelled", "WARNING")
+                self._set_task_state(False)
+                continue
+
+            # ------ Training events ------
+            if event_type == "train_started":
+                self.train_status_label.setText("Status: running")
+                continue
+
+            if event_type == "train_epoch":
+                epoch = int(event.get("epoch", 0))
+                total = int(event.get("total", 1))
+                train_loss = float(event.get("train_loss", 0.0))
+                train_acc = float(event.get("train_acc", 0.0))
+                val_loss = float(event.get("val_loss", 0.0))
+                val_acc = float(event.get("val_acc", 0.0))
+                lr = float(event.get("lr", 0.0))
+                self._train_total_epochs = total
+                pct = int((epoch / max(total, 1)) * 100)
+                self.train_progress_bar.setRange(0, 100)
+                self.train_progress_bar.setValue(max(0, min(100, pct)))
+                self.train_progress_bar.setFormat(f"Epoch progress: {epoch}/{total}")
+                self.train_status_label.setText(f"Status: epoch {epoch}/{total}")
+                self._set_train_metric("train_loss", f"{train_loss:.4f}")
+                self._set_train_metric("train_acc", f"{train_acc:.2f}%")
+                self._set_train_metric("val_loss", f"{val_loss:.4f}")
+                self._set_train_metric("val_acc", f"{val_acc:.2f}%")
+                self._set_train_metric("lr", f"{lr:.6f}")
+                continue
+
+            if event_type == "train_model_dir":
+                self._train_model_dir = str(event.get("model_dir", ""))
+                continue
+
+            if event_type == "train_completed":
+                self._set_train_metric("Result", "Training complete")
+                self.train_progress_bar.setRange(0, 100)
+                self.train_progress_bar.setValue(100)
+                self.train_progress_bar.setFormat("Epoch progress: 100%")
+                self.train_status_label.setText("Status: completed")
+                self._set_status("Training complete", "INFO")
+                if self._train_model_dir:
+                    self._load_train_evaluation_metrics()
+                self._set_task_state(False)
+                self.refresh_samples()
+                self._refresh_record_count()
+                continue
+
+            if event_type == "train_cancelled":
+                self.train_progress_bar.setRange(0, 100)
+                self.train_progress_bar.setValue(0)
+                self.train_progress_bar.setFormat("Epoch progress: cancelled")
+                self.train_status_label.setText("Status: cancelled")
+                self._set_status("Training cancelled", "WARNING")
+                self._set_task_state(False)
+                continue
+
+            if event_type == "train_failed":
+                message = str(event.get("message", "Training failed"))
+                self.train_progress_bar.setRange(0, 100)
+                self.train_progress_bar.setValue(0)
+                self.train_progress_bar.setFormat("Epoch progress: failed")
+                self.train_status_label.setText("Status: failed")
+                self._set_status(f"Training failed: {message}", "ERROR")
+                self._set_task_state(False)
+                continue
+
+            # ------ Log events (display only) ------
             if event_type != "log":
                 continue
 
@@ -725,48 +950,6 @@ class DataManagerWindow(QMainWindow):
             source = str(event.get("source", "app"))
             message = str(event.get("message", ""))
             self.log_box.appendPlainText(f"[{timestamp}] [{level}] {source}: {message}")
-
-            self._handle_progress_from_script_log(message)
-
-            lower = message.lower()
-            if message.startswith("[script]") and "exited with code" in lower:
-                succeeded = "code 0" in lower
-                if succeeded:
-                    self._set_status(f"Task completed: {self._task_name}", "INFO")
-                else:
-                    self._set_status(f"Task failed: {self._task_name}", "ERROR")
-
-                if "scripts/process_data.py" in message:
-                    self.process_progress_bar.setRange(0, 100)
-                    self.process_progress_bar.setValue(100 if succeeded else 0)
-                    self.process_progress_bar.setFormat(
-                        "Progress: 100%" if succeeded else "Progress: failed"
-                    )
-                    self.process_status_label.setText(
-                        "Status: completed" if succeeded else "Status: failed"
-                    )
-
-                if (
-                    "scripts/train_model.py" in message
-                    or "scripts/train_model_gui.py" in message
-                ):
-                    self.train_progress_bar.setRange(0, 100)
-                    if succeeded and self._train_total_epochs > 0:
-                        self.train_progress_bar.setValue(100)
-                        self.train_progress_bar.setFormat("Epoch progress: 100%")
-                    elif succeeded:
-                        self.train_progress_bar.setValue(100)
-                        self.train_progress_bar.setFormat("Epoch progress: complete")
-                    else:
-                        self.train_progress_bar.setValue(0)
-                        self.train_progress_bar.setFormat("Epoch progress: failed")
-                    self.train_status_label.setText(
-                        "Status: completed" if succeeded else "Status: failed"
-                    )
-
-                self._set_task_state(False)
-                self.refresh_samples()
-                self._refresh_record_count()
 
         if live_preview_rows is not None:
             self._plot_recording_preview(live_preview_rows, force=False)
@@ -985,120 +1168,6 @@ class DataManagerWindow(QMainWindow):
             row = self._train_result_rows[key]
             self.train_results_table.setItem(row, 1, QTableWidgetItem(value))
 
-    def _handle_process_script_line(self, line: str) -> None:
-        self.process_events_box.appendPlainText(line)
-
-        match_total = re.search(r"Found\s+(\d+)\s+gesture\(s\)", line)
-        if match_total:
-            self._process_total_gestures = int(match_total.group(1))
-            self.process_progress_bar.setRange(0, 100)
-            self.process_progress_bar.setValue(0)
-            self.process_progress_bar.setFormat("Progress: 0%")
-            return
-
-        match_summary = re.search(
-            r"-\s+([^:]+):\s+(\d+)\s+file\(s\),\s+(\d+)\s+samples", line
-        )
-        if match_summary:
-            gesture = match_summary.group(1).strip()
-            self._set_process_table_value(gesture, 1, match_summary.group(2))
-            self._set_process_table_value(gesture, 2, match_summary.group(3))
-            return
-
-        match_current = re.search(r"Processing gesture:\s+'([^']+)'", line)
-        if match_current:
-            gesture = match_current.group(1).strip()
-            self._process_current_gesture = gesture
-            self._process_seen_gestures.add(gesture)
-            if self._process_total_gestures > 0:
-                pct = int(
-                    (len(self._process_seen_gestures) / self._process_total_gestures)
-                    * 100
-                )
-                self.process_progress_bar.setValue(max(0, min(100, pct)))
-                self.process_progress_bar.setFormat(f"Progress: {pct}%")
-            self.process_status_label.setText(f"Status: processing {gesture}")
-            return
-
-        match_train_seq = re.search(r"Training:\s+(\d+)\s+sequences", line)
-        if match_train_seq and self._process_current_gesture:
-            self._set_process_table_value(
-                self._process_current_gesture,
-                3,
-                match_train_seq.group(1),
-            )
-            return
-
-        match_test_seq = re.search(r"Test:\s+(\d+)\s+sequences", line)
-        if match_test_seq and self._process_current_gesture:
-            self._set_process_table_value(
-                self._process_current_gesture,
-                4,
-                match_test_seq.group(1),
-            )
-            return
-
-        match_processed = re.search(r"Processed\s+(\d+)/(\d+)\s+gesture\(s\)", line)
-        if match_processed:
-            done = int(match_processed.group(1))
-            total = max(int(match_processed.group(2)), 1)
-            pct = int((done / total) * 100)
-            self.process_progress_bar.setRange(0, 100)
-            self.process_progress_bar.setValue(max(0, min(100, pct)))
-            self.process_progress_bar.setFormat(f"Progress: {pct}%")
-            self.process_status_label.setText(f"Status: processed {done}/{total}")
-
-    def _handle_train_script_line(self, line: str) -> None:
-        """Parse training metrics from script output and update UI without logging to console."""
-        # Extract model directory path
-        match_model_dir = re.search(r"MODEL_DIR=(.+?)(?:\s|$)", line)
-        if match_model_dir:
-            self._train_model_dir = match_model_dir.group(1).strip()
-            return
-
-        # Extract full epoch metrics from log line
-        # Format: Epoch N/TOTAL - Loss: X.XXXX - Acc: XX.XX% - Val Loss: X.XXXX - Val Acc: XX.XX% - LR: X.XXXXXX
-        match_epoch = re.search(
-            r"Epoch\s+(\d+)/(\d+)\s+-\s+Loss:\s+([0-9.]+)\s+-\s+Acc:\s+([0-9.]+)%\s+-\s+Val Loss:\s+([0-9.]+)\s+-\s+Val Acc:\s+([0-9.]+)%\s+-\s+LR:\s+([0-9.e+-]+)",
-            line,
-        )
-        if match_epoch:
-            current = int(match_epoch.group(1))
-            total = int(match_epoch.group(2))
-            train_loss = match_epoch.group(3)
-            train_acc = match_epoch.group(4)
-            val_loss = match_epoch.group(5)
-            val_acc = match_epoch.group(6)
-            learning_rate = match_epoch.group(7)
-
-            self._train_total_epochs = total
-            self.train_progress_bar.setRange(0, 100)
-            pct = int((current / max(total, 1)) * 100)
-            self.train_progress_bar.setValue(max(0, min(100, pct)))
-            self.train_progress_bar.setFormat(f"Epoch progress: {current}/{total}")
-            self.train_status_label.setText(f"Status: epoch {current}/{total}")
-
-            # Update all metric boxes
-            self._set_train_metric("train_loss", train_loss)
-            self._set_train_metric("train_acc", f"{train_acc}%")
-            self._set_train_metric("val_loss", val_loss)
-            self._set_train_metric("val_acc", f"{val_acc}%")
-            self._set_train_metric("lr", learning_rate)
-            return
-
-        if "TRAINING COMPLETE" in line:
-            self._set_train_metric("Result", "Training complete")
-            self.train_progress_bar.setRange(0, 100)
-            self.train_progress_bar.setValue(100)
-            self.train_progress_bar.setFormat("Epoch progress: 100%")
-            self.train_status_label.setText("Status: training complete")
-            # Load evaluation metrics when training completes
-            if self._train_model_dir:
-                self._load_train_evaluation_metrics()
-
-        if "ENSEMBLE TRAINING COMPLETE" in line:
-            self._set_train_metric("Mode", "Ensemble")
-
     def _load_train_evaluation_metrics(self) -> None:
         """Load and display evaluation metrics and confusion matrix from saved JSON."""
         try:
@@ -1205,51 +1274,44 @@ class DataManagerWindow(QMainWindow):
         """Resolve confusion-matrix background color from theme manager."""
         return get_confusion_cell_color(ratio, self._theme_name)
 
-    def _handle_progress_from_script_log(self, message: str) -> None:
-        process_prefix = "[script:scripts/process_data.py] "
-        train_prefix = "[script:scripts/train_model.py] "
-        train_adv_prefix = "[script:scripts/train_model_gui.py] "
-
-        if message.startswith(process_prefix):
-            self._handle_process_script_line(message[len(process_prefix) :])
-            return
-
-        if message.startswith(train_prefix):
-            self._handle_train_script_line(message[len(train_prefix) :])
-            return
-
-        if message.startswith(train_adv_prefix):
-            self._handle_train_script_line(message[len(train_adv_prefix) :])
-
     def run_processing(self) -> None:
-        self._reset_process_ui()
-        if not self._run_script("scripts/process_data.py", [], "process_data"):
-            self.process_status_label.setText("Status: could not start")
+        """Start the data processing pipeline via the native service."""
+        if self._task_active:
+            self._set_status("Another task is already running", "WARNING")
             return
+        self._reset_process_ui()
+        if not self.data_processing_service.start():
+            self.process_status_label.setText("Status: could not start")
+            self._set_status("Processing service is already running", "WARNING")
+            return
+        self._set_task_state(True, "process_data")
         self._set_status("Processing started", "INFO")
 
     def start_training(self) -> None:
-        self._reset_train_ui()
-        if not self._run_script("scripts/train_model.py", [], "train_model"):
-            self.train_status_label.setText("Status: could not start")
-            return
-        self._set_status("Training started", "INFO")
-
-    def _run_script(
-        self, script_rel_path: str, args: list[str], task_name: str
-    ) -> bool:
+        """Start the training pipeline via the native service."""
         if self._task_active:
             self._set_status("Another task is already running", "WARNING")
-            return False
+            return
+        self._reset_train_ui()
+        overrides = TrainingOverrides(
+            epochs=self.train_epochs_spin.value(),
+            learning_rate=self.train_lr_spin.value(),
+            batch_size=self.train_batch_spin.value(),
+            early_stopping_patience=self.train_patience_spin.value(),
+            use_ensemble=self.train_ensemble_check.isChecked(),
+        )
+        if not self.training_service.start(overrides):
+            self.train_status_label.setText("Status: could not start")
+            self._set_status("Training service is already running", "WARNING")
+            return
+        self._set_task_state(True, "train_model")
+        self._set_status("Training started", "INFO")
 
-        if not self.script_runner.run_script(script_rel_path, args):
-            self._set_status(
-                "Could not start task. A script is already active.", "WARNING"
-            )
-            return False
-
-        self._set_task_state(True, task_name)
-        return True
+    def cancel_training(self) -> None:
+        """Request cancellation of an in-progress training run."""
+        self.training_service.cancel()
+        self.train_cancel_btn.setEnabled(False)
+        self._set_status("Cancellation requested — stopping after current epoch…", "WARNING")
 
     def _refresh_record_count(self) -> None:
         gesture = self.record_gesture_combo.currentText().strip()
@@ -1310,8 +1372,7 @@ class DataManagerWindow(QMainWindow):
             return "LOW_ROWS"
         return "OK"
 
-    def _selected_sample(self) -> SampleRecord | None:
-        row = self.samples_table.currentRow()
+    def _sample_for_row(self, row: int) -> SampleRecord | None:
         if row < 0:
             return None
 
@@ -1325,15 +1386,46 @@ class DataManagerWindow(QMainWindow):
                 return sample
         return None
 
+    def _selected_samples(self) -> list[SampleRecord]:
+        rows = sorted({index.row() for index in self.samples_table.selectedIndexes()})
+        if not rows and self.samples_table.currentRow() >= 0:
+            rows = [self.samples_table.currentRow()]
+
+        selected: list[SampleRecord] = []
+        seen_paths: set[Path] = set()
+        for row in rows:
+            sample = self._sample_for_row(row)
+            if sample is None or sample.csv_path in seen_paths:
+                continue
+            selected.append(sample)
+            seen_paths.add(sample.csv_path)
+        return selected
+
+    def _selected_sample(self) -> SampleRecord | None:
+        current_sample = self._sample_for_row(self.samples_table.currentRow())
+        if current_sample is not None:
+            return current_sample
+
+        samples = self._selected_samples()
+        return samples[0] if samples else None
+
     def _on_sample_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        selected_samples = self._selected_samples()
+        if not selected_samples:
             self.quarantine_btn.setEnabled(False)
             self.restore_btn.setEnabled(False)
             return
 
-        self.quarantine_btn.setEnabled(sample.source == "raw")
-        self.restore_btn.setEnabled(sample.source == "quarantine")
+        self.quarantine_btn.setEnabled(
+            all(sample.source == "raw" for sample in selected_samples)
+        )
+        self.restore_btn.setEnabled(
+            all(sample.source == "quarantine" for sample in selected_samples)
+        )
+
+        sample = self._selected_sample()
+        if sample is None:
+            return
         self._plot_sample(sample)
 
     def _plot_sample(self, sample: SampleRecord) -> None:
@@ -1349,47 +1441,75 @@ class DataManagerWindow(QMainWindow):
         self.sample_trace_plot.plot_dataframe(data)
 
     def quarantine_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        samples = self._selected_samples()
+        if not samples:
             return
-        if sample.source != "raw":
+        if not all(sample.source == "raw" for sample in samples):
             self._set_status("Only raw samples can be quarantined", "WARNING")
             return
 
+        sample_count = len(samples)
+        if sample_count == 1:
+            prompt = f"Move sample to quarantine?\n\n{samples[0].file_name}"
+        else:
+            prompt = f"Move {sample_count} samples to quarantine?"
+
         response = QMessageBox.question(
             self,
-            "Quarantine Sample",
-            f"Move sample to quarantine?\n\n{sample.file_name}",
+            "Quarantine Samples" if sample_count > 1 else "Quarantine Sample",
+            prompt,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if response != QMessageBox.StandardButton.Yes:
             return
 
-        moved = self.sample_service.quarantine_sample(sample.csv_path)
-        self.logger.info("Quarantined sample: %s", moved)
-        self._set_status("Sample moved to quarantine", "INFO")
+        moved_count = 0
+        for sample in samples:
+            moved = self.sample_service.quarantine_sample(sample.csv_path)
+            moved_count += 1
+            self.logger.info("Quarantined sample: %s", moved)
+
+        if moved_count == 1:
+            self._set_status("Sample moved to quarantine", "INFO")
+        else:
+            self._set_status(f"{moved_count} samples moved to quarantine", "INFO")
         self.refresh_samples()
 
     def restore_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        samples = self._selected_samples()
+        if not samples:
             return
-        if sample.source != "quarantine":
+        if not all(sample.source == "quarantine" for sample in samples):
             self._set_status("Select a quarantined sample to restore", "WARNING")
             return
 
+        sample_count = len(samples)
+        if sample_count == 1:
+            prompt = (
+                f"Restore sample back to raw dataset?\n\n{samples[0].file_name}"
+            )
+        else:
+            prompt = f"Restore {sample_count} samples back to raw dataset?"
+
         response = QMessageBox.question(
             self,
-            "Restore Sample",
-            f"Restore sample back to raw dataset?\n\n{sample.file_name}",
+            "Restore Samples" if sample_count > 1 else "Restore Sample",
+            prompt,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if response != QMessageBox.StandardButton.Yes:
             return
 
-        moved = self.sample_service.restore_sample(sample.csv_path)
-        self.logger.info("Restored sample: %s", moved)
-        self._set_status("Sample restored to raw dataset", "INFO")
+        moved_count = 0
+        for sample in samples:
+            moved = self.sample_service.restore_sample(sample.csv_path)
+            moved_count += 1
+            self.logger.info("Restored sample: %s", moved)
+
+        if moved_count == 1:
+            self._set_status("Sample restored to raw dataset", "INFO")
+        else:
+            self._set_status(f"{moved_count} samples restored to raw dataset", "INFO")
         self.refresh_samples()
 
 

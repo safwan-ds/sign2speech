@@ -89,6 +89,7 @@ class LSTMGesturePredictor:
         model_path: str = MODEL_PATH,
         encoder_path: str = ENCODER_PATH,
         sequence_length: int = SEQUENCE_LENGTH,
+        use_ensemble: bool | None = None,
     ):
         self.sequence_length = sequence_length
         self.buffer: deque[list[float]] = deque(maxlen=sequence_length)
@@ -97,7 +98,7 @@ class LSTMGesturePredictor:
         self.include_acceleration = INCLUDE_ACCELERATION
         self.include_rolling_stats = INCLUDE_ROLLING_STATS
         self.rolling_window_size = ROLLING_WINDOW_SIZE
-        self.use_ensemble = USE_ENSEMBLE
+        self.use_ensemble = use_ensemble if use_ensemble is not None else USE_ENSEMBLE
 
         self.norm_mean = None
         self.norm_std = None
@@ -118,13 +119,15 @@ class LSTMGesturePredictor:
         self.classes = np.load(encoder_path, allow_pickle=True)
         num_classes = len(self.classes)
 
+        model_dir = os.path.dirname(model_path)
+
         if self.use_ensemble:
             # Load ensemble models
             self.ensemble_models = []
             input_size = None
             for ensemble_idx in range(ENSEMBLE_SIZE):
                 ensemble_model_path = os.path.join(
-                    MODELS_DIR, "latest", f"model_{ensemble_idx}.pth"
+                    model_dir, f"model_{ensemble_idx}.pth"
                 )
                 if not os.path.exists(ensemble_model_path):
                     logger.warning(

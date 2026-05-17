@@ -85,6 +85,7 @@
 	"loaded_at": "Loaded At",
 	"language_switch_stream_stopped": "Stream stopped due to language change. Start again to use the new language.",
 	"enable_tts": "Enable Text-to-Speech",
+	"enable_ensemble": "Enable Ensemble Mode",
 	"language_turkish": "Turkish",
 	"language_english": "English",
 	"tooltip_stream_toggle": "Start or stop the real-time prediction stream.",

@@ -439,20 +439,25 @@ class AppWindowLayoutMixin:
         self.tts_checkbox.stateChanged.connect(self._on_tts_changed)
         settings_layout.addWidget(self.tts_checkbox, 10, 0, 1, 2)
 
+        self.ensemble_checkbox = QCheckBox("")
+        self.ensemble_checkbox.setChecked(False)
+        self.ensemble_checkbox.stateChanged.connect(self._on_ensemble_changed)
+        settings_layout.addWidget(self.ensemble_checkbox, 11, 0, 1, 2)
+
         self.tts_mode_label = QLabel("")
-        settings_layout.addWidget(self.tts_mode_label, 11, 0, 1, 2)
+        settings_layout.addWidget(self.tts_mode_label, 12, 0, 1, 2)
         self.tts_mode_combo = QComboBox()
         self.tts_mode_combo.addItem("", "instant")
         self.tts_mode_combo.addItem("", "llm")
         self.tts_mode_combo.addItem("", "hybrid")
         self.tts_mode_combo.currentIndexChanged.connect(self._on_tts_mode_changed)
         self.tts_mode_combo.setCurrentIndex(0)
-        settings_layout.addWidget(self.tts_mode_combo, 12, 0, 1, 2)
+        settings_layout.addWidget(self.tts_mode_combo, 13, 0, 1, 2)
 
         self.tts_status_label = QLabel("")
-        settings_layout.addWidget(self.tts_status_label, 13, 0, 1, 2)
+        settings_layout.addWidget(self.tts_status_label, 14, 0, 1, 2)
         self.tts_status_value_label = QLabel("")
-        settings_layout.addWidget(self.tts_status_value_label, 14, 0, 1, 2)
+        settings_layout.addWidget(self.tts_status_value_label, 15, 0, 1, 2)
 
         layout.addWidget(self.settings_group)
         self.refresh_model_dirs()
@@ -560,6 +565,7 @@ class AppWindowLayoutMixin:
         self._on_smoothing_change(self.smoothing_slider.value())
         self.llm_checkbox.setText(self._t("enable_llm"))
         self.tts_checkbox.setText(self._t("enable_tts"))
+        self.ensemble_checkbox.setText(self._t("enable_ensemble"))
         self.tts_mode_label.setText(self._t("tts_mode"))
         self.tts_status_label.setText(self._t("tts_status"))
         self._set_tts_status_state(

@@ -85,6 +85,7 @@
 	"loaded_at": "Yüklenme",
 	"language_switch_stream_stopped": "Dil değiştiği için yayın durduruldu. Yeni dil ile yeniden başlatın.",
 	"enable_tts": "Metni Sese Dönüştürmeyi Etkinleştir",
+	"enable_ensemble": "Ensemble Modunu Etkinleştir",
 	"language_turkish": "Türkçe",
 	"language_english": "English",
 	"tooltip_stream_toggle": "Gerçek zamanlı tahmin akışını başlatır veya durdurur.",

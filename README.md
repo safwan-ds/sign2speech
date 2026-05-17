@@ -37,7 +37,7 @@ sign_language_glove/
 ├── tests/                  # Pytest suite
 ├── docs/                   # Documentation
 ├── main.py                 # Primary GUI entry point
-├── data_manager_gui.py     # Dataset manager entry point
+├── data_manager.py         # Dataset manager entry point
 ├── config.py               # Shared constants
 ├── pyproject.toml          # Build configuration
 └── requirements.txt        # Frozen dependencies
@@ -106,6 +106,10 @@ This manager GUI is focused on data lifecycle tasks:
 2. Process raw recordings into train/test sequences
 3. Train a new model (default or advanced runtime overrides)
 4. Review captures with trace plots and quarantine invalid samples
+
+Process/Train tabs run internal background services directly (no script subprocess
+or log-regex parsing); `scripts/process_data.py` and `scripts/train_model.py`
+remain available as deprecated CLI wrappers.
 
 **Keyboard Shortcuts:**
 

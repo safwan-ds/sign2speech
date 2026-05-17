@@ -34,7 +34,9 @@ class AppWindowActionsMixin:
         for entry in root.iterdir():
             if not entry.is_dir():
                 continue
-            if (entry / "model.pth").exists() and (entry / "encoder.npy").exists():
+            has_single = (entry / "model.pth").exists()
+            has_ensemble = (entry / "model_0.pth").exists()
+            if (has_single or has_ensemble) and (entry / "encoder.npy").exists():
                 discovered.append(entry)
 
         discovered.sort(key=lambda item: item.name.lower(), reverse=True)
@@ -226,9 +228,11 @@ class AppWindowActionsMixin:
 
         def _load() -> None:
             try:
-                metadata = self.model_service.load(model_dir)
+                # ensemble_enabled is defined in Sign2SpeechDashboard (AppWindow)
+                use_ensemble = getattr(self, "ensemble_enabled", False)
+                metadata = self.model_service.load(model_dir, use_ensemble=use_ensemble)
                 self.event_queue.put({"type": "model_loaded", "metadata": metadata})
-                self.logger.info("Model loaded from %s", model_dir)
+                self.logger.info("Model loaded (ensemble=%s) from %s", use_ensemble, model_dir)
             except Exception as exc:
                 self.logger.exception("Model load failed")
                 self.event_queue.put(
