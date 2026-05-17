@@ -601,6 +601,9 @@ class DataManagerWindow(QMainWindow):
         self.samples_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
+        self.samples_table.setSelectionMode(
+            QTableWidget.SelectionMode.ExtendedSelection
+        )
         self.samples_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.samples_table.horizontalHeader().setStretchLastSection(True)
         self.samples_table.itemSelectionChanged.connect(self._on_sample_selected)
@@ -1360,8 +1363,7 @@ class DataManagerWindow(QMainWindow):
             return "LOW_ROWS"
         return "OK"
 
-    def _selected_sample(self) -> SampleRecord | None:
-        row = self.samples_table.currentRow()
+    def _sample_for_row(self, row: int) -> SampleRecord | None:
         if row < 0:
             return None
 
@@ -1375,15 +1377,46 @@ class DataManagerWindow(QMainWindow):
                 return sample
         return None
 
+    def _selected_samples(self) -> list[SampleRecord]:
+        rows = sorted({index.row() for index in self.samples_table.selectedIndexes()})
+        if not rows and self.samples_table.currentRow() >= 0:
+            rows = [self.samples_table.currentRow()]
+
+        selected: list[SampleRecord] = []
+        seen_paths: set[Path] = set()
+        for row in rows:
+            sample = self._sample_for_row(row)
+            if sample is None or sample.csv_path in seen_paths:
+                continue
+            selected.append(sample)
+            seen_paths.add(sample.csv_path)
+        return selected
+
+    def _selected_sample(self) -> SampleRecord | None:
+        current_sample = self._sample_for_row(self.samples_table.currentRow())
+        if current_sample is not None:
+            return current_sample
+
+        samples = self._selected_samples()
+        return samples[0] if samples else None
+
     def _on_sample_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        selected_samples = self._selected_samples()
+        if not selected_samples:
             self.quarantine_btn.setEnabled(False)
             self.restore_btn.setEnabled(False)
             return
 
-        self.quarantine_btn.setEnabled(sample.source == "raw")
-        self.restore_btn.setEnabled(sample.source == "quarantine")
+        self.quarantine_btn.setEnabled(
+            all(sample.source == "raw" for sample in selected_samples)
+        )
+        self.restore_btn.setEnabled(
+            all(sample.source == "quarantine" for sample in selected_samples)
+        )
+
+        sample = self._selected_sample()
+        if sample is None:
+            return
         self._plot_sample(sample)
 
     def _plot_sample(self, sample: SampleRecord) -> None:
@@ -1399,47 +1432,75 @@ class DataManagerWindow(QMainWindow):
         self.sample_trace_plot.plot_dataframe(data)
 
     def quarantine_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        samples = self._selected_samples()
+        if not samples:
             return
-        if sample.source != "raw":
+        if not all(sample.source == "raw" for sample in samples):
             self._set_status("Only raw samples can be quarantined", "WARNING")
             return
 
+        sample_count = len(samples)
+        if sample_count == 1:
+            prompt = f"Move sample to quarantine?\n\n{samples[0].file_name}"
+        else:
+            prompt = f"Move {sample_count} samples to quarantine?"
+
         response = QMessageBox.question(
             self,
-            "Quarantine Sample",
-            f"Move sample to quarantine?\n\n{sample.file_name}",
+            "Quarantine Samples" if sample_count > 1 else "Quarantine Sample",
+            prompt,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if response != QMessageBox.StandardButton.Yes:
             return
 
-        moved = self.sample_service.quarantine_sample(sample.csv_path)
-        self.logger.info("Quarantined sample: %s", moved)
-        self._set_status("Sample moved to quarantine", "INFO")
+        moved_count = 0
+        for sample in samples:
+            moved = self.sample_service.quarantine_sample(sample.csv_path)
+            moved_count += 1
+            self.logger.info("Quarantined sample: %s", moved)
+
+        if moved_count == 1:
+            self._set_status("Sample moved to quarantine", "INFO")
+        else:
+            self._set_status(f"{moved_count} samples moved to quarantine", "INFO")
         self.refresh_samples()
 
     def restore_selected(self) -> None:
-        sample = self._selected_sample()
-        if sample is None:
+        samples = self._selected_samples()
+        if not samples:
             return
-        if sample.source != "quarantine":
+        if not all(sample.source == "quarantine" for sample in samples):
             self._set_status("Select a quarantined sample to restore", "WARNING")
             return
 
+        sample_count = len(samples)
+        if sample_count == 1:
+            prompt = (
+                f"Restore sample back to raw dataset?\n\n{samples[0].file_name}"
+            )
+        else:
+            prompt = f"Restore {sample_count} samples back to raw dataset?"
+
         response = QMessageBox.question(
             self,
-            "Restore Sample",
-            f"Restore sample back to raw dataset?\n\n{sample.file_name}",
+            "Restore Samples" if sample_count > 1 else "Restore Sample",
+            prompt,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if response != QMessageBox.StandardButton.Yes:
             return
 
-        moved = self.sample_service.restore_sample(sample.csv_path)
-        self.logger.info("Restored sample: %s", moved)
-        self._set_status("Sample restored to raw dataset", "INFO")
+        moved_count = 0
+        for sample in samples:
+            moved = self.sample_service.restore_sample(sample.csv_path)
+            moved_count += 1
+            self.logger.info("Restored sample: %s", moved)
+
+        if moved_count == 1:
+            self._set_status("Sample restored to raw dataset", "INFO")
+        else:
+            self._set_status(f"{moved_count} samples restored to raw dataset", "INFO")
         self.refresh_samples()
 
 
