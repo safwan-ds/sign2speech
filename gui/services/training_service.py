@@ -25,9 +25,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
+from dataclasses import dataclass
 from queue import Queue
 
 from config.config import (
@@ -35,14 +33,9 @@ from config.config import (
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
     LEARNING_RATE,
-    MODELS_DIR,
     USE_ENSEMBLE,
 )
-from core.training.data_loader import load_processed_sequences
-from core.training.ensemble import train_ensemble_models
-from core.training.model_evaluation import evaluate_lstm_model
-from core.training.model_training import train_lstm_model
-from core.training.model_utils import save_lstm_model
+from core.pipeline.training_pipeline import run_training_pipeline
 
 
 @dataclass(slots=True)
@@ -156,90 +149,35 @@ class TrainingService:
                 eff_patience,
             )
 
-            # Load processed sequences
-            X, y, test_X, test_y = load_processed_sequences()
-            if X is None:
-                self._emit("train_failed", message="No processed sequences found. Run Processing first.")
-                return
-
-            if USE_ENSEMBLE:
-                ensemble_models, label_encoder, mean, std = train_ensemble_models(
-                    X, y, test_X, test_y
-                )
-                self._logger.info("[train] ENSEMBLE TRAINING COMPLETE!")
-                self._emit("train_completed")
-                return
-
-            # Single model training
-            result = train_lstm_model(
-                X,
-                y,
-                test_X,
-                test_y,
+            result = run_training_pipeline(
+                logger_instance=self._logger,
                 epoch_callback=self._epoch_callback,
                 cancel_event=self._cancel_event,
                 n_epochs=eff_epochs,
                 learning_rate=eff_lr,
                 batch_size=eff_batch,
                 patience=eff_patience,
+                use_ensemble=USE_ENSEMBLE,
             )
 
-            # Cancellation: train_lstm_model returns a tuple of Nones
-            if result[0] is None:
+            if result.status == "cancelled":
                 self._emit("train_cancelled")
                 self._logger.info("[train] Training cancelled")
                 return
 
-            (
-                model,
-                label_encoder,
-                X_val,
-                y_val,
-                history,
-                mean,
-                std,
-                test_X_norm,
-                test_y_norm,
-            ) = result
+            if result.status == "failed":
+                self._emit("train_failed", message=result.message or "Training failed")
+                return
 
-            # Create model directory
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            model_dir = Path(MODELS_DIR) / f"lstm_{timestamp}"
-            model_dir.mkdir(parents=True, exist_ok=True)
-
-            # Evaluate
-            val_accuracy, test_accuracy = evaluate_lstm_model(
-                model,
-                label_encoder,
-                X_val,
-                y_val,
-                history,
-                test_X_norm,
-                test_y_norm,
-                model_dir=str(model_dir),
-            )
-
-            # Persist model
-            metadata: dict = {
-                "num_classes": len(label_encoder.classes_),
-                "classes": ", ".join(label_encoder.classes_),
-                "val_accuracy": f"{val_accuracy:.4f}",
-                "total_sequences": len(X),
-                "sequence_length": X.shape[1],
-                "num_features": X.shape[2],
-                "epochs_run": eff_epochs,
-                "learning_rate": eff_lr,
-                "batch_size": eff_batch,
-                "early_stopping_patience": eff_patience,
-            }
-            if test_accuracy is not None:
-                metadata["test_accuracy"] = f"{test_accuracy:.4f}"
-
-            save_lstm_model(model, label_encoder, mean, std, metadata, model_dir=str(model_dir))
-
-            self._emit("train_model_dir", model_dir=str(model_dir))
+            if result.model_dir:
+                self._emit("train_model_dir", model_dir=result.model_dir)
             self._emit("train_completed")
-            self._logger.info("[train] Training complete — model saved to %s", model_dir)
+            if result.is_ensemble:
+                self._logger.info("[train] Ensemble training complete")
+            else:
+                self._logger.info(
+                    "[train] Training complete — model saved to %s", result.model_dir
+                )
 
         except Exception as exc:
             self._logger.exception("[train] Training pipeline failed: %s", exc)

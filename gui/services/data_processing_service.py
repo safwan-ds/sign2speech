@@ -24,6 +24,8 @@ Event types emitted
     ``processed: int, total: int`` – final success counts.
 ``process_failed``
     ``message: str`` – human-readable error message on failure.
+``process_cancelled``
+    Processing was cancelled. No extra payload.
 """
 
 from __future__ import annotations
@@ -61,6 +63,7 @@ class DataProcessingService:
         self._event_queue = event_queue
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._cancel_event = threading.Event()
 
     # ------------------------------------------------------------------
     # Public API
@@ -76,6 +79,7 @@ class DataProcessingService:
         with self._lock:
             if self.is_running:
                 return False
+            self._cancel_event.clear()
             self._thread = threading.Thread(
                 target=self._run,
                 daemon=True,
@@ -83,6 +87,14 @@ class DataProcessingService:
             )
             self._thread.start()
             return True
+
+    def stop(self) -> bool:
+        """Request cancellation. Returns *False* when not running."""
+        if not self.is_running:
+            return False
+        self._cancel_event.set()
+        self._logger.info("[process] Cancellation requested")
+        return True
 
     # ------------------------------------------------------------------
     # Internal implementation
@@ -118,6 +130,10 @@ class DataProcessingService:
 
             done = 0
             for gesture, dataframes in gestures_data.items():
+                if self._cancel_event.is_set():
+                    self._emit("process_cancelled")
+                    self._logger.info("[process] Processing cancelled")
+                    return
                 self._emit("process_gesture_current", gesture=gesture)
                 self._logger.info("[process] Processing gesture: '%s'", gesture)
 

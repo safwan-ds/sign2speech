@@ -216,9 +216,10 @@ def save_processed_data_lstm(
     return filepath
 
 
-def main() -> None:
+def main(*, configure_logging: bool = True) -> None:
     """Main processing pipeline for LSTM data (CLI entry-point)."""
-    setup_logging("process_data")
+    if configure_logging:
+        setup_logging("process_data")
 
     logger.info("LSTM DATA PROCESSING")
     clear_previous_sequence_files()

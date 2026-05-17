@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import queue
-import re
 import time
 from pathlib import Path
 
@@ -859,6 +858,15 @@ class DataManagerWindow(QMainWindow):
                 self._set_task_state(False)
                 continue
 
+            if event_type == "process_cancelled":
+                self.process_progress_bar.setRange(0, 100)
+                self.process_progress_bar.setValue(0)
+                self.process_progress_bar.setFormat("Progress: cancelled")
+                self.process_status_label.setText("Status: cancelled")
+                self._set_status("Processing cancelled", "WARNING")
+                self._set_task_state(False)
+                continue
+
             # ------ Training events ------
             if event_type == "train_started":
                 self.train_status_label.setText("Status: running")
@@ -1254,9 +1262,6 @@ class DataManagerWindow(QMainWindow):
     def _confusion_cell_color(self, ratio: float) -> QColor:
         """Resolve confusion-matrix background color from theme manager."""
         return get_confusion_cell_color(ratio, self._theme_name)
-
-    def _handle_progress_from_script_log(self, message: str) -> None:
-        pass  # Retained for backward compat; no longer needed with native services.
 
     def run_processing(self) -> None:
         """Start the data processing pipeline via the native service."""
