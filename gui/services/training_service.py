@@ -46,6 +46,7 @@ class TrainingOverrides:
     learning_rate: float | None = None
     batch_size: int | None = None
     early_stopping_patience: int | None = None
+    use_ensemble: bool | None = None
 
 
 class TrainingService:
@@ -141,12 +142,18 @@ class TrainingService:
                 if overrides.early_stopping_patience is not None
                 else EARLY_STOPPING_PATIENCE
             )
+            eff_use_ensemble = (
+                overrides.use_ensemble
+                if overrides.use_ensemble is not None
+                else USE_ENSEMBLE
+            )
             self._logger.info(
-                "[train] Overrides — epochs=%d, lr=%.6f, batch=%d, patience=%d",
+                "[train] Overrides — epochs=%d, lr=%.6f, batch=%d, patience=%d, ensemble=%s",
                 eff_epochs,
                 eff_lr,
                 eff_batch,
                 eff_patience,
+                eff_use_ensemble,
             )
 
             result = run_training_pipeline(
@@ -157,7 +164,7 @@ class TrainingService:
                 learning_rate=eff_lr,
                 batch_size=eff_batch,
                 patience=eff_patience,
-                use_ensemble=USE_ENSEMBLE,
+                use_ensemble=eff_use_ensemble,
             )
 
             if result.status == "cancelled":

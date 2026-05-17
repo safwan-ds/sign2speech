@@ -373,6 +373,14 @@ class DataManagerWindow(QMainWindow):
         )
         override_form.addRow("Early Stop Patience:", self.train_patience_spin)
 
+        self.train_ensemble_check = QCheckBox("Train as Ensemble")
+        from config.config import USE_ENSEMBLE
+        self.train_ensemble_check.setChecked(USE_ENSEMBLE)
+        self.train_ensemble_check.setToolTip(
+            f"Train an ensemble of multiple models (config default: {USE_ENSEMBLE})"
+        )
+        override_form.addRow("Ensemble Mode:", self.train_ensemble_check)
+
         mainLayout.addWidget(override_group)
 
         action_row = QHBoxLayout()
@@ -1290,6 +1298,7 @@ class DataManagerWindow(QMainWindow):
             learning_rate=self.train_lr_spin.value(),
             batch_size=self.train_batch_spin.value(),
             early_stopping_patience=self.train_patience_spin.value(),
+            use_ensemble=self.train_ensemble_check.isChecked(),
         )
         if not self.training_service.start(overrides):
             self.train_status_label.setText("Status: could not start")

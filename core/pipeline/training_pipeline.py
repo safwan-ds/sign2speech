@@ -87,7 +87,13 @@ def run_training_pipeline(
         )
 
     if eff_use_ensemble:
-        ensemble_models, label_encoder, mean, std = train_ensemble_models(X, y, test_X, test_y)
+        result_ensemble = train_ensemble_models(
+            X, y, test_X, test_y, epoch_callback=epoch_callback, cancel_event=cancel_event
+        )
+        if result_ensemble[0] is None or len(result_ensemble[0]) == 0:
+            return TrainingPipelineResult(status="cancelled")
+
+        ensemble_models, label_encoder, mean, std = result_ensemble
         model_dir = _latest_model_dir(models_dir, "ensemble_")
         return TrainingPipelineResult(
             status="completed",

@@ -68,6 +68,7 @@ class Sign2SpeechDashboard(
         self.tts_service = TTSService(logger=self.logger, event_queue=self.event_queue)
         self.tts_enabled = True
         self.tts_mode = "instant"
+        self.ensemble_enabled = False
         self._tts_status_state = "waiting"
         self._tts_status_backend = "local"
         self._stream_started_at: float | None = None
@@ -309,6 +310,12 @@ class Sign2SpeechDashboard(
         if mode not in {"instant", "llm", "hybrid"}:
             mode = "instant"
         self.tts_mode = mode
+
+    def _on_ensemble_changed(self, state: int) -> None:
+        self.ensemble_enabled = state == 2
+        # If model is already loaded, we might want to reload it with/without ensemble
+        if self._model_loaded:
+            self.load_model_async()
 
 
 def run_dashboard(project_root: Path) -> None:
