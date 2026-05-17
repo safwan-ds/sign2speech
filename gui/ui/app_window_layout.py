@@ -30,7 +30,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.config import BAUD_RATE, CONFIDENCE_THRESHOLD
+from config.config import (
+    BAUD_RATE,
+    CONFIDENCE_THRESHOLD,
+    USE_QWEN_LLM,
+    MOTION_DETECTION_SMOOTHING_WINDOW,
+    USE_TTS,
+)
 from gui.ui.theme_manager import build_dashboard_stylesheet
 
 
@@ -419,17 +425,17 @@ class AppWindowLayoutMixin:
         settings_layout.addWidget(self.smoothing_label, 7, 0, 1, 2)
         self.smoothing_slider = QSlider(Qt.Orientation.Horizontal)
         self.smoothing_slider.setRange(1, 12)
-        self.smoothing_slider.setValue(2)
+        self.smoothing_slider.setValue(MOTION_DETECTION_SMOOTHING_WINDOW)
         self.smoothing_slider.valueChanged.connect(self._on_smoothing_change)
         settings_layout.addWidget(self.smoothing_slider, 8, 0, 1, 2)
 
         self.llm_checkbox = QCheckBox("")
-        self.llm_checkbox.setChecked(True)
+        self.llm_checkbox.setChecked(USE_QWEN_LLM)
         self.llm_checkbox.stateChanged.connect(self._on_llm_changed)
         settings_layout.addWidget(self.llm_checkbox, 9, 0, 1, 2)
 
         self.tts_checkbox = QCheckBox("")
-        self.tts_checkbox.setChecked(True)
+        self.tts_checkbox.setChecked(USE_TTS)
         self.tts_checkbox.stateChanged.connect(self._on_tts_changed)
         settings_layout.addWidget(self.tts_checkbox, 10, 0, 1, 2)
 
