@@ -1,6 +1,8 @@
 """Core LSTM model training logic"""
 
 import logging
+import threading
+from typing import Callable
 
 import numpy as np
 import torch
@@ -140,18 +142,48 @@ def prepare_data_split(X, y, label_encoder, separate_test_X=None, separate_test_
     return X_train, X_test, y_train, y_test, mean, std, separate_test_X
 
 
-def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
-    """Train LSTM model
+def train_lstm_model(
+    X,
+    y,
+    separate_test_X=None,
+    separate_test_y=None,
+    *,
+    epoch_callback: Callable[[int, int, float, float, float, float, float], None]
+    | None = None,
+    cancel_event: threading.Event | None = None,
+    n_epochs: int | None = None,
+    learning_rate: float | None = None,
+    batch_size: int | None = None,
+    patience: int | None = None,
+):
+    """Train LSTM model.
 
     Args:
-        X: Training features
-        y: Training labels
-        separate_test_X: Optional separate test set features (completely unseen during training)
-        separate_test_y: Optional separate test set labels
+        X: Training features.
+        y: Training labels.
+        separate_test_X: Optional separate test set features (completely unseen during training).
+        separate_test_y: Optional separate test set labels.
+        epoch_callback: Optional callable invoked after every epoch with
+            ``(epoch, total_epochs, train_loss, train_acc, val_loss, val_acc, lr)``.
+        cancel_event: Optional :class:`threading.Event`; when set the training
+            loop exits cleanly after the current epoch and returns *None* for
+            all results to signal cancellation.
+        n_epochs: Override for ``EPOCHS`` config value.
+        learning_rate: Override for ``LEARNING_RATE`` config value.
+        batch_size: Override for ``BATCH_SIZE`` config value.
+        patience: Override for ``EARLY_STOPPING_PATIENCE`` config value.
 
     Returns:
-        Tuple of (model, label_encoder, X_test, y_test, history, mean, std, separate_test_X, separate_test_y)
+        Tuple of (model, label_encoder, X_test, y_test, history, mean, std,
+        separate_test_X, separate_test_y), or a tuple of *None* values when
+        training was cancelled.
     """
+    # Resolve effective hyper-parameter values (override > config default)
+    _n_epochs: int = n_epochs if n_epochs is not None else EPOCHS
+    _learning_rate: float = learning_rate if learning_rate is not None else LEARNING_RATE
+    _batch_size: int = batch_size if batch_size is not None else BATCH_SIZE
+    _patience: int = patience if patience is not None else EARLY_STOPPING_PATIENCE
+
     logger.info("TRAINING LSTM MODEL")
     logger.info(f"Using device: {device}")
 
@@ -219,9 +251,9 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
 
     train_loader = DataLoader(
-        train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=False
+        train_dataset, batch_size=_batch_size, shuffle=True, drop_last=False
     )
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=_batch_size, shuffle=False)
 
     # Build model
     input_size = X.shape[2]  # num_features
@@ -263,7 +295,7 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
         )
 
     optimizer = optim.AdamW(
-        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+        model.parameters(), lr=_learning_rate, weight_decay=WEIGHT_DECAY
     )
 
     # Learning rate scheduler (with optional warmup chained via SequentialLR)
@@ -311,7 +343,6 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
 
     best_val_acc = 0.0
     patience_counter = 0
-    patience = EARLY_STOPPING_PATIENCE
     best_model_state = None
     best_epoch = 0
 
@@ -320,7 +351,12 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
     train_accs = []
     val_accs = []
 
-    for epoch in range(EPOCHS):
+    for epoch in range(_n_epochs):
+        # Check for cancellation before starting the epoch
+        if cancel_event is not None and cancel_event.is_set():
+            logger.info("Training cancelled by user after %d epoch(s)", epoch)
+            return (None,) * 9  # type: ignore[return-value]
+
         # Training phase
         model.train()
         train_loss = 0.0
@@ -382,13 +418,25 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
             scheduler.step(val_loss)  # type: ignore
         current_lr = optimizer.param_groups[0]["lr"]
 
-        # Print progress
+        # Log progress
         logger.info(
-            f"Epoch {epoch+1}/{EPOCHS} - "
+            f"Epoch {epoch+1}/{_n_epochs} - "
             f"Loss: {train_loss:.4f} - Acc: {train_acc:.2f}% - "
             f"Val Loss: {val_loss:.4f} - Val Acc: {val_acc:.2f}% - "
             f"LR: {current_lr:.6f}"
         )
+
+        # Fire optional per-epoch callback (used by GUI training service)
+        if epoch_callback is not None:
+            epoch_callback(
+                epoch + 1,
+                _n_epochs,
+                train_loss,
+                train_acc,
+                val_loss,
+                val_acc,
+                current_lr,
+            )
 
         # Early stopping based on validation accuracy (with MIN_DELTA threshold)
         if val_acc > best_val_acc + MIN_DELTA:
@@ -398,7 +446,7 @@ def train_lstm_model(X, y, separate_test_X=None, separate_test_y=None):
             best_epoch = epoch + 1
         else:
             patience_counter += 1
-            if patience_counter >= patience:
+            if patience_counter >= _patience:
                 logger.info(f"Early stopping triggered after {epoch+1} epochs")
                 logger.info(
                     f"Best validation accuracy: {best_val_acc:.2f}% at epoch {best_epoch}"
