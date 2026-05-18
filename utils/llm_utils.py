@@ -48,41 +48,30 @@ def generate_reply(llm, gesture_text: str, language: str = "tr") -> str | None:
     if llm is None:
         return None
 
-    if language.lower() == "en":
-        system_prompt = (
-            "You are a sign-language post-editor. Convert isolated words into one fluent English sentence.\n"
-            "Strict rules:\n"
-            "1. Reply only in English.\n"
-            "2. Do not explain your reasoning.\n"
-            "3. Use all provided words; do not drop core meaning.\n"
-            "4. You may add minimal grammar words to make it natural.\n"
-            "5. Keep the sentence concise."
-        )
-        user_label = "Words"
-    else:
-        system_prompt = (
-            "Sen bir işaret dili çevirmenisin. Amacın izole kelimeleri kurallı bir Türkçe cümleye dönüştürmektir.\n"
-            "Kesin kurallar:\n"
-            "1. Yalnızca Türkçe yanıt ver.\n"
-            "2. Açıklama yapma, noktalama işareti (nokta, virgül vb.) kullanma.\n"
-            "3. Verilen kelimelerin tamamını kullan, hiçbirini silme.\n"
-            "4. Cümleyi kurallı yapmak için kelimelere gerekli dilbilgisi eklerini (zaman, şahıs, hal ekleri) ekleyebilirsin.\n"
-            "5. Anlamı değiştirecek yeni kök kelimeler ekleme.\n\n"
-            "Örnek 1:\n"
-            "Kelimeler: ben okul gitmek\n"
-            "Yanıt: Ben okula gittim.\n\n"
-            "Örnek 2:\n"
-            "Kelimeler: sen proje yapmak\n"
-            "Yanıt: Sen proje yaptın."
-            "Örnek 3:\n"
-            "Kelimeler: ben yemek alişveri̇ş yapmak ben eksi̇k yok tamam"
-            "Yanıt: Yemek için alışverişi yaptım, hiç eksik yok. Her şey tamam."
-        )
-        user_label = "Kelimeler"
+    system_prompt = """You are a syntactic processing module for a sign language translation array. Your objective is to take a sequential array of raw word tokens (often in base or infinitive forms) and restructure them into a grammatically correct, natural-sounding sentence.
+
+    STRICT CONSTRAINTS:
+    1. NO NEW VOCABULARY: You are strictly forbidden from adding new semantic concepts or nouns. Use only the concepts provided.
+    2. CONJUGATE VERBS: If a verb is provided in the infinitive form (e.g., "yapmak", "gitmek", "go"), you MUST conjugate it to match the subject. DEFAULT to the Present Continuous tense (e.g., "yapıyorum", "am doing") unless the context clearly implies past tense.
+    3. APPLY SUFFIXES: Apply necessary grammatical modifications (declension, case markers, prepositions) to the existing nouns to ensure proper syntax (e.g., "üniversite" -> "üniversiteye").
+    4. OUTPUT FORMAT: Output the finalized sentence string ONLY. Do not output explanations, conversational filler, or markdown delimiters.
+
+    EXAMPLES:
+    Input: me university go
+    Output: I am going to the university.
+
+    Input: ben üniversite gitmek
+    Output: Ben üniversiteye gidiyorum.
+
+    Input: sen proje bitirmek
+    Output: Sen projeyi bitirdin.
+
+    Input: merhaba ben eldiven yapmak
+    Output: Merhaba, ben eldiven yapıyorum."""
 
     prompt = (
         f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        f"<|im_start|>user\n{user_label}: {gesture_text}<|im_end|>\n"
+        f"<|im_start|>user\nInput: {gesture_text}\nOutput:<|im_end|>\n"
         "<|im_start|>assistant\n"
     )
 
@@ -91,10 +80,14 @@ def generate_reply(llm, gesture_text: str, language: str = "tr") -> str | None:
             prompt,
             max_tokens=QWEN_MAX_TOKENS,
             temperature=QWEN_INFERENCE_TEMPERATURE,
+            top_p=0.5,
             stop=["<|im_end|>", "\n"],
         )
         if isinstance(result, dict) and "choices" in result:
             text = result["choices"][0]["text"].strip()
+            # 3. Clean up the output in case the model repeats the trigger word
+            if text.startswith("Output:"):
+                text = text.replace("Output:", "").strip()
             return text if text else None
         return None
     except Exception as e:

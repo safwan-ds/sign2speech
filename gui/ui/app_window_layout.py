@@ -36,6 +36,7 @@ from config.config import (
     USE_QWEN_LLM,
     MOTION_DETECTION_SMOOTHING_WINDOW,
     USE_TTS,
+    USE_ENSEMBLE,
 )
 from gui.ui.theme_manager import build_dashboard_stylesheet
 
@@ -425,38 +426,38 @@ class AppWindowLayoutMixin:
         settings_layout.addWidget(self.smoothing_label, 7, 0, 1, 2)
         self.smoothing_slider = QSlider(Qt.Orientation.Horizontal)
         self.smoothing_slider.setRange(1, 12)
-        self.smoothing_slider.setValue(MOTION_DETECTION_SMOOTHING_WINDOW)
         self.smoothing_slider.valueChanged.connect(self._on_smoothing_change)
+        self.smoothing_slider.setValue(MOTION_DETECTION_SMOOTHING_WINDOW)
         settings_layout.addWidget(self.smoothing_slider, 8, 0, 1, 2)
 
         self.llm_checkbox = QCheckBox("")
-        self.llm_checkbox.setChecked(USE_QWEN_LLM)
         self.llm_checkbox.stateChanged.connect(self._on_llm_changed)
+        self.llm_checkbox.setChecked(USE_QWEN_LLM)
         settings_layout.addWidget(self.llm_checkbox, 9, 0, 1, 2)
 
+        self.tts_mode_label = QLabel("")
+        self.tts_mode_combo = QComboBox()
+        self.tts_status_label = QLabel("")
+        self.tts_status_value_label = QLabel("")
         self.tts_checkbox = QCheckBox("")
-        self.tts_checkbox.setChecked(USE_TTS)
         self.tts_checkbox.stateChanged.connect(self._on_tts_changed)
+        self.tts_checkbox.setChecked(USE_TTS)
         settings_layout.addWidget(self.tts_checkbox, 10, 0, 1, 2)
 
         self.ensemble_checkbox = QCheckBox("")
-        self.ensemble_checkbox.setChecked(False)
         self.ensemble_checkbox.stateChanged.connect(self._on_ensemble_changed)
+        self.ensemble_checkbox.setChecked(USE_ENSEMBLE)
         settings_layout.addWidget(self.ensemble_checkbox, 11, 0, 1, 2)
 
-        self.tts_mode_label = QLabel("")
         settings_layout.addWidget(self.tts_mode_label, 12, 0, 1, 2)
-        self.tts_mode_combo = QComboBox()
         self.tts_mode_combo.addItem("", "instant")
         self.tts_mode_combo.addItem("", "llm")
         self.tts_mode_combo.addItem("", "hybrid")
         self.tts_mode_combo.currentIndexChanged.connect(self._on_tts_mode_changed)
-        self.tts_mode_combo.setCurrentIndex(0)
+        self.tts_mode_combo.setCurrentIndex(2)
         settings_layout.addWidget(self.tts_mode_combo, 13, 0, 1, 2)
 
-        self.tts_status_label = QLabel("")
         settings_layout.addWidget(self.tts_status_label, 14, 0, 1, 2)
-        self.tts_status_value_label = QLabel("")
         settings_layout.addWidget(self.tts_status_value_label, 15, 0, 1, 2)
 
         layout.addWidget(self.settings_group)

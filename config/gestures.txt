@@ -3,10 +3,11 @@ hello - merhaba
 me - ben
 mine - benim
 you - sen
-do - yapmak
+your - senin
 project - proje
 sign_language - işaret dili
 teacher - hoca
+student - öğrenci
 thank_you - teşekkür ederim
 welcome - hoş geldiniz
 glove - eldiven
@@ -14,6 +15,7 @@ good - iyi
 bad - kötü
 wolf - kurt
 ok - tamam
+zero - sıfır
 one - bir
 two - iki
 three - üç
@@ -28,12 +30,16 @@ what - ne
 where - nerede
 why - neden
 how - nasıl
+do - yapmak
 want - istemek
-help - yardım
 go - gitmek
-finish - bitti
+come - gelmek
+help - yardım etmek
+finish - bitirmek
+eat - yemek
+drink - içmek
 name - isim
 university - üniversite
-engineering - mühendislik
 yes - evet
 no - hayır
+deaf - sağır
