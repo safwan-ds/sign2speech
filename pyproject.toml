@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sign-lang-glove"
+name = "sign2speech"
 version = "0.2.0"
 description = "Sign2Speech - Real-time gesture recognition with LSTM and attention"
 requires-python = ">=3.11"
