@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+import utils.serial_utils as serial_utils
 from utils.serial_utils import (
     FlexZeroWarningMonitor,
     build_flex_zero_warning,
+    connect_serial,
+    detect_glove_ports,
     flex_zero_sensors,
     parse_sensor_data,
+    select_serial_port,
 )
 
 
@@ -106,6 +112,16 @@ def test_build_flex_zero_warning_mentions_sensor_and_connection() -> None:
     assert "connection or calibration" in warning
 
 
+def test_build_flex_zero_warning_plural_message_lists_all_sensors() -> None:
+    warning = build_flex_zero_warning(("flex0", "flex3"))
+    assert "flex sensors flex0, flex3 are reading 0" in warning
+
+
+def test_flex_zero_warning_monitor_rejects_invalid_min_samples() -> None:
+    with pytest.raises(ValueError):
+        FlexZeroWarningMonitor(min_consecutive_samples=0)
+
+
 def test_flex_zero_warning_monitor_ignores_the_first_zero_sample() -> None:
     messages: list[str] = []
     monitor = FlexZeroWarningMonitor(
@@ -163,3 +179,137 @@ def test_flex_zero_warning_monitor_resets_after_recovery() -> None:
     monitor.check({"flex0": 0.0})
 
     assert len(messages) == 1
+
+
+def test_select_serial_port_returns_none_when_no_ports(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: [])
+    assert select_serial_port() is None
+
+
+def test_select_serial_port_prefers_explicit_available_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [
+        SimpleNamespace(device="/dev/ttyS1", description="Other", manufacturer="Unknown"),
+        SimpleNamespace(device="/dev/ttyUSB0", description="USB-serial", manufacturer="Vendor"),
+    ]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    assert select_serial_port("/dev/ttyS1") == "/dev/ttyS1"
+
+
+def test_select_serial_port_prefers_known_device_keywords(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [
+        SimpleNamespace(device="/dev/ttyS1", description="Debug adapter", manufacturer="Unknown"),
+        SimpleNamespace(device="/dev/ttyUSB0", description="USB Serial CH340", manufacturer="QinHeng"),
+    ]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    assert select_serial_port() == "/dev/ttyUSB0"
+
+
+def test_select_serial_port_returns_none_when_no_matches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [
+        SimpleNamespace(device="/dev/ttyS1", description="Debug adapter", manufacturer="Unknown"),
+        SimpleNamespace(device="/dev/ttyS2", description="Bluetooth", manufacturer="Unknown"),
+    ]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    assert select_serial_port() is None
+
+
+def test_detect_glove_ports_returns_only_ports_with_valid_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [SimpleNamespace(device="COM1"), SimpleNamespace(device="COM2")]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    monkeypatch.setattr(serial_utils.time, "sleep", lambda _: None)
+
+    class _FakeSerial:
+        def __init__(self, device: str, baud_rate: int, timeout: float) -> None:
+            self.device = device
+            self.closed = False
+            self._lines = (
+                [b"noise\n", b">1,2,3,4,5,6,7,8,9,10,11\n"]
+                if device == "COM1"
+                else [b"bad\n", b"still-bad\n"]
+            )
+
+        def readline(self) -> bytes:
+            return self._lines.pop(0) if self._lines else b""
+
+        def close(self) -> None:
+            self.closed = True
+
+    monkeypatch.setattr(serial_utils.serial, "Serial", _FakeSerial)
+
+    detected = detect_glove_ports(read_attempts=2)
+    assert detected == ["COM1"]
+
+
+def test_detect_glove_ports_skips_ports_with_serial_open_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [SimpleNamespace(device="COM1"), SimpleNamespace(device="COM2")]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    monkeypatch.setattr(serial_utils.time, "sleep", lambda _: None)
+
+    class _FakeSerial:
+        def __init__(self, device: str, baud_rate: int, timeout: float) -> None:
+            if device == "COM1":
+                raise serial_utils.serial.SerialException("port busy")
+            self._lines = [b">1,2,3,4,5,6,7,8,9,10,11\n"]
+
+        def readline(self) -> bytes:
+            return self._lines.pop(0) if self._lines else b""
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(serial_utils.serial, "Serial", _FakeSerial)
+
+    detected = detect_glove_ports(read_attempts=1)
+    assert detected == ["COM2"]
+
+
+def test_detect_glove_ports_ignores_close_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ports = [SimpleNamespace(device="COM1")]
+    monkeypatch.setattr(serial_utils.serial.tools.list_ports, "comports", lambda: ports)
+    monkeypatch.setattr(serial_utils.time, "sleep", lambda _: None)
+
+    class _FakeSerial:
+        def __init__(self, device: str, baud_rate: int, timeout: float) -> None:
+            self._lines = [b"not-valid\n"]
+
+        def readline(self) -> bytes:
+            return self._lines.pop(0) if self._lines else b""
+
+        def close(self) -> None:
+            raise RuntimeError("close failed")
+
+    monkeypatch.setattr(serial_utils.serial, "Serial", _FakeSerial)
+
+    detected = detect_glove_ports(read_attempts=1)
+    assert detected == []
+
+
+def test_connect_serial_returns_serial_instance(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeSerial:
+        def __init__(self, port: str, baud_rate: int, timeout: float) -> None:
+            captured["port"] = port
+            captured["baud_rate"] = baud_rate
+            captured["timeout"] = timeout
+
+    monkeypatch.setattr(serial_utils.serial, "Serial", _FakeSerial)
+
+    connection = connect_serial("COM9", 115200, timeout=0.75)
+
+    assert isinstance(connection, _FakeSerial)
+    assert captured == {"port": "COM9", "baud_rate": 115200, "timeout": 0.75}
