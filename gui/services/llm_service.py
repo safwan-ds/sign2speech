@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+from collections import deque
 from dataclasses import dataclass
 from queue import Queue
 
@@ -40,6 +41,7 @@ class LLMService:
         self._llm = None
         self._load_lock = threading.Lock()
         self._is_loading = False
+        self._history: deque[str] = deque(maxlen=2)
         self._worker.start()
 
     def preload_model(self) -> None:
@@ -96,17 +98,31 @@ class LLMService:
         )
 
     def _ensure_loaded(self) -> bool:
-        if self._llm is not None:
-            return True
-
-        with self._load_lock:
+        while not self._stop_event.is_set():
             if self._llm is not None:
                 return True
-            if self._is_loading:
-                return False
-            self._is_loading = True
+
+            should_load = False
+            with self._load_lock:
+                if self._llm is not None:
+                    return True
+                if not self._is_loading:
+                    self._is_loading = True
+                    should_load = True
+
+            if should_load:
+                break
+
+            # Another thread is preloading the model. Keep the queued request
+            # alive until that load finishes instead of dropping it.
+            self._stop_event.wait(0.05)
+
+        if self._stop_event.is_set():
+            return False
 
         try:
+            if self._llm is not None:
+                return True
             self._emit_status(
                 "QWEN model is loading...",
                 progress="loading",
@@ -159,11 +175,13 @@ class LLMService:
                     self._llm,
                     request.text,
                     language=request.language,
+                    context=list(self._history),
                 )
                 if refined:
                     self._emit_result(
                         LLMResultEvent(text=refined, source_text=request.text)
                     )
+                    self._history.append(refined)
                     self._logger.info("QWEN refinement generated")
                     self._emit_status(
                         "QWEN refinement complete",

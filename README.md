@@ -208,7 +208,7 @@ data/raw/
 └── [other gestures]/
 ```
 
-Each CSV has columns: `flex_0, flex_1, flex_2, flex_3, flex_4, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z`
+Each CSV has columns: `flex0, flex1, flex2, flex3, flex4, accelX, accelY, accelZ, gyroX, gyroY, gyroZ`
 
 ### Processed Data
 

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from core.inference.gesture_translations import (
+    GestureTransitionStateMachine,
     load_gesture_translations,
     translate_gesture,
     translate_gestures,
@@ -51,3 +52,12 @@ def test_translate_gestures_translates_list_in_selected_language() -> None:
         "hello",
         "me",
     ]
+
+
+def test_gesture_transition_state_machine_requires_rest_between_active_tokens() -> None:
+    state = GestureTransitionStateMachine()
+
+    assert state.observe("hello", valid=True) == ("HELLO", True, False)
+    assert state.observe("me", valid=True) == ("HELLO", False, False)
+    assert state.observe("REST", valid=True) == ("REST", True, True)
+    assert state.observe("me", valid=True) == ("ME", True, False)

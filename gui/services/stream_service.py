@@ -8,7 +8,7 @@ import math
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from queue import Queue
 from typing import TYPE_CHECKING
@@ -20,6 +20,7 @@ from config.config import (
     MIN_CONSECUTIVE_REST,
     MIN_GESTURES_FOR_LLM,
     PREDICTION_AVG_MOTION_THRESHOLD,
+    PREDICTION_CLASS_THRESHOLDS,
     PREDICTION_CONSENSUS_FRAMES,
     PREDICTION_INITIAL_CONSENSUS_FRAMES,
     PREDICTION_KEEP_LAST_STABLE_FRAMES,
@@ -35,6 +36,7 @@ from config.config import (
     SEQUENCE_LENGTH,
 )
 from core.inference.gesture_translations import (
+    GestureTransitionStateMachine,
     load_gesture_translations,
     translate_gesture,
     translate_gestures,
@@ -270,6 +272,9 @@ class GestureLockState:
     locked_token: str | None = None
     locked_at: float | None = None
     last_transition_at: float | None = None
+    transition_state: GestureTransitionStateMachine = field(
+        default_factory=GestureTransitionStateMachine
+    )
 
     def observe(
         self, token: str, confidence: float, confidence_threshold: float
@@ -281,6 +286,7 @@ class GestureLockState:
         now = time.monotonic()
 
         if is_rest:
+            self.transition_state.observe(normalized, valid=True)
             self.locked_token = None
             self.locked_at = None
             self.last_transition_at = now
@@ -288,6 +294,8 @@ class GestureLockState:
 
         if not confident:
             return False, False, normalized
+
+        self.transition_state.observe(normalized, valid=True)
 
         if self.locked_token is None or self.locked_token != normalized:
             self.locked_token = normalized
@@ -327,6 +335,10 @@ class StreamWorker(threading.Thread):
         metadata = getattr(model_service, "metadata", None)
         model_dir = getattr(metadata, "model_dir", None) if metadata else None
         self._per_class_thresholds = _load_per_class_thresholds(model_dir)
+        self._config_class_thresholds = {
+            str(key).strip().upper(): float(value)
+            for key, value in PREDICTION_CLASS_THRESHOLDS.items()
+        }
         self._decoder: SequenceDecoder | None = None
         self._flex_zero_monitor = FlexZeroWarningMonitor(
             logger,
@@ -337,9 +349,16 @@ class StreamWorker(threading.Thread):
         )
 
     def _thresholds_for(self, token: str) -> tuple[float, float]:
-        per_class = self._per_class_thresholds.get(token.strip().upper())
+        normalized = token.strip().upper()
+        per_class = self._per_class_thresholds.get(normalized)
         conf_threshold = self._config.confidence_threshold
         gap_threshold = PREDICTION_MIN_CONFIDENCE_GAP
+        config_threshold = self._config_class_thresholds.get(
+            normalized,
+            self._config_class_thresholds.get("DEFAULT"),
+        )
+        if config_threshold is not None:
+            conf_threshold = max(conf_threshold, float(config_threshold))
         if per_class:
             conf_threshold = max(
                 conf_threshold, float(per_class.get("confidence", 0.0))
@@ -459,20 +478,24 @@ class StreamWorker(threading.Thread):
                     filtered_token.strip().upper() == PREDICTION_UNCERTAIN_TOKEN
                 )
                 filtered_is_rest = filtered_token.strip().upper() == "REST"
+                emit_token = filtered_token
+
+                if filtered_is_uncertain:
+                    should_emit = False
+                else:
+                    should_emit, emit_is_rest, emit_token = (
+                        self._lock_state.observe(
+                            filtered_token,
+                            effective_confidence,
+                            conf_threshold,
+                        )
+                    )
+
                 display_token = (
                     filtered_token
                     if not filtered_is_uncertain
                     else ("Belirsiz" if self._config.language == "tr" else "Uncertain")
                 )
-
-                if filtered_is_uncertain:
-                    should_emit = False
-                else:
-                    should_emit, filtered_is_rest, _ = self._lock_state.observe(
-                        filtered_token,
-                        effective_confidence,
-                        conf_threshold,
-                    )
 
                 self._event_queue.put(
                     {
@@ -484,13 +507,13 @@ class StreamWorker(threading.Thread):
                     }
                 )
 
-                if should_emit and not filtered_is_rest and not filtered_is_uncertain:
+                if should_emit and not emit_is_rest and not filtered_is_uncertain:
                     translated = translate_gesture(
-                        filtered_token,
+                        emit_token,
                         self._translations,
                         target_language=self._config.language,
                     )
-                    if self._sentence.try_append(filtered_token):
+                    if self._sentence.try_append(emit_token):
                         self._event_queue.put(
                             {
                                 "type": "sentence",
@@ -535,7 +558,7 @@ class StreamWorker(threading.Thread):
                 elif should_emit and is_confident:
                     consecutive_rest_frames = 0
 
-                    collected_gestures.append((filtered_token, effective_confidence))
+                    collected_gestures.append((emit_token, effective_confidence))
         except Exception as exc:  # pragma: no cover - guarded by UI notifications
             self._logger.exception("Stream worker failed")
             self._event_queue.put(

@@ -26,6 +26,7 @@ def _extract_arch_params(model: torch.nn.Module) -> dict:
         "bidirectional",
         "use_attention",
         "use_batch_norm",
+        "use_cnn",
     ):
         if hasattr(model, attr):
             params[attr] = getattr(model, attr)

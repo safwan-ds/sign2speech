@@ -3,6 +3,8 @@ Data processing and normalization utilities for Sign2Speech project
 """
 
 import logging
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,6 +28,8 @@ from config.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+QUATERNION_FEATURE_NAMES = ["quatW", "quatX", "quatY", "quatZ"]
 
 
 def convert_to_snake_case(label: str) -> str:
@@ -365,6 +369,325 @@ def compute_rolling_statistics(sequence: np.ndarray, window_size: int = 5):
     stats["max"] = np.max(windows, axis=2).astype(np.float32)
 
     return stats
+
+
+def _euclidean_distance(left: np.ndarray, right: np.ndarray) -> float:
+    """Distance function shared by fastdtw and the local fallback."""
+    return float(np.linalg.norm(np.asarray(left, dtype=float) - np.asarray(right, dtype=float)))
+
+
+def _exact_dtw_path(
+    sequence: np.ndarray,
+    template: np.ndarray,
+) -> tuple[float, list[tuple[int, int]]]:
+    """Small, dependency-free DTW fallback for short inference sequences."""
+    n_seq, n_template = len(sequence), len(template)
+    if n_seq == 0 or n_template == 0:
+        return float("inf"), []
+
+    costs = np.full((n_seq + 1, n_template + 1), np.inf, dtype=np.float64)
+    costs[0, 0] = 0.0
+    backtrack: dict[tuple[int, int], tuple[int, int]] = {}
+
+    for i in range(1, n_seq + 1):
+        for j in range(1, n_template + 1):
+            candidates = (
+                (costs[i - 1, j], (i - 1, j)),
+                (costs[i, j - 1], (i, j - 1)),
+                (costs[i - 1, j - 1], (i - 1, j - 1)),
+            )
+            best_cost, best_prev = min(candidates, key=lambda item: item[0])
+            costs[i, j] = (
+                best_cost + _euclidean_distance(sequence[i - 1], template[j - 1])
+            )
+            backtrack[(i, j)] = best_prev
+
+    path: list[tuple[int, int]] = []
+    cursor = (n_seq, n_template)
+    while cursor != (0, 0):
+        i, j = cursor
+        if i > 0 and j > 0:
+            path.append((i - 1, j - 1))
+        cursor = backtrack.get(cursor, (0, 0))
+    path.reverse()
+    return float(costs[n_seq, n_template]), path
+
+
+def _dtw_path(
+    sequence: np.ndarray,
+    template: np.ndarray,
+    radius: int = 5,
+) -> tuple[float, list[tuple[int, int]]]:
+    """Return DTW distance/path, preferring fastdtw when available."""
+    try:
+        from fastdtw import fastdtw  # type: ignore
+
+        distance, path = fastdtw(
+            sequence,
+            template,
+            radius=max(1, int(radius)),
+            dist=_euclidean_distance,
+        )
+        return float(distance), [(int(i), int(j)) for i, j in path]
+    except Exception:
+        return _exact_dtw_path(sequence, template)
+
+
+def resample_sequence(sequence: np.ndarray, target_length: int) -> np.ndarray:
+    """Linearly resample a sequence along time to a target length."""
+    arr = np.asarray(sequence, dtype=np.float32)
+    if arr.ndim != 2:
+        raise ValueError("sequence must be a 2D array")
+    if target_length <= 0:
+        raise ValueError("target_length must be positive")
+    if len(arr) == target_length:
+        return arr.astype(np.float32, copy=True)
+    if len(arr) == 0:
+        return np.zeros((target_length, arr.shape[1]), dtype=np.float32)
+    if len(arr) == 1:
+        return np.repeat(arr, target_length, axis=0).astype(np.float32)
+
+    source_x = np.linspace(0.0, 1.0, len(arr), dtype=np.float32)
+    target_x = np.linspace(0.0, 1.0, target_length, dtype=np.float32)
+    columns = [
+        np.interp(target_x, source_x, arr[:, feature_idx])
+        for feature_idx in range(arr.shape[1])
+    ]
+    return np.stack(columns, axis=1).astype(np.float32)
+
+
+def align_sequence_to_template(
+    sequence: np.ndarray,
+    template: np.ndarray,
+    *,
+    radius: int = 5,
+    target_length: int | None = None,
+) -> tuple[np.ndarray, float]:
+    """DTW-align an incoming sequence to a class template timeline."""
+    seq = np.asarray(sequence, dtype=np.float32)
+    tmpl = np.asarray(template, dtype=np.float32)
+    if seq.ndim != 2 or tmpl.ndim != 2:
+        raise ValueError("sequence and template must be 2D arrays")
+    if seq.shape[1] != tmpl.shape[1]:
+        raise ValueError(
+            f"Feature mismatch: sequence has {seq.shape[1]}, template has {tmpl.shape[1]}"
+        )
+
+    distance, path = _dtw_path(seq, tmpl, radius=radius)
+    output_length = int(target_length or len(tmpl))
+    if not path:
+        return resample_sequence(seq, output_length), distance
+
+    grouped: list[list[np.ndarray]] = [[] for _ in range(len(tmpl))]
+    for seq_idx, tmpl_idx in path:
+        if 0 <= seq_idx < len(seq) and 0 <= tmpl_idx < len(tmpl):
+            grouped[tmpl_idx].append(seq[seq_idx])
+
+    aligned = np.empty_like(tmpl, dtype=np.float32)
+    for tmpl_idx, rows in enumerate(grouped):
+        if rows:
+            aligned[tmpl_idx] = np.mean(np.stack(rows, axis=0), axis=0)
+        else:
+            nearest_idx = int(round(tmpl_idx * (len(seq) - 1) / max(1, len(tmpl) - 1)))
+            aligned[tmpl_idx] = seq[nearest_idx]
+
+    if len(aligned) != output_length:
+        aligned = resample_sequence(aligned, output_length)
+    return aligned.astype(np.float32), distance
+
+
+def align_sequence_to_templates(
+    sequence: np.ndarray,
+    templates: dict[str, np.ndarray],
+    *,
+    radius: int = 5,
+    target_length: int | None = None,
+) -> tuple[np.ndarray, str | None, float | None]:
+    """Align a sequence to the nearest class template and return the aligned copy."""
+    if not templates:
+        return np.asarray(sequence, dtype=np.float32), None, None
+
+    best_label: str | None = None
+    best_distance = float("inf")
+    best_aligned: np.ndarray | None = None
+
+    for label, template in templates.items():
+        tmpl = np.asarray(template, dtype=np.float32)
+        if tmpl.ndim != 2 or tmpl.shape[1] != np.asarray(sequence).shape[1]:
+            continue
+        aligned, distance = align_sequence_to_template(
+            sequence,
+            tmpl,
+            radius=radius,
+            target_length=target_length,
+        )
+        if distance < best_distance:
+            best_label = str(label)
+            best_distance = float(distance)
+            best_aligned = aligned
+
+    if best_aligned is None:
+        return np.asarray(sequence, dtype=np.float32), None, None
+    return best_aligned, best_label, best_distance
+
+
+def load_dtw_templates(path_or_dir: str | Path | None) -> dict[str, np.ndarray]:
+    """Load class templates from ``dtw_templates.npz`` when present."""
+    if path_or_dir is None:
+        return {}
+
+    path = Path(path_or_dir)
+    if path.is_dir():
+        path = path / "dtw_templates.npz"
+    if not path.exists():
+        return {}
+
+    try:
+        payload = np.load(path, allow_pickle=True)
+        if "templates" in payload.files:
+            templates = np.asarray(payload["templates"], dtype=np.float32)
+            labels = None
+            if "classes" in payload.files:
+                labels = payload["classes"]
+            elif "labels" in payload.files:
+                labels = payload["labels"]
+            if labels is None:
+                labels = [f"class_{idx}" for idx in range(len(templates))]
+            return {
+                str(label): np.asarray(template, dtype=np.float32)
+                for label, template in zip(labels, templates)
+                if np.asarray(template).ndim == 2
+            }
+        return {
+            str(key): np.asarray(payload[key], dtype=np.float32)
+            for key in payload.files
+            if np.asarray(payload[key]).ndim == 2
+        }
+    except Exception as exc:
+        logger.warning("Could not load DTW templates from %s: %s", path, exc)
+        return {}
+
+
+def _normalize_quaternion(quaternion: np.ndarray) -> np.ndarray:
+    norm = float(np.linalg.norm(quaternion))
+    if norm <= 1e-12:
+        return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    return (quaternion / norm).astype(np.float32)
+
+
+def _quaternion_multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    w1, x1, y1, z1 = left
+    w2, x2, y2, z2 = right
+    return np.array(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ],
+        dtype=np.float32,
+    )
+
+
+@dataclass
+class MadgwickFilter:
+    """IMU-only Madgwick orientation filter that emits [w, x, y, z]."""
+
+    beta: float = 0.1
+    sample_period: float = 1.0 / 100.0
+    quaternion: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+    )
+
+    def update_imu(
+        self,
+        accel: np.ndarray,
+        gyro: np.ndarray,
+        *,
+        gyro_degrees: bool = False,
+    ) -> np.ndarray:
+        accel = np.asarray(accel, dtype=np.float32)
+        gyro = np.asarray(gyro, dtype=np.float32)
+        if accel.shape != (3,) or gyro.shape != (3,):
+            raise ValueError("accel and gyro must be 3-element vectors")
+
+        if gyro_degrees:
+            gyro = np.deg2rad(gyro).astype(np.float32)
+
+        accel_norm = float(np.linalg.norm(accel))
+        if accel_norm <= 1e-12:
+            return self.quaternion.copy()
+        accel = accel / accel_norm
+
+        q1, q2, q3, q4 = self.quaternion
+        ax, ay, az = accel
+
+        objective = np.array(
+            [
+                2.0 * (q2 * q4 - q1 * q3) - ax,
+                2.0 * (q1 * q2 + q3 * q4) - ay,
+                2.0 * (0.5 - q2 * q2 - q3 * q3) - az,
+            ],
+            dtype=np.float32,
+        )
+        jacobian = np.array(
+            [
+                [-2.0 * q3, 2.0 * q4, -2.0 * q1, 2.0 * q2],
+                [2.0 * q2, 2.0 * q1, 2.0 * q4, 2.0 * q3],
+                [0.0, -4.0 * q2, -4.0 * q3, 0.0],
+            ],
+            dtype=np.float32,
+        )
+        step = jacobian.T @ objective
+        step_norm = float(np.linalg.norm(step))
+        if step_norm > 1e-12:
+            step = step / step_norm
+
+        q_dot = 0.5 * _quaternion_multiply(
+            self.quaternion,
+            np.array([0.0, gyro[0], gyro[1], gyro[2]], dtype=np.float32),
+        ) - self.beta * step
+
+        self.quaternion = _normalize_quaternion(
+            self.quaternion + q_dot * float(self.sample_period)
+        )
+        return self.quaternion.copy()
+
+
+def compute_madgwick_quaternions(
+    sequence: np.ndarray,
+    *,
+    feature_names: list[str] | None = None,
+    beta: float = 0.1,
+    sample_rate_hz: float = 100.0,
+    gyro_degrees: bool = False,
+) -> np.ndarray:
+    """Convert raw accel/gyro columns from a sequence into quaternion features."""
+    arr = np.asarray(sequence, dtype=np.float32)
+    if arr.ndim != 2:
+        raise ValueError("sequence must be a 2D array")
+
+    names = feature_names or get_feature_names()
+    name_to_idx = {name: idx for idx, name in enumerate(names)}
+    required = ["accelX", "accelY", "accelZ", "gyroX", "gyroY", "gyroZ"]
+    missing = [name for name in required if name not in name_to_idx]
+    if missing:
+        raise ValueError("Missing IMU feature(s): " + ", ".join(missing))
+
+    sample_period = 1.0 / max(float(sample_rate_hz), 1e-6)
+    filter_state = MadgwickFilter(beta=beta, sample_period=sample_period)
+    quaternions = np.empty((len(arr), 4), dtype=np.float32)
+
+    for idx, row in enumerate(arr):
+        accel = np.array([row[name_to_idx[name]] for name in required[:3]], dtype=np.float32)
+        gyro = np.array([row[name_to_idx[name]] for name in required[3:]], dtype=np.float32)
+        quaternions[idx] = filter_state.update_imu(
+            accel,
+            gyro,
+            gyro_degrees=gyro_degrees,
+        )
+
+    return quaternions.astype(np.float32)
 
 
 def extract_enhanced_features(

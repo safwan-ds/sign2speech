@@ -31,6 +31,7 @@ class ModelService:
     def load(self, model_dir: Path, use_ensemble: bool = False) -> ModelMetadata:
         """Load predictor assets from a model directory."""
         model_path = model_dir / "model.pth"
+        onnx_path = model_dir / "model.onnx"
         encoder_path = model_dir / "encoder.npy"
         norm_path = model_dir / "normalization.npz"
         ensemble_first_path = model_dir / "model_0.pth"
@@ -42,7 +43,9 @@ class ModelService:
 
         if not use_ensemble:
             if not model_path.exists():
-                if ensemble_first_path.exists():
+                if onnx_path.exists():
+                    model_path = onnx_path
+                elif ensemble_first_path.exists():
                     raise FileNotFoundError(
                         f"Directory '{model_dir.name}' contains an ensemble model. "
                         "Please enable 'Ensemble Mode' in Settings to load it."

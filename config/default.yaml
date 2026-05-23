@@ -26,6 +26,13 @@ training:
     use_attention: true
     use_batch_norm: true
 
+  features:
+    use_enhanced_features: true
+    include_velocity: true
+    include_acceleration: true
+    include_rolling_stats: true
+    rolling_window_size: 5
+
   hyperparameters:
     batch_size: 32
     epochs: 150
@@ -59,7 +66,10 @@ inference:
     smoothing_window: 3
 
   prediction:
-    min_confidence: 0.80
+    prediction_interval: 0.08
+    min_confidence:
+      default: 0.80
+      REST: 0.80
     consensus_frames: 2
     switch_consensus_frames: 3
     confidence_gap_threshold: 0.15
@@ -79,7 +89,7 @@ llm:
     n_ctx: 512
     n_gpu_layers: -1
     max_tokens: 32
-    temperature: 0.1
+    temperature: 0.25
 
 gui:
   window:

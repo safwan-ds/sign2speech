@@ -1,11 +1,54 @@
 import logging
 import os
+from dataclasses import dataclass
 
 from config.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
 GESTURES_PATH = os.path.join(BASE_DIR, "config", "gestures.txt")
+
+
+@dataclass(slots=True)
+class GestureTransitionStateMachine:
+    """Require a verified REST transition before accepting a new active gesture."""
+
+    rest_token: str = "REST"
+    min_rest_frames: int = 1
+    active_token: str | None = None
+    rest_frames: int = 0
+
+    def observe(self, token: str, *, valid: bool = True) -> tuple[str, bool, bool]:
+        """Return (resolved_token, accepted_transition, is_rest)."""
+        normalized = token.strip().upper()
+        if not normalized:
+            return self.active_token or "", False, False
+
+        is_rest = normalized == self.rest_token
+        if is_rest:
+            if valid:
+                self.rest_frames += 1
+                if self.rest_frames >= max(1, self.min_rest_frames):
+                    self.active_token = None
+                    return self.rest_token, True, True
+            return self.active_token or self.rest_token, False, True
+
+        if not valid:
+            self.rest_frames = 0
+            return self.active_token or normalized, False, False
+
+        if self.active_token is None:
+            self.active_token = normalized
+            self.rest_frames = 0
+            return normalized, True, False
+
+        if normalized == self.active_token:
+            self.rest_frames = 0
+            return normalized, False, False
+
+        # A direct active->active switch is held until REST verifies a break.
+        self.rest_frames = 0
+        return self.active_token, False, False
 
 
 def load_gesture_translations(path: str = GESTURES_PATH):

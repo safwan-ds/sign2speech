@@ -10,6 +10,8 @@ from utils.data_utils import (
     detect_motion_boundaries,
     get_feature_names,
     compute_rolling_statistics,
+    align_sequence_to_template,
+    compute_madgwick_quaternions,
 )
 
 
@@ -132,6 +134,28 @@ class TestComputeRollingStatistics:
         stats = compute_rolling_statistics(seq, window_size=5)
         assert np.allclose(stats["mean"], 3.0)
         assert np.allclose(stats["std"], 0.0)
+
+
+class TestDtwAlignment:
+    def test_align_sequence_to_template_preserves_template_length(self):
+        seq = np.array([[0.0], [0.5], [1.0]], dtype=np.float32)
+        template = np.array([[0.0], [0.25], [0.75], [1.0]], dtype=np.float32)
+
+        aligned, distance = align_sequence_to_template(seq, template)
+
+        assert aligned.shape == template.shape
+        assert distance >= 0.0
+
+
+class TestMadgwickQuaternions:
+    def test_compute_madgwick_quaternions_returns_normalized_quats(self):
+        seq = np.zeros((5, 11), dtype=np.float32)
+        seq[:, 7] = 1.0
+
+        quats = compute_madgwick_quaternions(seq)
+
+        assert quats.shape == (5, 4)
+        assert np.allclose(np.linalg.norm(quats, axis=1), 1.0)
 
 
 class TestConvertToSnakeCase:

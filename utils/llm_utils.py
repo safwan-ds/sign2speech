@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -44,30 +45,48 @@ def load_qwen_model():
     )
 
 
-def generate_reply(llm, gesture_text: str, language: str = "tr") -> str | None:
+FEW_SHOT_MAPPINGS = """STANDARD TOKEN-TO-SENTENCE MAPPINGS:
+Input: me university go
+Output: I am going to the university.
+
+Input: ben üniversite gitmek
+Output: Ben üniversiteye gidiyorum.
+
+Input: sen proje bitirmek
+Output: Sen projeyi bitirdin.
+
+Input: merhaba ben eldiven yapmak
+Output: Merhaba, ben eldiven yapıyorum."""
+
+
+def generate_reply(
+    llm,
+    gesture_text: str,
+    language: str = "tr",
+    context: Sequence[str] | None = None,
+) -> str | None:
     if llm is None:
         return None
 
-    system_prompt = """You are a syntactic processing module for a sign language translation array. Your objective is to take a sequential array of raw word tokens (often in base or infinitive forms) and restructure them into a grammatically correct, natural-sounding sentence.
+    context_lines = ""
+    if context:
+        compact_context = [item.strip() for item in context if item.strip()]
+        if compact_context:
+            context_lines = (
+                "\n\nRECENT OUTPUT CONTEXT:\n"
+                + "\n".join(f"- {item}" for item in compact_context[-2:])
+            )
+
+    system_prompt = f"""{FEW_SHOT_MAPPINGS}
+
+    You are a syntactic processing module for a sign language translation array. Your objective is to take a sequential array of raw word tokens (often in base or infinitive forms) and restructure them into a grammatically correct, natural-sounding sentence.
 
     STRICT CONSTRAINTS:
     1. NO NEW VOCABULARY: You are strictly forbidden from adding new semantic concepts or nouns. Use only the concepts provided.
     2. CONJUGATE VERBS: If a verb is provided in the infinitive form (e.g., "yapmak", "gitmek", "go"), you MUST conjugate it to match the subject. DEFAULT to the Present Continuous tense (e.g., "yapıyorum", "am doing") unless the context clearly implies past tense.
     3. APPLY SUFFIXES: Apply necessary grammatical modifications (declension, case markers, prepositions) to the existing nouns to ensure proper syntax (e.g., "üniversite" -> "üniversiteye").
-    4. OUTPUT FORMAT: Output the finalized sentence string ONLY. Do not output explanations, conversational filler, or markdown delimiters.
-
-    EXAMPLES:
-    Input: me university go
-    Output: I am going to the university.
-
-    Input: ben üniversite gitmek
-    Output: Ben üniversiteye gidiyorum.
-
-    Input: sen proje bitirmek
-    Output: Sen projeyi bitirdin.
-
-    Input: merhaba ben eldiven yapmak
-    Output: Merhaba, ben eldiven yapıyorum."""
+    4. USE CONTEXT ONLY FOR PRONOUN/TENSE CONTINUITY: Recent outputs may clarify continuity, but do not add concepts absent from the current input.
+    5. OUTPUT FORMAT: Output the finalized sentence string ONLY. Do not output explanations, conversational filler, or markdown delimiters.{context_lines}"""
 
     prompt = (
         f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
