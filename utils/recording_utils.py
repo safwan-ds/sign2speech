@@ -75,22 +75,111 @@ def save_recording_metadata(file_path: str | Path, metadata: dict[str, object]) 
 
 
 def load_gesture_names(project_root: str | Path) -> list[str]:
-    """Load gesture names from config/gestures.txt, preserving file order."""
+    """Load gesture names from config/gestures.json (preferred) or gestures.txt.
+
+    The JSON format is an array of objects: [{"name": "hello", "translation": "merhaba"}, ...]
+    For backwards compatibility a plain text file where each line is
+    "name - translation" will also be read.
+    """
     root = Path(project_root)
-    gestures_file = root / "config" / "gestures.txt"
-    if not gestures_file.exists():
-        return []
+    json_file = root / "config" / "gestures.json"
+    txt_file = root / "config" / "gestures.txt"
 
     names: list[str] = []
-    with gestures_file.open("r", encoding="utf-8") as handle:
-        for raw_line in handle:
-            line = raw_line.strip()
-            if not line:
-                continue
-            name = line.split(" - ", 1)[0].strip()
-            if name:
-                names.append(name)
+    if json_file.exists():
+        try:
+            with json_file.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            # Support either dict mapping or list of objects
+            if isinstance(data, dict):
+                for name in data.keys():
+                    if name:
+                        names.append(str(name))
+            elif isinstance(data, list):
+                for entry in data:
+                    if isinstance(entry, dict) and entry.get("name"):
+                        names.append(str(entry.get("name")))
+        except Exception:
+            # Fall back to txt parser on error
+            pass
+
+    if not names and txt_file.exists():
+        with txt_file.open("r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                name = line.split(" - ", 1)[0].strip()
+                if name:
+                    names.append(name)
+
     return names
+
+
+def load_gestures(project_root: str | Path) -> list[dict[str, str]]:
+    """Load gestures with optional translations.
+
+    Returns a list of dicts [{"name": ..., "translation": ...}, ...].
+    """
+    root = Path(project_root)
+    json_file = root / "config" / "gestures.json"
+    txt_file = root / "config" / "gestures.txt"
+
+    entries: list[dict[str, str]] = []
+    if json_file.exists():
+        try:
+            with json_file.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    entries.append({"name": str(k), "translation": str(v)})
+            elif isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict):
+                        name = item.get("name")
+                        trans = item.get("translation", "")
+                        if name:
+                            entries.append({"name": str(name), "translation": str(trans)})
+        except Exception:
+            # ignore and try txt fallback
+            entries = []
+
+    if not entries and txt_file.exists():
+        with txt_file.open("r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "-" in line:
+                    original, translated = [part.strip() for part in line.split("-", 1)]
+                else:
+                    original, translated = line, ""
+                if original:
+                    entries.append({"name": original, "translation": translated})
+
+    return entries
+
+
+def save_gestures(project_root: str | Path, entries: list[dict[str, str]]) -> Path:
+    """Save the gestures list to config/gestures.json.
+
+    Entries should be a list of dicts with keys 'name' and optional 'translation'.
+    """
+    root = Path(project_root)
+    json_file = root / "config" / "gestures.json"
+    json_file.parent.mkdir(parents=True, exist_ok=True)
+    # Normalize entries to list of objects
+    to_write: list[dict[str, str]] = []
+    for e in entries:
+        name = str(e.get("name", "")).strip()
+        translation = str(e.get("translation", "")).strip()
+        if not name:
+            continue
+        to_write.append({"name": name, "translation": translation})
+
+    with json_file.open("w", encoding="utf-8") as handle:
+        json.dump(to_write, handle, ensure_ascii=False, indent=2)
+    return json_file
 
 
 def count_csv_samples(gesture_label: str, base_dir: str = LOGS_DIR) -> int:

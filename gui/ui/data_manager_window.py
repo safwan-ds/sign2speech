@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
 )
+from PySide6.QtWidgets import QDialog, QDialogButtonBox
 
 from config.config import (
     BATCH_SIZE,
@@ -64,6 +65,8 @@ from gui.ui.trace_preview_widget import TracePreviewWidget
 from utils.recording_utils import (
     count_csv_samples,
     load_gesture_names,
+    load_gestures,
+    save_gestures,
     sanitize_gesture_label,
 )
 from utils.serial_utils import select_serial_port
@@ -189,7 +192,21 @@ class DataManagerWindow(QMainWindow):
         self.record_gesture_combo.currentTextChanged.connect(
             lambda _text: self._refresh_record_count()
         )
-        form.addRow("Gesture", self.record_gesture_combo)
+
+        # Provide a small manager button to edit the gestures list
+        self.manage_gestures_btn = QPushButton("Manage")
+        self.manage_gestures_btn.setToolTip("Edit gestures list")
+        self.manage_gestures_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        self.manage_gestures_btn.clicked.connect(self._open_gestures_editor)
+
+        gesture_host = QWidget()
+        gesture_layout = QHBoxLayout(gesture_host)
+        gesture_layout.setContentsMargins(0, 0, 0, 0)
+        gesture_layout.setSpacing(6)
+        gesture_layout.addWidget(self.record_gesture_combo)
+        gesture_layout.addWidget(self.manage_gestures_btn)
+
+        form.addRow("Gesture", gesture_host)
 
         record_port.addWidget(self.record_group)
 
@@ -982,6 +999,14 @@ class DataManagerWindow(QMainWindow):
                 self.review_gesture_filter.setCurrentIndex(idx)
         self.review_gesture_filter.blockSignals(False)
 
+    def _open_gestures_editor(self) -> None:
+        """Open a dialog allowing the user to edit the gestures list (name + translation)."""
+        dialog = GesturesEditorDialog(parent=self, project_root=self.project_root)
+        result = dialog.exec()
+        if result == QDialog.Accepted:
+            # Refresh options after a successful save
+            self._load_gesture_options()
+
     def _selected_record_port(self) -> str:
         data = self.record_port_combo.currentData()
         if isinstance(data, str):
@@ -1511,6 +1536,106 @@ class DataManagerWindow(QMainWindow):
         else:
             self._set_status(f"{moved_count} samples restored to raw dataset", "INFO")
         self.refresh_samples()
+
+
+class GesturesEditorDialog(QDialog):
+    """Dialog to view and edit the gestures list stored in config/gestures.json."""
+
+    def __init__(self, project_root: Path, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.project_root = project_root
+        self.setWindowTitle("Manage Gestures")
+        self.resize(600, 420)
+
+        layout = QVBoxLayout(self)
+
+        self.table = QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels(["Name", "Translation"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked | QTableWidget.EditTrigger.SelectedClicked | QTableWidget.EditTrigger.EditKeyPressed)
+        layout.addWidget(self.table, stretch=1)
+
+        btn_row = QHBoxLayout()
+        self.add_btn = QPushButton("Add")
+        self.add_btn.clicked.connect(self._add_row)
+        btn_row.addWidget(self.add_btn)
+
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.clicked.connect(self._delete_selected)
+        btn_row.addWidget(self.delete_btn)
+
+        btn_row.addStretch(1)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self._on_save)
+        self.button_box.rejected.connect(self.reject)
+        btn_row.addWidget(self.button_box)
+
+        layout.addLayout(btn_row)
+
+        self._load()
+
+    def _load(self) -> None:
+        self.table.setRowCount(0)
+        entries = []
+        try:
+            entries = load_gestures(self.project_root)
+        except Exception:
+            entries = []
+
+        for entry in entries:
+            name = entry.get("name", "") if isinstance(entry, dict) else ""
+            trans = entry.get("translation", "") if isinstance(entry, dict) else ""
+            self._insert_row(str(name), str(trans))
+
+    def _insert_row(self, name: str = "", translation: str = "") -> None:
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        name_item = QTableWidgetItem(name)
+        trans_item = QTableWidgetItem(translation)
+        self.table.setItem(row, 0, name_item)
+        self.table.setItem(row, 1, trans_item)
+
+    def _add_row(self) -> None:
+        self._insert_row()
+        # Start editing the name cell of the new row
+        new_row = self.table.rowCount() - 1
+        self.table.editItem(self.table.item(new_row, 0))
+
+    def _delete_selected(self) -> None:
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        for r in rows:
+            self.table.removeRow(r)
+
+    def _on_save(self) -> None:
+        # Collect entries
+        entries: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, 0)
+            trans_item = self.table.item(row, 1)
+            name = (name_item.text() if name_item else "").strip()
+            translation = (trans_item.text() if trans_item else "").strip()
+            if not name:
+                QMessageBox.warning(self, "Invalid Entry", f"Row {row+1} has empty name. Please provide a name or delete the row.")
+                return
+            key = name.lower()
+            if key in seen:
+                QMessageBox.warning(self, "Duplicate Entry", f"Duplicate gesture name: '{name}'. Names must be unique.")
+                return
+            seen.add(key)
+            entries.append({"name": name, "translation": translation})
+
+        try:
+            save_gestures(self.project_root, entries)
+        except Exception as exc:
+            QMessageBox.critical(self, "Save Failed", f"Could not save gestures: {exc}")
+            return
+
+        QMessageBox.information(self, "Saved", "Gestures saved successfully.")
+        self.accept()
 
 
 def run_data_manager(project_root: Path) -> None:

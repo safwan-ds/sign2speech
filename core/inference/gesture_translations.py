@@ -6,7 +6,8 @@ from config.config import BASE_DIR
 
 logger = logging.getLogger(__name__)
 
-GESTURES_PATH = os.path.join(BASE_DIR, "config", "gestures.txt")
+GESTURES_JSON = os.path.join(BASE_DIR, "config", "gestures.json")
+GESTURES_TXT = os.path.join(BASE_DIR, "config", "gestures.txt")
 
 
 @dataclass(slots=True)
@@ -51,23 +52,63 @@ class GestureTransitionStateMachine:
         return self.active_token, False, False
 
 
-def load_gesture_translations(path: str = GESTURES_PATH):
+def load_gesture_translations(path: str | None = None):
+    """Load gesture translations from JSON (preferred) or fallback to text.
+
+    Returns a mapping original.lower() -> translation string.
+    """
     translations: dict[str, str] = {}
-    if not os.path.exists(path):
-        logger.warning(f"Warning: Gestures file not found at {path}")
-        return translations
+    # Determine path preference: explicit path > JSON > TXT
+    candidates = []
+    if path:
+        candidates.append(path)
+    candidates.extend([GESTURES_JSON, GESTURES_TXT])
 
-    with open(path, "r", encoding="utf-8") as handle:
-        for raw_line in handle:
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
+    found = False
+    for candidate in candidates:
+        if not os.path.exists(candidate):
+            continue
+        try:
+            if candidate.lower().endswith(".json"):
+                import json
 
-            if "-" in line:
-                original, translated = [part.strip() for part in line.split("-", 1)]
-                if not original:
-                    continue
-                translations[original.lower()] = translated
+                with open(candidate, "r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                # Accept dict mapping or list of objects
+                if isinstance(data, dict):
+                    for k, v in data.items():
+                        if k:
+                            translations[str(k).lower()] = str(v or "")
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and item.get("name"):
+                            translations[str(item.get("name")).lower()] = str(
+                                item.get("translation", "") or ""
+                            )
+                found = True
+                break
+            else:
+                # Plain text fallback
+                with open(candidate, "r", encoding="utf-8") as handle:
+                    for raw_line in handle:
+                        line = raw_line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if "-" in line:
+                            original, translated = [part.strip() for part in line.split("-", 1)]
+                        else:
+                            original, translated = line, ""
+                        if not original:
+                            continue
+                        translations[original.lower()] = translated
+                found = True
+                break
+        except Exception:
+            # Try next candidate
+            continue
+
+    if not found:
+        logger.warning(f"Warning: Gestures file not found at any expected location")
 
     return translations
 

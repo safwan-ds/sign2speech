@@ -23,3 +23,5 @@ build/
 launcher.cpp
 *.exe
 *.ttf
+
+gestures.json
