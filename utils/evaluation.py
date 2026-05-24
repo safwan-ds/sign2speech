@@ -360,10 +360,20 @@ def plot_confusion_matrix(
         fmt = "d"
         title = "Confusion Matrix"
 
-    plt.figure(figsize=(10, 8))
+    # Dynamic scaling: 0.4 inches per class, minimum 10 inches
+    num_classes = len(class_names)
+    fig_size = max(10, int(num_classes * 0.4))
+
+    plt.figure(figsize=(fig_size, fig_size * 0.8))
+
+    # Disable annotations if too many classes to prevent text overlap
+    show_annotations = num_classes <= 25
+    annot_kwargs = {"size": max(6, 12 - (num_classes // 5))}
+
     sns.heatmap(
         cm,
-        annot=True,
+        annot=show_annotations,
+        annot_kws=annot_kwargs if show_annotations else None,
         fmt=fmt,
         cmap="Blues",
         xticklabels=class_names,
@@ -373,8 +383,10 @@ def plot_confusion_matrix(
     plt.title(title, fontsize=16, pad=20)
     plt.ylabel("True Label", fontsize=12)
     plt.xlabel("Predicted Label", fontsize=12)
-    plt.xticks(rotation=45, ha="right")
-    plt.yticks(rotation=0)
+
+    # Adjust label rotation for dense grids
+    plt.xticks(rotation=90, ha="center", fontsize=max(6, 10 - (num_classes // 10)))
+    plt.yticks(rotation=0, fontsize=max(6, 10 - (num_classes // 10)))
     plt.tight_layout()
 
     if save_path:
@@ -437,18 +449,17 @@ def plot_roc_curves(
             _QTGRAPHS_IMPORT_ERROR,
         )
 
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(12, 8))  # Slightly wider for external legend
 
     for i in range(num_classes):
-
         plt.plot(
             fpr[i],
             tpr[i],
-            lw=2,
+            lw=1.5,  # Thinner lines for density
+            alpha=0.8,  # Slight transparency
             label=f"{class_names[i]} (AUC = {roc_auc[i]:.3f})",
         )
 
-    # Plot diagonal line
     plt.plot([0, 1], [0, 1], "k--", lw=2, label="Random Classifier")
 
     plt.xlim([0.0, 1.0])
@@ -456,7 +467,13 @@ def plot_roc_curves(
     plt.xlabel("False Positive Rate", fontsize=12)
     plt.ylabel("True Positive Rate", fontsize=12)
     plt.title("ROC Curves - Multi-Class Classification", fontsize=16, pad=20)
-    plt.legend(loc="lower right", fontsize=10)
+
+    # External multi-column legend handling
+    if num_classes > 15:
+        plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left", fontsize=8, ncol=2)
+    else:
+        plt.legend(loc="lower right", fontsize=10)
+
     plt.grid(alpha=0.3)
     plt.tight_layout()
 
@@ -514,10 +531,14 @@ def plot_per_class_metrics(
             _QTGRAPHS_IMPORT_ERROR,
         )
 
-    x = np.arange(len(class_names))
+    num_classes = len(class_names)
+    x = np.arange(num_classes)
     width = 0.25
 
-    _, ax = plt.subplots(figsize=(12, 6))
+    # Dynamic width: 0.5 inches per class, minimum 12 inches
+    fig_width = max(12, int(num_classes * 0.5))
+    _, ax = plt.subplots(figsize=(fig_width, 6))
+
     bars1 = ax.bar(x - width, precision, width, label="Precision", color="skyblue")
     bars2 = ax.bar(x, recall, width, label="Recall", color="lightgreen")
     bars3 = ax.bar(x + width, f1, width, label="F1-Score", color="lightcoral")
@@ -526,23 +547,31 @@ def plot_per_class_metrics(
     ax.set_ylabel("Score", fontsize=12)
     ax.set_title("Per-Class Performance Metrics", fontsize=16, pad=20)
     ax.set_xticks(x)
-    ax.set_xticklabels(class_names, rotation=45, ha="right")
-    ax.legend()
+
+    # Vertical rotation for dense x-axis labels
+    ax.set_xticklabels(
+        class_names, rotation=90, ha="center", fontsize=max(6, 10 - (num_classes // 10))
+    )
+
+    # Move legend outside
+    ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
     ax.set_ylim(0, 1.1)
     ax.grid(axis="y", alpha=0.3)
 
-    # Add value labels on bars
-    for bars in [bars1, bars2, bars3]:
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height,
-                f"{height:.2f}",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-            )
+    # Only add value labels on bars if the grid is sparse enough
+    if num_classes <= 20:
+        for bars in [bars1, bars2, bars3]:
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height,
+                    f"{height:.2f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    rotation=90,
+                )
 
     plt.tight_layout()
 
