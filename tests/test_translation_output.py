@@ -1,6 +1,7 @@
 """Tests for bilingual gesture translation output."""
 
 from pathlib import Path
+import json
 
 from core.inference.gesture_translations import (
     GestureTransitionStateMachine,
@@ -11,13 +12,17 @@ from core.inference.gesture_translations import (
 
 
 def test_load_gesture_translations_reads_pairs(tmp_path: Path) -> None:
-    gestures = tmp_path / "gestures.txt"
-    gestures.write_text("hello - merhaba\nme - ben\nREST\n", encoding="utf-8")
+    # Use the new JSON approach (preferred). Create a JSON file containing
+    # a simple mapping of gesture name -> translation.
+    gestures = tmp_path / "gestures.json"
+    data = {"hello": "merhaba", "me": "ben"}
+    gestures.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     mapping = load_gesture_translations(str(gestures))
 
     assert mapping["hello"] == "merhaba"
     assert mapping["me"] == "ben"
+    # REST token should not be present in the JSON mapping
     assert "rest" not in mapping
 
 
