@@ -73,6 +73,72 @@ from utils.recording_utils import (
 from utils.serial_utils import select_serial_port
 
 
+class StageWidget(QGroupBox):
+    """Small helper widget that visualizes a pipeline stage.
+
+    Contains an independent progress bar, status and metrics text and two
+    actionable buttons (Retry / Skip) that map to backend control methods.
+    """
+
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+        super().__init__(title, parent)
+        self.setObjectName(f"stage_{title}")
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(6, 6, 6, 6)
+        self._layout.setSpacing(6)
+
+        self.status_label = QLabel("Idle")
+        self._layout.addWidget(self.status_label)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self._layout.addWidget(self.progress)
+
+        self.metrics_label = QLabel("")
+        self.metrics_label.setWordWrap(True)
+        self._layout.addWidget(self.metrics_label)
+
+        btn_row = QHBoxLayout()
+        self.retry_btn = QPushButton("Retry")
+        self.skip_btn = QPushButton("Skip")
+        btn_row.addWidget(self.retry_btn)
+        btn_row.addWidget(self.skip_btn)
+        btn_row.addStretch(1)
+        self._layout.addLayout(btn_row)
+
+    def set_started(self, message: str | None = None) -> None:
+        self.status_label.setText(message or "Running")
+        self.progress.setRange(0, 0)  # busy
+
+    def set_progress(self, done: int, total: int) -> None:
+        self.progress.setRange(0, max(1, total))
+        self.progress.setValue(max(0, min(total, done)))
+        self.status_label.setText(f"{done}/{total}")
+
+    def set_completed(self) -> None:
+        self.status_label.setText("Completed")
+        self.progress.setRange(0, 100)
+        self.progress.setValue(100)
+
+    def set_failed(self, message: str | None = None) -> None:
+        self.status_label.setText(f"Failed: {message or 'error'}")
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+
+    def set_skipped(self) -> None:
+        self.status_label.setText("Skipped")
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+
+    def set_metrics(self, metrics: dict | None) -> None:
+        if not metrics:
+            self.metrics_label.setText("")
+            return
+        lines = [f"{k}: {v}" for k, v in metrics.items()]
+        self.metrics_label.setText("; ".join(lines))
+
+
 class DataManagerWindow(QMainWindow):
     """Standalone GUI for recording, processing, training, and data cleaning."""
 
@@ -290,57 +356,85 @@ class DataManagerWindow(QMainWindow):
         self.addAction(self.stop_recording_action)
 
     def _build_process_tab(self) -> QWidget:
+        """Build the process tab with dedicated stage widgets.
+
+        Each stage has its own small widget (StageWidget) that presents
+        status/progress/metrics and actionable Retry/Skip buttons.
+        """
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setSpacing(10)
 
-        pipeline_group = QGroupBox("Processing Pipeline")
-        grid = QGridLayout(pipeline_group)
+        header = QLabel("Processing Pipeline — Live Telemetry")
+        header.setObjectName("panelTitle")
+        layout.addWidget(header)
 
-        grid.addWidget(QLabel("1. Load all raw CSV recordings"), 0, 0)
-        grid.addWidget(QLabel("2. Normalize and segment sequences"), 1, 0)
-        grid.addWidget(
-            QLabel("3. Regenerate data/processed and data/test outputs"), 2, 0
-        )
-
+        # Top action row
+        action_row = QHBoxLayout()
         self.process_btn = QPushButton("Run Processing")
         self.process_btn.clicked.connect(self.run_processing)
-        grid.addWidget(self.process_btn, 3, 0)
+        action_row.addWidget(self.process_btn)
 
-        layout.addWidget(pipeline_group)
+        self.process_cancel_btn = QPushButton("Cancel")
+        self.process_cancel_btn.clicked.connect(lambda: self.data_processing_service.stop())
+        action_row.addWidget(self.process_cancel_btn)
+        action_row.addStretch(1)
+        layout.addLayout(action_row)
 
-        self.process_status_label = QLabel("Status: idle")
-        layout.addWidget(self.process_status_label)
+        # Stage widgets grid
+        stages_layout = QGridLayout()
+        stages_layout.setSpacing(8)
 
-        self.process_progress_bar = QProgressBar()
-        self.process_progress_bar.setRange(0, 100)
-        self.process_progress_bar.setValue(0)
-        self.process_progress_bar.setFormat("Progress: 0%")
-        layout.addWidget(self.process_progress_bar)
+        self.stage_file_ingest = StageWidget("File Ingestion")
+        self.stage_smoothing = StageWidget("Signal Smoothing")
+        self.stage_augmentation = StageWidget("Data Augmentation")
+        self.stage_feature = StageWidget("Feature Extraction")
+        self.stage_tensor = StageWidget("Tensor Formatting")
+        self.stage_save_train = StageWidget("Save Training Sequences")
+        self.stage_save_test = StageWidget("Save Test Sequences")
 
+        stages = [
+            self.stage_file_ingest,
+            self.stage_smoothing,
+            self.stage_augmentation,
+            self.stage_feature,
+            self.stage_tensor,
+            self.stage_save_train,
+            self.stage_save_test,
+        ]
+
+        # Connect stage actions to backend controls
+        for w in stages:
+            w.retry_btn.clicked.connect(self.data_processing_service.retry_current_stage)
+            w.skip_btn.clicked.connect(self.data_processing_service.skip_current_stage)
+
+        stages_layout.addWidget(self.stage_file_ingest, 0, 0)
+        stages_layout.addWidget(self.stage_smoothing, 0, 1)
+        stages_layout.addWidget(self.stage_augmentation, 1, 0)
+        stages_layout.addWidget(self.stage_feature, 1, 1)
+        stages_layout.addWidget(self.stage_tensor, 2, 0)
+        stages_layout.addWidget(self.stage_save_train, 2, 1)
+        stages_layout.addWidget(self.stage_save_test, 3, 0)
+
+        layout.addLayout(stages_layout)
+
+        # Results table (keeps previous functionality)
         self.process_results_table = QTableWidget(0, 5)
         self.process_results_table.setHorizontalHeaderLabels(
             ["Gesture", "Files", "Samples", "Train Seq", "Test Seq"]
         )
         self.process_results_table.verticalHeader().setVisible(False)
-        self.process_results_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
-        )
+        self.process_results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.process_results_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.process_results_table)
 
-        self.process_events_box = QPlainTextEdit()
-        self.process_events_box.setReadOnly(True)
-        self.process_events_box.setPlaceholderText(
-            "Processing events will appear here..."
-        )
-        layout.addWidget(self.process_events_box, stretch=1)
-
+        # Compact summary
         self.process_summary_label = QLabel(
             f"Raw directory: {self.raw_data_root}\nProcessed output: {self.project_root / 'data' / 'processed'}"
         )
         self.process_summary_label.setWordWrap(True)
         layout.addWidget(self.process_summary_label)
+
         return tab
 
     def _build_train_tab(self) -> QWidget:
@@ -802,17 +896,29 @@ class DataManagerWindow(QMainWindow):
                     self.recording_status_label.setText("Recording status: discarded")
                 continue
 
-            # ------ Processing events ------
+            # ------ Processing events (stage-level) ------
             if event_type == "process_started":
-                self.process_status_label.setText("Status: running")
+                # Reset all stages
+                for stage in (
+                    self.stage_file_ingest,
+                    self.stage_smoothing,
+                    self.stage_augmentation,
+                    self.stage_feature,
+                    self.stage_tensor,
+                    self.stage_save_train,
+                    self.stage_save_test,
+                ):
+                    stage.set_metrics(None)
+                    stage.set_skipped()
+                self.stage_file_ingest.set_started("Preparing")
+                self._set_task_state(True, "process_data")
                 continue
 
             if event_type == "process_total_gestures":
                 total = int(event.get("total", 0))
                 self._process_total_gestures = total
-                self.process_progress_bar.setRange(0, 100)
-                self.process_progress_bar.setValue(0)
-                self.process_progress_bar.setFormat("Progress: 0%")
+                # show in file ingest widget
+                self.stage_file_ingest.set_metrics({"gestures": total})
                 continue
 
             if event_type == "process_gesture_summary":
@@ -823,55 +929,116 @@ class DataManagerWindow(QMainWindow):
                 self._set_process_table_value(gesture, 2, str(samples))
                 continue
 
-            if event_type == "process_gesture_current":
-                gesture = str(event.get("gesture", ""))
-                self._process_current_gesture = gesture
-                self._process_seen_gestures.add(gesture)
-                if self._process_total_gestures > 0:
-                    pct = int(
-                        (len(self._process_seen_gestures) / self._process_total_gestures) * 100
-                    )
-                    self.process_progress_bar.setValue(max(0, min(100, pct)))
-                    self.process_progress_bar.setFormat(f"Progress: {pct}%")
-                self.process_status_label.setText(f"Status: processing {gesture}")
-                self.process_events_box.appendPlainText(f"Processing gesture: '{gesture}'")
+            if event_type == "process_stage_started":
+                stage = str(event.get("stage", ""))
+                gesture = event.get("gesture")
+                widget = getattr(self, f"stage_{stage}", None)
+                if widget is None:
+                    # Map friendly names
+                    mapping = {
+                        "file_ingest": self.stage_file_ingest,
+                        "smoothing": self.stage_smoothing,
+                        "augmentation": self.stage_augmentation,
+                        "feature_extraction": self.stage_feature,
+                        "tensor_formatting": self.stage_tensor,
+                        "save_train": self.stage_save_train,
+                        "save_test": self.stage_save_test,
+                    }
+                    widget = mapping.get(stage)
+                if widget is not None:
+                    label = f"Running{': ' + str(gesture) if gesture else ''}"
+                    widget.set_started(label)
+                continue
+
+            if event_type == "process_stage_metrics":
+                stage = str(event.get("stage", ""))
+                widget = getattr(self, f"stage_{stage}", None)
+                if widget is None:
+                    mapping = {
+                        "feature_extraction": self.stage_feature,
+                    }
+                    widget = mapping.get(stage)
+                if widget is not None:
+                    metrics = {k: v for k, v in event.items() if k not in {"type", "stage", "gesture"}}
+                    # stringify simple metrics
+                    widget.set_metrics(metrics)
+                continue
+
+            if event_type == "process_stage_completed":
+                stage = str(event.get("stage", ""))
+                widget = getattr(self, f"stage_{stage}", None)
+                if widget is None:
+                    mapping = {
+                        "file_ingest": self.stage_file_ingest,
+                        "save_train": self.stage_save_train,
+                        "save_test": self.stage_save_test,
+                    }
+                    widget = mapping.get(stage)
+                if widget is not None:
+                    widget.set_completed()
+                continue
+
+            if event_type == "process_stage_failed":
+                stage = str(event.get("stage", ""))
+                message = str(event.get("message", ""))
+                widget = getattr(self, f"stage_{stage}", None)
+                if widget is None:
+                    mapping = {
+                        "feature_extraction": self.stage_feature,
+                        "save_test": self.stage_save_test,
+                    }
+                    widget = mapping.get(stage)
+                if widget is not None:
+                    widget.set_failed(message)
+                # Show actionable message in status bar
+                self._set_status(f"Stage {stage} failed: {message}", "ERROR")
+                continue
+
+            if event_type == "process_stage_skipped":
+                stage = str(event.get("stage", ""))
+                widget = getattr(self, f"stage_{stage}", None)
+                if widget is None:
+                    widget = None
+                if widget is not None:
+                    widget.set_skipped()
                 continue
 
             if event_type == "process_train_sequences":
                 gesture = str(event.get("gesture", ""))
                 count = int(event.get("count", 0))
                 self._set_process_table_value(gesture, 3, str(count))
-                self.process_events_box.appendPlainText(
-                    f"  Training: {count} sequences"
-                )
+                # reflect in save_train widget
+                self.stage_save_train.set_metrics({"train_seq": count})
                 continue
 
             if event_type == "process_test_sequences":
                 gesture = str(event.get("gesture", ""))
                 count = int(event.get("count", 0))
                 self._set_process_table_value(gesture, 4, str(count))
-                self.process_events_box.appendPlainText(
-                    f"  Test: {count} sequences"
-                )
+                self.stage_save_test.set_metrics({"test_seq": count})
                 continue
 
             if event_type == "process_progress":
                 done = int(event.get("done", 0))
                 total = max(int(event.get("total", 1)), 1)
-                pct = int((done / total) * 100)
-                self.process_progress_bar.setRange(0, 100)
-                self.process_progress_bar.setValue(max(0, min(100, pct)))
-                self.process_progress_bar.setFormat(f"Progress: {pct}%")
-                self.process_status_label.setText(f"Status: processed {done}/{total}")
+                self._set_status(f"Status: processed {done}/{total}", "INFO")
                 continue
 
             if event_type == "process_completed":
                 processed = int(event.get("processed", 0))
                 total = int(event.get("total", 0))
-                self.process_progress_bar.setRange(0, 100)
-                self.process_progress_bar.setValue(100)
-                self.process_progress_bar.setFormat("Progress: 100%")
-                self.process_status_label.setText("Status: completed")
+                # mark any incomplete stages as completed
+                for w in (
+                    self.stage_file_ingest,
+                    self.stage_smoothing,
+                    self.stage_augmentation,
+                    self.stage_feature,
+                    self.stage_tensor,
+                    self.stage_save_train,
+                    self.stage_save_test,
+                ):
+                    if w.status_label.text() != "Completed":
+                        w.set_completed()
                 self._set_status(f"Processing complete: {processed}/{total} gesture(s)", "INFO")
                 self._set_task_state(False)
                 self.refresh_samples()
@@ -880,19 +1047,11 @@ class DataManagerWindow(QMainWindow):
 
             if event_type == "process_failed":
                 message = str(event.get("message", "Processing failed"))
-                self.process_progress_bar.setRange(0, 100)
-                self.process_progress_bar.setValue(0)
-                self.process_progress_bar.setFormat("Progress: failed")
-                self.process_status_label.setText("Status: failed")
                 self._set_status(f"Processing failed: {message}", "ERROR")
                 self._set_task_state(False)
                 continue
 
             if event_type == "process_cancelled":
-                self.process_progress_bar.setRange(0, 100)
-                self.process_progress_bar.setValue(0)
-                self.process_progress_bar.setFormat("Progress: cancelled")
-                self.process_status_label.setText("Status: cancelled")
                 self._set_status("Processing cancelled", "WARNING")
                 self._set_task_state(False)
                 continue
@@ -1121,11 +1280,21 @@ class DataManagerWindow(QMainWindow):
         self._process_seen_gestures.clear()
         self._process_current_gesture = ""
         self._process_table_rows.clear()
-        self.process_status_label.setText("Status: running")
-        self.process_progress_bar.setRange(0, 0)
-        self.process_progress_bar.setFormat("Progress: preparing...")
+        # Reset stage widgets
+        for w in (
+            self.stage_file_ingest,
+            self.stage_smoothing,
+            self.stage_augmentation,
+            self.stage_feature,
+            self.stage_tensor,
+            self.stage_save_train,
+            self.stage_save_test,
+        ):
+            w.set_metrics(None)
+            w.status_label.setText("Idle")
+            w.progress.setRange(0, 100)
+            w.progress.setValue(0)
         self.process_results_table.setRowCount(0)
-        self.process_events_box.setPlainText("")
 
     def _reset_train_ui(self) -> None:
         self._train_total_epochs = 0
@@ -1308,7 +1477,6 @@ class DataManagerWindow(QMainWindow):
             return
         self._reset_process_ui()
         if not self.data_processing_service.start():
-            self.process_status_label.setText("Status: could not start")
             self._set_status("Processing service is already running", "WARNING")
             return
         self._set_task_state(True, "process_data")

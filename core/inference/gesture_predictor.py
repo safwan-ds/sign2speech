@@ -25,6 +25,8 @@ from config.config import (
     INCLUDE_ACCELERATION,
     INCLUDE_ROLLING_STATS,
     ROLLING_WINDOW_SIZE,
+    # Control computation of Madgwick quaternions (yaw normalization)
+    ENABLE_MADGWICK,
     USE_ENSEMBLE,
     ENSEMBLE_SIZE,
     CONFIDENCE_THRESHOLD,
@@ -197,7 +199,9 @@ class LSTMGesturePredictor:
         self._class_confidence_thresholds = _normalise_class_thresholds(
             PREDICTION_CLASS_THRESHOLDS
         )
-        self._madgwick_filter = MadgwickFilter()
+        # Create Madgwick filter only when enabled via config to allow disabling
+        # the yaw/orientation normalization for latency-sensitive deployments.
+        self._madgwick_filter = MadgwickFilter() if ENABLE_MADGWICK else None
         self._dtw_templates: dict[str, np.ndarray] = {}
         self._last_dtw_template: str | None = None
         self._last_dtw_distance: float | None = None
@@ -540,6 +544,10 @@ class LSTMGesturePredictor:
         if all(name in sensor_dict for name in QUATERNION_FEATURE_NAMES):
             return
 
+        # If the Madgwick filter is disabled, skip quaternion computation entirely.
+        if self._madgwick_filter is None:
+            return
+
         required = ["accelX", "accelY", "accelZ", "gyroX", "gyroY", "gyroZ"]
         if any(name not in sensor_dict for name in required):
             return
@@ -651,16 +659,27 @@ class LSTMGesturePredictor:
         return self._probability_result(probabilities)
 
     def predict(self):
+        """Predict on the current buffer and emit timing diagnostics for profiling."""
+        t0 = time.perf_counter()
         with self._lock:
             if not self._can_predict_unlocked():
                 return None, None, None, None
             sequence = np.array(list(self.buffer), dtype=np.float32)
 
+        t_after_lock = time.perf_counter()
+        t_enhance = 0.0
+        t_dtw = 0.0
+        t_tensor = 0.0
+        t_infer = 0.0
+        t_post = 0.0
+
+        # Enhanced features (velocity/accel/rolling)
         if self.use_enhanced_features and (
             self.include_velocity
             or self.include_acceleration
             or self.include_rolling_stats
         ):
+            t_a = time.perf_counter()
             enhanced_sequence = [sequence]
 
             if self.include_velocity:
@@ -679,15 +698,24 @@ class LSTMGesturePredictor:
                 enhanced_sequence.append(stats["std"])
 
             sequence = np.concatenate(enhanced_sequence, axis=1)
+            t_enhance = time.perf_counter() - t_a
 
+        # DTW alignment
+        t_b = time.perf_counter()
         sequence = self._apply_dtw_alignment(sequence)
+        t_dtw = time.perf_counter() - t_b
 
+        # Convert to tensor and normalize
+        t_c = time.perf_counter()
         sequence_tensor = (
             torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(DEVICE)
         )
         if self._norm_mean_t is not None:
             sequence_tensor = (sequence_tensor - self._norm_mean_t) / self._norm_std_t
+        t_tensor = time.perf_counter() - t_c
 
+        # Inference (ONNX / Ensemble / Single model)
+        t_d = time.perf_counter()
         if self.use_onnx:
             predicted_class_idx, confidence, confidence_gap, all_probs = (
                 self._predict_onnx(sequence_tensor)
@@ -719,12 +747,29 @@ class LSTMGesturePredictor:
                 predicted_class_idx, confidence, confidence_gap, all_probs = (
                     self._probability_result(probabilities)
                 )
+        t_infer = time.perf_counter() - t_d
 
+        # Post-processing
+        t_e = time.perf_counter()
         predicted_gesture = str(self.classes[predicted_class_idx])
         confidence_threshold = self._confidence_threshold_for(predicted_gesture)
 
         with self._lock:
             self.last_prediction_time = time.time()
+        t_post = time.perf_counter() - t_e
+
+        # Diagnostics
+        total = time.perf_counter() - t0
+        logger.debug(
+            "Prediction timing (ms): total=%.2f, lock=%.2f, enhance=%.2f, dtw=%.2f, tensor=%.2f, infer=%.2f, post=%.2f",
+            total * 1000.0,
+            (t_after_lock - t0) * 1000.0,
+            t_enhance * 1000.0,
+            t_dtw * 1000.0,
+            t_tensor * 1000.0,
+            t_infer * 1000.0,
+            t_post * 1000.0,
+        )
 
         if confidence < confidence_threshold:
             logger.debug(

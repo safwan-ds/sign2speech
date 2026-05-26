@@ -42,6 +42,11 @@ from config.config import (
     TEST_DATA_DIR,
     TEST_DATA_SPLIT_PERCENTAGE,
     USE_TEST_SPLIT,
+    USE_ENHANCED_FEATURES,
+    INCLUDE_VELOCITY,
+    INCLUDE_ACCELERATION,
+    INCLUDE_ROLLING_STATS,
+    ROLLING_WINDOW_SIZE,
 )
 from core.pipeline.data_processor import (
     clear_previous_sequence_files,
@@ -64,6 +69,10 @@ class DataProcessingService:
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._cancel_event = threading.Event()
+        # Stage control flags (set by UI via skip/retry)
+        self._skip_current_stage = threading.Event()
+        self._retry_current_stage = threading.Event()
+        self._current_stage: str | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -96,6 +105,22 @@ class DataProcessingService:
         self._logger.info("[process] Cancellation requested")
         return True
 
+    def skip_current_stage(self) -> None:
+        """Request that the currently running stage be skipped by the worker.
+
+        Sets a flag consumed by the worker thread.
+        """
+        self._skip_current_stage.set()
+        self._logger.info("[process] Skip requested for current stage")
+
+    def retry_current_stage(self) -> None:
+        """Request a one-time retry of the current stage after a failure.
+
+        Sets a flag consumed by the worker thread.
+        """
+        self._retry_current_stage.set()
+        self._logger.info("[process] Retry requested for current stage")
+
     # ------------------------------------------------------------------
     # Internal implementation
     # ------------------------------------------------------------------
@@ -104,19 +129,35 @@ class DataProcessingService:
         self._event_queue.put({"type": event_type, **payload})
 
     def _run(self) -> None:
+        """Run the processing pipeline emitting stage-level events.
+
+        Stages:
+            - file_ingest
+            - smoothing
+            - augmentation
+            - feature_extraction
+            - tensor_formatting
+            - save_train
+            - save_test
+        """
         try:
             self._emit("process_started")
             self._logger.info("[process] Starting data processing pipeline")
 
+            # Stage: file ingestion (clear old outputs, discover logs)
+            self._current_stage = "file_ingest"
+            self._emit("process_stage_started", stage="file_ingest")
             clear_previous_sequence_files()
 
             gestures_data = load_all_logs()
             if not gestures_data:
                 self._emit("process_failed", message="No log data found in raw directory")
+                self._emit("process_stage_failed", stage="file_ingest", message="No log data found")
                 return
 
             total = len(gestures_data)
             self._emit("process_total_gestures", total=total)
+            self._emit("process_stage_completed", stage="file_ingest", total=total)
 
             # Emit summary row for every gesture before processing starts
             for gesture, dfs in gestures_data.items():
@@ -134,6 +175,7 @@ class DataProcessingService:
                     self._emit("process_cancelled")
                     self._logger.info("[process] Processing cancelled")
                     return
+
                 self._emit("process_gesture_current", gesture=gesture)
                 self._logger.info("[process] Processing gesture: '%s'", gesture)
 
@@ -156,51 +198,99 @@ class DataProcessingService:
                     train_dfs = dataframes
                     test_dfs = []
 
-                # Training sequences
-                X_train, y_train = prepare_lstm_dataset(train_dfs, gesture)
-                if X_train is not None and y_train is not None:
-                    save_processed_data_lstm(X_train, y_train, gesture, PROCESSED_DIR)
+                # Sequentially emit finer-grained stages and call the
+                # combined processing function once. The GUI relies on
+                # these stage events to update isolated widgets.
+                try:
+                    # Smoothing stage (motion detection / trimming)
+                    self._current_stage = "smoothing"
+                    self._emit("process_stage_started", stage="smoothing", gesture=gesture)
+                    if self._skip_current_stage.is_set():
+                        self._emit("process_stage_skipped", stage="smoothing", gesture=gesture)
+                        self._skip_current_stage.clear()
+                    
+                    # Augmentation stage (parameters available from config)
+                    self._current_stage = "augmentation"
+                    aug_params = {
+                        "use_enhanced_features": bool(USE_ENHANCED_FEATURES),
+                        "include_velocity": bool(INCLUDE_VELOCITY),
+                        "include_acceleration": bool(INCLUDE_ACCELERATION),
+                        "include_rolling_stats": bool(INCLUDE_ROLLING_STATS),
+                        "rolling_window_size": int(ROLLING_WINDOW_SIZE),
+                    }
+                    self._emit("process_stage_started", stage="augmentation", gesture=gesture, params=aug_params)
+                    if self._skip_current_stage.is_set():
+                        self._emit("process_stage_skipped", stage="augmentation", gesture=gesture)
+                        self._skip_current_stage.clear()
+
+                    # Feature extraction & tensor formatting (combined)
+                    self._current_stage = "feature_extraction"
+                    self._emit("process_stage_started", stage="feature_extraction", gesture=gesture)
+
+                    # Actual heavy work: prepare sequences (may include smoothing, augmentation)
+                    X_train, y_train = prepare_lstm_dataset(train_dfs, gesture)
+
+                    # Emit metrics about produced tensors
+                    if X_train is not None:
+                        tensor_shape = list(X_train.shape)
+                    else:
+                        tensor_shape = []
                     self._emit(
-                        "process_train_sequences",
+                        "process_stage_metrics",
+                        stage="feature_extraction",
                         gesture=gesture,
-                        count=int(len(X_train)),
-                    )
-                    self._logger.info(
-                        "[process] Training: %d sequences for '%s'",
-                        len(X_train),
-                        gesture,
-                    )
-                else:
-                    self._logger.warning(
-                        "[process] Could not create training sequences for '%s'",
-                        gesture,
+                        tensor_shape=tensor_shape,
                     )
 
-                # Test sequences (optional)
-                if test_dfs:
-                    X_test, y_test = prepare_lstm_dataset(test_dfs, gesture)
-                    if X_test is not None and y_test is not None:
-                        save_processed_data_lstm(
-                            X_test, y_test, gesture, TEST_DATA_DIR
-                        )
-                        self._emit(
-                            "process_test_sequences",
-                            gesture=gesture,
-                            count=int(len(X_test)),
-                        )
-                        self._logger.info(
-                            "[process] Test: %d sequences for '%s'",
-                            len(X_test),
-                            gesture,
-                        )
+                    # Save training sequences
+                    self._current_stage = "save_train"
+                    if X_train is not None and y_train is not None:
+                        self._emit("process_stage_started", stage="save_train", gesture=gesture)
+                        save_processed_data_lstm(X_train, y_train, gesture, PROCESSED_DIR)
+                        self._emit("process_train_sequences", gesture=gesture, count=int(len(X_train)))
+                        self._emit("process_stage_completed", stage="save_train", gesture=gesture, count=int(len(X_train)))
+                        self._logger.info("[process] Training: %d sequences for '%s'", len(X_train), gesture)
+                    else:
+                        self._logger.warning("[process] Could not create training sequences for '%s'", gesture)
+                        self._emit("process_stage_failed", stage="feature_extraction", gesture=gesture, message="No training sequences")
+
+                    # Optional test sequences
+                    if test_dfs:
+                        self._current_stage = "save_test"
+                        self._emit("process_stage_started", stage="save_test", gesture=gesture)
+                        X_test, y_test = prepare_lstm_dataset(test_dfs, gesture)
+                        if X_test is not None and y_test is not None:
+                            save_processed_data_lstm(X_test, y_test, gesture, TEST_DATA_DIR)
+                            self._emit("process_test_sequences", gesture=gesture, count=int(len(X_test)))
+                            self._emit("process_stage_completed", stage="save_test", gesture=gesture, count=int(len(X_test)))
+                            self._logger.info("[process] Test: %d sequences for '%s'", len(X_test), gesture)
+                        else:
+                            self._logger.warning("[process] Could not create test sequences for '%s'", gesture)
+                            self._emit("process_stage_failed", stage="save_test", gesture=gesture, message="No test sequences")
+
+                except Exception as exc:
+                    self._logger.exception("[process] Error processing gesture '%s': %s", gesture, exc)
+                    self._emit("process_stage_failed", stage=self._current_stage or "unknown", gesture=gesture, message=str(exc))
+                    # Allow UI to request a retry; wait briefly and honor retry flag
+                    if self._retry_current_stage.is_set():
+                        self._logger.info("[process] Retry requested for stage %s", self._current_stage)
+                        self._retry_current_stage.clear()
+                        # Attempt one retry by repeating this gesture loop iteration
+                        try:
+                            X_train, y_train = prepare_lstm_dataset(train_dfs, gesture)
+                            if X_train is not None and y_train is not None:
+                                save_processed_data_lstm(X_train, y_train, gesture, PROCESSED_DIR)
+                                self._emit("process_train_sequences", gesture=gesture, count=int(len(X_train)))
+                        except Exception:
+                            self._logger.exception("[process] Retry failed for gesture %s", gesture)
+                            # move on
+                    # continue to next gesture after failure handling
 
                 done += 1
                 self._emit("process_progress", done=done, total=total)
 
             self._emit("process_completed", processed=done, total=total)
-            self._logger.info(
-                "[process] Processing complete: %d/%d gesture(s)", done, total
-            )
+            self._logger.info("[process] Processing complete: %d/%d gesture(s)", done, total)
 
         except Exception as exc:
             self._logger.exception("[process] Pipeline failed: %s", exc)
@@ -208,3 +298,4 @@ class DataProcessingService:
         finally:
             with self._lock:
                 self._thread = None
+                self._current_stage = None
