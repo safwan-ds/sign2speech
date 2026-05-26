@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QKeySequence, QColor
+from PySide6.QtGui import QAction, QBrush, QKeySequence, QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -62,6 +62,7 @@ from gui.ui.theme_manager import (
     get_status_banner_style,
 )
 from gui.ui.trace_preview_widget import TracePreviewWidget
+from gui.utils.icon_utils import apply_app_icon, resolve_app_icon_path
 from utils.recording_utils import (
     count_csv_samples,
     load_gesture_names,
@@ -78,6 +79,7 @@ class DataManagerWindow(QMainWindow):
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.project_root = project_root
+        apply_app_icon(self, self.project_root)
         self.raw_data_root = Path(LOGS_DIR)
         self.samples: list[SampleRecord] = []
         self._task_active = False
@@ -1647,6 +1649,10 @@ def run_data_manager(project_root: Path) -> None:
         owns_app = True
 
     window = DataManagerWindow(project_root=project_root)
+    icon_path = resolve_app_icon_path(project_root)
+    if icon_path is not None:
+        app.setWindowIcon(QIcon(str(icon_path)))
+    apply_app_icon(window, project_root)
     theme_loaded = apply_custom_widgets_theme(
         window,
         project_root,

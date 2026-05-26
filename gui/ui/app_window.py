@@ -6,7 +6,7 @@ import queue
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from config.config import (
@@ -32,6 +32,7 @@ from gui.ui.theme_manager import (
     get_status_banner_style,
 )
 from gui.utils.formatting import percent
+from gui.utils.icon_utils import apply_app_icon, resolve_app_icon_path
 
 
 class Sign2SpeechDashboard(
@@ -47,6 +48,7 @@ class Sign2SpeechDashboard(
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.project_root = project_root
+        apply_app_icon(self, self.project_root)
         self._i18n = LOCALIZATION
         self.ui_language = (
             DEFAULT_UI_LANGUAGE
@@ -334,6 +336,10 @@ def run_dashboard(project_root: Path) -> None:
             app.setFont(safe_font)
 
     window = Sign2SpeechDashboard(project_root=project_root)
+    icon_path = resolve_app_icon_path(project_root)
+    if icon_path is not None:
+        app.setWindowIcon(QIcon(str(icon_path)))
+    apply_app_icon(window, project_root)
     theme_loaded = apply_custom_widgets_theme(
         window,
         project_root,

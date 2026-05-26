@@ -23,5 +23,6 @@ build/
 launcher.cpp
 *.exe
 *.ttf
+*.rc
 
 gestures.json
