@@ -8,11 +8,11 @@ data. Leverages deep learning (LSTM with attention) and optional LLM refinement 
 - **Real-time Gesture Recognition**: 11+ gestures (REST, hello, goodbye, numbers, etc.) via LSTM-based inference
 - **Smart Glove Hardware**: five flex sensors + IMU (accelerometer/gyroscope) data streaming over serial
 - **Advanced ML Pipeline**:
-    - LSTM with bidirectional, attention, and batch normalization layers
-    - Data augmentation (time warping, magnitude warping, noise injection)
-    - Weighted loss and label smoothing for imbalanced classes
-    - Cosine annealing and learning rate plateau scheduling
-    - Ensemble training support
+  - LSTM with bidirectional, attention, and batch normalization layers
+  - Data augmentation (time warping, magnitude warping, noise injection)
+  - Weighted loss and label smoothing for imbalanced classes
+  - Cosine annealing and learning rate plateau scheduling
+  - Ensemble training support
 - **Production GUI (PySide6)**: Non-blocking threaded pipeline with real-time prediction cards, confidence bars, and
   sentence assembly
 - **QtGraphs Trace Previews**: Dataset manager trace panels use PySide6 QtGraphs with automatic matplotlib fallback

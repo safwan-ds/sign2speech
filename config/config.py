@@ -243,5 +243,11 @@ def setup_logging(script_name: str | None = None) -> None:
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
 
+    # Silence matplotlib internal loggers (font manager, backends, pyplot)
+    for mpl_logger in ("matplotlib", "matplotlib.font_manager", "matplotlib.pyplot"):
+        lg = logging.getLogger(mpl_logger)
+        lg.setLevel(logging.WARNING)
+        lg.propagate = False
+
     logger = logging.getLogger(__name__)
     logger.info(f"Logging initialized - Log file: {log_filepath}")
