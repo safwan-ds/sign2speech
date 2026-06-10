@@ -37,9 +37,16 @@ def test_data_processing_service_emits_happy_path_events(monkeypatch) -> None:
         "gui.services.data_processing_service.load_all_logs",
         lambda: {"HELLO": [_FakeDataFrame(12), _FakeDataFrame(18)]},
     )
+
+    class _FakeSequence:
+        shape = (3, 30, 11)
+
+        def __len__(self) -> int:
+            return int(self.shape[0]) if self.shape else 0
+
     monkeypatch.setattr(
         "gui.services.data_processing_service.prepare_lstm_dataset",
-        lambda dataframes, gesture: ([1, 2, 3], [gesture, gesture, gesture]),
+        lambda dataframes, gesture: (_FakeSequence(), [gesture, gesture, gesture]),
     )
     monkeypatch.setattr(
         "gui.services.data_processing_service.save_processed_data_lstm",
@@ -59,8 +66,8 @@ def test_data_processing_service_emits_happy_path_events(monkeypatch) -> None:
 
     assert "process_started" in event_types
     assert "process_total_gestures" in event_types
-    assert "process_gesture_summary" in event_types
-    assert "process_gesture_current" in event_types
+    assert event_types.count("process_gesture_summary") == 1
+    assert event_types.count("process_gesture_current") == 1
     assert "process_train_sequences" in event_types
     assert "process_progress" in event_types
     assert "process_completed" in event_types

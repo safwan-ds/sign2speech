@@ -26,7 +26,7 @@ data. Leverages deep learning (LSTM with attention) and optional LLM refinement 
 ## What's Inside
 
 ```text
-sign_language_glove/
+sign2speech/
 ├── core/                    # ML logic (models, inference, training)
 ├── gui/                    # UI services and components
 ├── scripts/                # Utility scripts
@@ -38,7 +38,6 @@ sign_language_glove/
 ├── docs/                   # Documentation
 ├── main.py                 # Primary GUI entry point
 ├── data_manager.py         # Dataset manager entry point
-├── config.py               # Shared constants
 ├── pyproject.toml          # Build configuration
 └── requirements.txt        # Frozen dependencies
 ```
@@ -57,7 +56,7 @@ sign_language_glove/
 
 ```bash
 # Clone repository
-cd sign_language_glove
+cd sign2speech
 
 # Create virtual environment
 python -m venv .venv

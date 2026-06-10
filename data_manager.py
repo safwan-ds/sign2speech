@@ -27,15 +27,14 @@ from gui.utils.icon_utils import resolve_app_icon_path
 
 def main() -> None:
     """Start the dataset and model manager GUI."""
-    print("Initializing dataset manager GUI...", flush=True)
     project_root = Path(__file__).resolve().parent
     icon_path = resolve_app_icon_path(project_root)
     if icon_path is not None:
-        app.setWindowIcon(QIcon(str(icon_path)))
+        app.setWindowIcon(QIcon(str(icon_path)))  # type: ignore
     run_data_manager(project_root=project_root)
 
     if QApplication.instance() is app:
-        sys.exit(app.exec())
+        sys.exit(app.exec())  # type: ignore
 
 
 if __name__ == "__main__":

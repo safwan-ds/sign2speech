@@ -18,11 +18,7 @@ app = QApplication.instance()
 if app is None:
     app = QApplication([])
 
-try:
-    from gui.ui.app_window import run_dashboard
-except ImportError:
-    from gui.ui.app_window import run_dashboard
-
+from gui.ui.app_window import run_dashboard
 from gui.utils.icon_utils import resolve_app_icon_path
 
 
@@ -33,12 +29,12 @@ def main() -> None:
     print(f"Project root: {project_root}", flush=True)
     icon_path = resolve_app_icon_path(project_root)
     if icon_path is not None:
-        app.setWindowIcon(QIcon(str(icon_path)))
+        app.setWindowIcon(QIcon(str(icon_path)))  # type: ignore
     print("Starting dashboard...", flush=True)
     run_dashboard(project_root=project_root)
 
     print("GUI started successfully.", flush=True)
-    sys.exit(app.exec())
+    sys.exit(app.exec())  # type: ignore
 
 
 if __name__ == "__main__":
