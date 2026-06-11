@@ -3,8 +3,23 @@ Shared configuration and constants for Sign2Speech project
 """
 
 import os
+from pathlib import Path
 
-COM_PORT = "COM9"
+# --- Load .env file (if present) -------------------------------------------
+_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+if _ENV_PATH.is_file():
+    with open(_ENV_PATH, encoding="utf-8") as _fh:
+        for _line in _fh:
+            _line = _line.strip()
+            if not _line or _line.startswith("#") or "=" not in _line:
+                continue
+            key, _, val = _line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+COM_PORT = os.environ.get("SIGN2SPEECH_COM_PORT", "COM9")
 BAUD_RATE = 115200
 TIMEOUT = 3
 SERIAL_CONNECTION_DELAY = 2
@@ -157,6 +172,15 @@ QWEN_N_BATCH = 512
 QWEN_FORCE_GPU = True
 QWEN_MAX_TOKENS = 64
 QWEN_INFERENCE_TEMPERATURE = 0.25
+
+# ── Remote LLM backend (OpenAI-compatible) ─────────────────────────────────
+LLM_BACKEND = os.environ.get("LLM_BACKEND", "local")          # "local" or "remote"
+LLM_REMOTE_URL = os.environ.get("LLM_REMOTE_URL", "https://api.deepseek.com")
+LLM_REMOTE_API_KEY = os.environ.get("LLM_REMOTE_API_KEY", os.environ.get("DEEPSEEK_API_KEY", ""))
+LLM_REMOTE_MODEL = os.environ.get("LLM_REMOTE_MODEL", "deepseek-v4-flash")
+LLM_REMOTE_TIMEOUT = 15.0
+LLM_REMOTE_FORMAT = os.environ.get("LLM_REMOTE_FORMAT", "chat")  # "chat" (OpenAI/Nous) or "completions" (legacy)
+LLM_REMOTE_MAX_TOKENS = int(os.environ.get("LLM_REMOTE_MAX_TOKENS", "1024"))
 
 PLOT_FIGURE_WIDTH = 12
 PLOT_FIGURE_HEIGHT = 10

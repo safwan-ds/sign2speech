@@ -89,6 +89,99 @@ def test_generate_reply_strips_output_prefix_when_present() -> None:
     assert result == "Merhaba dünya"
 
 
+# -- Remote callable integration tests (mocked OpenAI SDK) --------------------------
+
+from unittest.mock import MagicMock
+import openai
+
+def _make_remote_callable(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    url: str = "https://api.example.com/v1",
+    model: str = "test-model",
+    api_key: str = "sk-test",
+) -> tuple[object, MagicMock]:
+    monkeypatch.setattr(llm_utils, "LLM_REMOTE_URL", url)
+    monkeypatch.setattr(llm_utils, "LLM_REMOTE_API_KEY", api_key)
+    monkeypatch.setattr(llm_utils, "LLM_REMOTE_MODEL", model)
+
+    # Mock the OpenAI client
+    mock_client_instance = MagicMock()
+    mock_openai_class = MagicMock(return_value=mock_client_instance)
+    monkeypatch.setattr("openai.OpenAI", mock_openai_class)
+
+    callable_fn, meta = llm_utils._make_remote_llm()
+    return callable_fn, mock_client_instance
+
+
+class TestRemoteCallable:
+    def test_successful_chat_response(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        remote, mock_client = _make_remote_callable(monkeypatch)
+
+        # Setup mock response
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Merhaba!"
+        mock_client.chat.completions.create.return_value = mock_response
+
+        result = remote("test prompt")
+        assert result == {"choices": [{"text": "Merhaba!"}]}
+        mock_client.chat.completions.create.assert_called_once()
+        kwargs = mock_client.chat.completions.create.call_args[1]
+        assert kwargs["model"] == "test-model"
+        assert kwargs["messages"][1]["content"] == "test prompt"
+
+    def test_null_content_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        remote, mock_client = _make_remote_callable(monkeypatch)
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = ""  # OpenAI SDK handles nulls typically as empty string or we simulate empty
+        mock_client.chat.completions.create.return_value = mock_response
+
+        assert remote("test") == {"choices": [{"text": ""}]}
+
+    def test_api_error_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        remote, mock_client = _make_remote_callable(monkeypatch)
+
+        # Simulate API error
+        mock_client.chat.completions.create.side_effect = openai.APIError("invalid request", request=MagicMock(), body={})
+
+        assert remote("test") == {}
+
+    def test_network_error_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        remote, mock_client = _make_remote_callable(monkeypatch)
+
+        # Simulate network error
+        mock_client.chat.completions.create.side_effect = openai.APIConnectionError(request=MagicMock())
+
+        assert remote("test") == {}
+
+    def test_remote_through_generate_reply(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        remote, mock_client = _make_remote_callable(monkeypatch)
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Ben üniversiteye gidiyorum."
+        mock_client.chat.completions.create.return_value = mock_response
+
+        # Enable remote backend flag
+        monkeypatch.setattr(llm_utils, "_remote_backend_active", True)
+        result = generate_reply(remote, "ben üniversite gitmek", language="tr")
+        assert result == "Ben üniversiteye gidiyorum."
+
+    def test_remote_model_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(llm_utils, "LLM_REMOTE_MODEL", "test-model")
+        monkeypatch.setattr(llm_utils, "LLM_REMOTE_URL", "https://x.com/v1")
+        monkeypatch.setattr(llm_utils, "LLM_REMOTE_API_KEY", "k")
+        
+        mock_openai_class = MagicMock()
+        monkeypatch.setattr("openai.OpenAI", mock_openai_class)
+
+        _, meta = llm_utils._make_remote_llm()
+        assert meta["model"] == "test-model"
+
+
 def test_load_qwen_model_returns_none_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", False)
     assert llm_utils.load_qwen_model() is None

@@ -23,12 +23,12 @@ dependencies = [
     "llama-cpp-python>=0.3,<0.4",
     "edge-tts>=7.2,<8",
     "pyttsx3>=2.99,<3",
+    "openai>=1.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "torchviz"]
 optimization = ["fastdtw>=0.3,<1", "onnx>=1.16,<2", "onnxruntime>=1.20,<2"]
-
 [project.scripts]
 sign-glove-gui = "main:main"
 sign-glove-manager = "data_manager_gui:main"

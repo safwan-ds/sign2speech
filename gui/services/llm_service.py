@@ -9,8 +9,7 @@ from collections import deque
 from dataclasses import dataclass
 from queue import Queue
 
-from config.config import QWEN_N_GPU_LAYERS
-from utils.llm_utils import generate_reply, load_qwen_model
+from utils.llm_utils import create_llm_backend, generate_reply
 
 
 @dataclass(slots=True)
@@ -39,6 +38,7 @@ class LLMService:
         self._stop_event = threading.Event()
         self._worker = threading.Thread(target=self._run, daemon=True)
         self._llm = None
+        self._backend_meta: dict[str, str] = {}
         self._load_lock = threading.Lock()
         self._is_loading = False
         self._history: deque[str] = deque(maxlen=2)
@@ -128,21 +128,22 @@ class LLMService:
                 progress="loading",
                 backend="unknown",
             )
-            self._logger.info("Loading QWEN model for GUI refinement")
-            llm = load_qwen_model()
+            self._logger.info("Loading LLM backend...")
+            llm, meta = create_llm_backend()
+            backend = meta.get("type", "unknown")
             if llm is None:
-                self._logger.warning("QWEN unavailable; refinement disabled")
+                self._logger.warning("LLM backend unavailable; refinement disabled")
                 self._emit_status(
-                    "QWEN unavailable. Check model path and dependencies.",
+                    "LLM unavailable. Check model path and dependencies.",
                     progress="unavailable",
-                    backend="unknown",
+                    backend=backend,
                 )
                 return False
 
             self._llm = llm
-            backend = self._detect_backend()
-            self._logger.info("QWEN model loaded")
-            self._emit_status("QWEN ready", progress="ready", backend=backend)
+            self._backend_meta = meta
+            self._logger.info("LLM backend ready (type=%s)", backend)
+            self._emit_status("LLM ready", progress="ready", backend=backend)
             return True
         finally:
             with self._load_lock:
@@ -197,15 +198,4 @@ class LLMService:
                 )
 
     def _detect_backend(self) -> str:
-        # Backend mode is inferred from offload support and requested GPU layers.
-        if self._llm is None:
-            return "unknown"
-        try:
-            from llama_cpp import llama_cpp as llama_lib
-
-            supports_gpu = bool(llama_lib.llama_supports_gpu_offload())
-            if supports_gpu and QWEN_N_GPU_LAYERS != 0:
-                return "gpu"
-        except Exception:
-            return "unknown"
-        return "cpu"
+        return self._backend_meta.get("type", "unknown")

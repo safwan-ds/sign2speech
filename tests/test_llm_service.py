@@ -32,10 +32,10 @@ def test_refinement_request_waits_for_in_progress_preload(monkeypatch) -> None:
     release_load = threading.Event()
     fake_llm = object()
 
-    def _fake_load_qwen_model():
+    def _fake_create_backend():
         load_started.set()
         assert release_load.wait(timeout=2.0)
-        return fake_llm
+        return fake_llm, {"type": "local_qwen", "model_path": "/tmp/test.gguf"}
 
     def _fake_generate_reply(llm, text, language="tr", context=None):
         assert llm is fake_llm
@@ -43,8 +43,8 @@ def test_refinement_request_waits_for_in_progress_preload(monkeypatch) -> None:
         return "Merhaba, ben buradayım."
 
     monkeypatch.setattr(
-        "gui.services.llm_service.load_qwen_model",
-        _fake_load_qwen_model,
+        "gui.services.llm_service.create_llm_backend",
+        _fake_create_backend,
     )
     monkeypatch.setattr(
         "gui.services.llm_service.generate_reply",

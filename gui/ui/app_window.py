@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import queue
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -298,6 +299,18 @@ class Sign2SpeechDashboard(
             self._set_llm_progress_state("idle")
         else:
             self._set_llm_progress_state("disabled")
+
+    def _on_llm_backend_changed(self, _index: int) -> None:
+        selected = self.llm_backend_combo.currentData()
+        backend = str(selected) if isinstance(selected, str) else "local"
+        if backend not in {"local", "remote"}:
+            return
+        os.environ["LLM_BACKEND"] = backend
+        # Reload LLM backend on next request
+        self.llm_service._llm = None
+        self.llm_service._backend_meta = {}
+        if self.llm_enabled:
+            self.llm_service.preload_model()
 
     def _on_tts_changed(self, state: int) -> None:
         self.tts_enabled = state == 2

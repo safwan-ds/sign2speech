@@ -43,7 +43,7 @@ from core.inference.gesture_translations import (
     load_gesture_translations,
     translate_gestures,
 )
-from utils.llm_utils import load_qwen_model, generate_turkish_reply
+from utils.llm_utils import create_llm_backend, generate_turkish_reply
 
 logger = logging.getLogger(__name__)
 
@@ -137,11 +137,9 @@ def main():
 
     translations = load_gesture_translations()
 
-    llm = load_qwen_model()
+    llm, _meta = create_llm_backend()
     if llm is not None:
-        from config.config import QWEN_N_GPU_LAYERS
-
-        logger.info(f"Qwen GGUF loaded with GPU offload (layers: {QWEN_N_GPU_LAYERS})")
+        logger.info("LLM backend loaded")
 
     # Motion detection settings
     logger.info("MOTION DETECTION (Rest vs Gesture Classification)")

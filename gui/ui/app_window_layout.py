@@ -435,6 +435,20 @@ class AppWindowLayoutMixin:
         self.llm_checkbox.setChecked(USE_QWEN_LLM)
         settings_layout.addWidget(self.llm_checkbox, 9, 0, 1, 2)
 
+        from config.config import LLM_BACKEND as _DEFAULT_LLM_BE
+
+        self.llm_backend_label = QLabel("")
+        settings_layout.addWidget(self.llm_backend_label, 10, 0)
+        self.llm_backend_combo = QComboBox()
+        self.llm_backend_combo.addItem("", "local")
+        self.llm_backend_combo.addItem("", "remote")
+        idx = self.llm_backend_combo.findData(_DEFAULT_LLM_BE)
+        self.llm_backend_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.llm_backend_combo.currentIndexChanged.connect(
+            self._on_llm_backend_changed
+        )
+        settings_layout.addWidget(self.llm_backend_combo, 11, 0)
+
         self.tts_mode_label = QLabel("")
         self.tts_mode_combo = QComboBox()
         self.tts_status_label = QLabel("")
@@ -442,23 +456,23 @@ class AppWindowLayoutMixin:
         self.tts_checkbox = QCheckBox("")
         self.tts_checkbox.stateChanged.connect(self._on_tts_changed)
         self.tts_checkbox.setChecked(USE_TTS)
-        settings_layout.addWidget(self.tts_checkbox, 10, 0, 1, 2)
+        settings_layout.addWidget(self.tts_checkbox, 12, 0, 1, 2)
 
         self.ensemble_checkbox = QCheckBox("")
         self.ensemble_checkbox.stateChanged.connect(self._on_ensemble_changed)
         self.ensemble_checkbox.setChecked(USE_ENSEMBLE)
-        settings_layout.addWidget(self.ensemble_checkbox, 11, 0, 1, 2)
+        settings_layout.addWidget(self.ensemble_checkbox, 13, 0, 1, 2)
 
-        settings_layout.addWidget(self.tts_mode_label, 12, 0, 1, 2)
+        settings_layout.addWidget(self.tts_mode_label, 14, 0, 1, 2)
         self.tts_mode_combo.addItem("", "instant")
         self.tts_mode_combo.addItem("", "llm")
         self.tts_mode_combo.addItem("", "hybrid")
         self.tts_mode_combo.currentIndexChanged.connect(self._on_tts_mode_changed)
         self.tts_mode_combo.setCurrentIndex(2)
-        settings_layout.addWidget(self.tts_mode_combo, 13, 0, 1, 2)
+        settings_layout.addWidget(self.tts_mode_combo, 15, 0, 1, 2)
 
-        settings_layout.addWidget(self.tts_status_label, 14, 0, 1, 2)
-        settings_layout.addWidget(self.tts_status_value_label, 15, 0, 1, 2)
+        settings_layout.addWidget(self.tts_status_label, 16, 0, 1, 2)
+        settings_layout.addWidget(self.tts_status_value_label, 17, 0, 1, 2)
 
         layout.addWidget(self.settings_group)
         self.refresh_model_dirs()
@@ -565,6 +579,9 @@ class AppWindowLayoutMixin:
         self._on_threshold_change(self.threshold_slider.value())
         self._on_smoothing_change(self.smoothing_slider.value())
         self.llm_checkbox.setText(self._t("enable_llm"))
+        self.llm_backend_label.setText(self._t("llm_backend"))
+        self.llm_backend_combo.setItemText(0, self._t("llm_backend_local"))
+        self.llm_backend_combo.setItemText(1, self._t("llm_backend_remote"))
         self.tts_checkbox.setText(self._t("enable_tts"))
         self.ensemble_checkbox.setText(self._t("enable_ensemble"))
         self.tts_mode_label.setText(self._t("tts_mode"))
