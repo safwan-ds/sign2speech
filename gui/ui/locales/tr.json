@@ -165,5 +165,13 @@
 	"tts_mode_hybrid": "Hibrit (anlık kelimeler + LLM cümlesi)",
 	"speak_prediction": "Tahmini Söyle",
 	"speak_sentence": "Cümleyi Söyle",
-	"speak_refined": "Düzeltilmiş Metni Söyle"
+	"speak_refined": "Düzeltilmiş Metni Söyle",
+	"remove_last": "Son Kelimeyi Geri Al",
+	"clear": "Temizle",
+	"refine": "Düzenle",
+	"no_words_to_remove": "Geri alınacak kelime yok",
+	"word_removed": "Kaldırıldı: {word}",
+	"llm_not_enabled": "LLM düzenlemesi etkin değil",
+	"no_sentence_for_llm": "Düzenlenecek cümle yok",
+	"llm_request_sent": "Düzenleme isteği gönderildi"
 }

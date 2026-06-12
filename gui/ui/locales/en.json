@@ -165,5 +165,13 @@
 	"tts_mode_hybrid": "Hybrid (instant words + LLM sentence)",
 	"speak_prediction": "Speak Prediction",
 	"speak_sentence": "Speak Sentence",
-	"speak_refined": "Speak Refined"
+	"speak_refined": "Speak Refined",
+	"remove_last": "Undo Last",
+	"clear": "Clear",
+	"refine": "Refine",
+	"no_words_to_remove": "No words to remove",
+	"word_removed": "Removed: {word}",
+	"llm_not_enabled": "LLM refinement is not enabled",
+	"no_sentence_for_llm": "No sentence to refine",
+	"llm_request_sent": "Refinement request sent"
 }

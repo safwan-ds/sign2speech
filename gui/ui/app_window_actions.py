@@ -367,6 +367,38 @@ class AppWindowActionsMixin:
         self._set_status(self._t("sentence_cleared"), "INFO")
         self._refresh_action_states()
 
+    def remove_last_word(self) -> None:
+        if not self.current_sentence_tokens:
+            self._set_status(self._t("no_words_to_remove"), "WARNING")
+            return
+        removed = self.current_sentence_tokens.pop()
+        self.word_count_label.setText(self._format_word_count(len(self.current_sentence_tokens)))
+        sentence_text = " ".join(self.current_sentence_tokens)
+        if sentence_text:
+            self.sentence_box.setPlainText(sentence_text)
+        else:
+            self.sentence_box.setPlainText(self._t("placeholder_sentence"))
+        self._set_status(self._tf("word_removed", word=removed), "INFO")
+        self._refresh_action_states()
+
+    def request_llm_refinement(self) -> None:
+        if not self.llm_enabled:
+            self._set_status(self._t("llm_not_enabled"), "WARNING")
+            return
+        sentence = " ".join(self.current_sentence_tokens).strip()
+        if not sentence:
+            self._set_status(self._t("no_sentence_for_llm"), "WARNING")
+            return
+        self.event_queue.put({"type": "llm_request", "text": sentence})
+        
+        self.current_sentence_tokens.clear()
+        self.word_count_label.setText(self._format_word_count(0))
+        self.sentence_box.setPlainText(self._t("placeholder_sentence"))
+        self.refined_box.setPlainText(self._t("placeholder_refined"))
+        
+        self._set_status(self._t("llm_request_sent"), "INFO")
+        self._refresh_action_states()
+
     def export_sentence_text(self) -> None:
         sentence = " ".join(self.current_sentence_tokens)
         if not sentence.strip():

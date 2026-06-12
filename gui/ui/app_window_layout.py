@@ -188,6 +188,15 @@ class AppWindowLayoutMixin:
         self.sentence_header_label = QLabel("")
         sentence_header.addWidget(self.sentence_header_label)
         sentence_header.addStretch(1)
+
+        self.sentence_remove_last_btn = QPushButton("")
+        self.sentence_remove_last_btn.clicked.connect(self.remove_last_word)
+        sentence_header.addWidget(self.sentence_remove_last_btn)
+
+        self.sentence_clear_btn = QPushButton("")
+        self.sentence_clear_btn.clicked.connect(self.clear_sentence)
+        sentence_header.addWidget(self.sentence_clear_btn)
+
         self.sentence_copy_btn = QPushButton("")
         self.sentence_copy_btn.clicked.connect(self.copy_sentence)
         sentence_header.addWidget(self.sentence_copy_btn)
@@ -207,6 +216,11 @@ class AppWindowLayoutMixin:
         self.refined_header_label = QLabel("")
         refined_header.addWidget(self.refined_header_label)
         refined_header.addStretch(1)
+
+        self.refined_refine_btn = QPushButton("")
+        self.refined_refine_btn.clicked.connect(self.request_llm_refinement)
+        refined_header.addWidget(self.refined_refine_btn)
+
         self.refined_copy_btn = QPushButton("")
         self.refined_copy_btn.clicked.connect(self.copy_refined)
         refined_header.addWidget(self.refined_copy_btn)
@@ -444,9 +458,7 @@ class AppWindowLayoutMixin:
         self.llm_backend_combo.addItem("", "remote")
         idx = self.llm_backend_combo.findData(_DEFAULT_LLM_BE)
         self.llm_backend_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        self.llm_backend_combo.currentIndexChanged.connect(
-            self._on_llm_backend_changed
-        )
+        self.llm_backend_combo.currentIndexChanged.connect(self._on_llm_backend_changed)
         settings_layout.addWidget(self.llm_backend_combo, 11, 0)
 
         self.tts_mode_label = QLabel("")
@@ -523,6 +535,16 @@ class AppWindowLayoutMixin:
         copy_action.triggered.connect(self.copy_sentence)
         self.addAction(copy_action)
 
+        remove_last_action = QAction("", parent)
+        remove_last_action.setShortcut(QKeySequence("Z"))
+        remove_last_action.triggered.connect(self.remove_last_word)
+        self.addAction(remove_last_action)
+
+        refine_action = QAction("", parent)
+        refine_action.setShortcut(QKeySequence("R"))
+        refine_action.triggered.connect(self.request_llm_refinement)
+        self.addAction(refine_action)
+
     def _apply_localization(self) -> None:
         self._refresh_language_option_labels()
         self.setWindowTitle(self._t("title"))
@@ -554,7 +576,12 @@ class AppWindowLayoutMixin:
             self._format_llm_backend(self._llm_backend_state)
         )
         self.sentence_copy_btn.setText(self._t("copy"))
+        self.sentence_remove_last_btn.setText(self._t("remove_last"))
+        self.sentence_clear_btn.setText(self._t("clear"))
+
         self.refined_copy_btn.setText(self._t("copy"))
+        self.refined_refine_btn.setText(self._t("refine"))
+
         self.history_label.setText(self._t("history"))
         self.history_table.setHorizontalHeaderLabels(
             [self._t("table_time"), self._t("table_class"), self._t("table_confidence")]
