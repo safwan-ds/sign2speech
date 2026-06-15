@@ -1,6 +1,8 @@
 .venv/
 .vscode/
 .idea/
+.junie/
+.hermes/
 .env
 
 __pycache__/
