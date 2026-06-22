@@ -5,6 +5,8 @@ Provides QtGraphs-based rendering for ROC curves and per-class metrics,
 used as an alternative to the matplotlib backend when PySide6 is available.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import urllib.parse
