@@ -12,7 +12,7 @@ from queue import Queue
 from config.config import (
     BAUD_RATE,
     COM_PORT,
-    LOGS_DIR,
+    RAW_DATA_DIR,
     SERIAL_CONNECTION_DELAY,
     TIMEOUT,
 )
@@ -183,7 +183,7 @@ class RecordingService:
         elapsed_seconds: float,
     ) -> str:
         """Persist a reviewed recording and return saved CSV path."""
-        target_path = build_recording_file_path(gesture_label, base_dir=LOGS_DIR)
+        target_path = build_recording_file_path(gesture_label, base_dir=RAW_DATA_DIR)
         saved_path = save_rows_to_csv(target_path, rows)
         metadata_path = build_recording_metadata_path(saved_path)
         metadata = {

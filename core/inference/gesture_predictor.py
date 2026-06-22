@@ -7,7 +7,7 @@ from collections import deque
 
 import numpy as np
 import torch
-from core.models.lstm_model import build_lstm_model
+from core.models.model_factory import build_model_from_checkpoint
 
 from config.config import (
     MODELS_DIR,
@@ -50,9 +50,6 @@ except ImportError:  # pragma: no cover - backward compatibility for old configs
     PREDICTION_CLASS_THRESHOLDS = {}
 
 logger = logging.getLogger(__name__)
-
-# Set device
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Model paths – new layout keeps everything inside models/latest/
 MODEL_PATH = os.path.join(MODELS_DIR, "latest", "model.pth")
@@ -108,7 +105,7 @@ def _canonical_sensor_name(name: str) -> str:
     return key
 
 
-def _normalise_class_thresholds(
+def _normalize_class_thresholds(
     thresholds: object,
 ) -> dict[str, float]:
     if not isinstance(thresholds, dict):
@@ -122,61 +119,6 @@ def _normalise_class_thresholds(
     return normalized
 
 
-def _load_model_checkpoint(path: str) -> tuple[dict, dict, int, int | None]:
-    """Load model checkpoint with backward compatibility.
-
-    Handles both the new format (dict with 'state_dict' + 'arch_params')
-    and legacy format (bare state_dict).
-
-    Returns:
-        (state_dict, arch_params, input_size, num_classes)
-    """
-    try:
-        checkpoint = torch.load(path, map_location=DEVICE, weights_only=False)
-    except TypeError:
-        # Older PyTorch without weights_only parameter
-        checkpoint = torch.load(path, map_location=DEVICE)
-
-    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-        state_dict = checkpoint["state_dict"]
-        arch_params = checkpoint.get("arch_params", {})
-    else:
-        state_dict = checkpoint
-        arch_params = {}
-
-    # Infer input size
-    # Check input_proj first (advanced model projects input before LSTM)
-    if "input_size" in arch_params:
-        input_size = int(arch_params["input_size"])
-    elif "input_proj.weight" in state_dict:
-        input_size = int(state_dict["input_proj.weight"].shape[1])
-    elif "lstm.weight_ih_l0" in state_dict:
-        input_size = int(state_dict["lstm.weight_ih_l0"].shape[1])
-    else:
-        raise ValueError(f"Cannot infer input size from model: {path}")
-
-    # Infer num_classes
-    num_classes = arch_params.get("num_classes")
-    if num_classes is None:
-        # Try to find last layer output size
-        # Check classifier (Transformer)
-        classifier_weights = [
-            k
-            for k in state_dict.keys()
-            if k.startswith("classifier.") and k.endswith(".weight")
-        ]
-        if classifier_weights:
-            # Sort by index (classifier.N.weight)
-            classifier_weights.sort(key=lambda x: int(x.split(".")[1]), reverse=True)
-            num_classes = state_dict[classifier_weights[0]].shape[0]
-        elif "fc_out.weight" in state_dict:
-            num_classes = state_dict["fc_out.weight"].shape[0]
-        elif "fc.weight" in state_dict:
-            num_classes = state_dict["fc.weight"].shape[0]
-
-    return state_dict, arch_params, input_size, num_classes
-
-
 class LSTMGesturePredictor:
     """Real-time gesture prediction using LSTM"""
 
@@ -186,7 +128,11 @@ class LSTMGesturePredictor:
         encoder_path: str = ENCODER_PATH,
         sequence_length: int = SEQUENCE_LENGTH,
         use_ensemble: bool | None = None,
+        device: torch.device | None = None,
     ):
+        self._device = device or torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
         self.sequence_length = sequence_length
         self.buffer: deque[list[float]] = deque(maxlen=sequence_length)
         self._lock = threading.Lock()
@@ -196,7 +142,7 @@ class LSTMGesturePredictor:
         self.include_rolling_stats = INCLUDE_ROLLING_STATS
         self.rolling_window_size = ROLLING_WINDOW_SIZE
         self.use_ensemble = use_ensemble if use_ensemble is not None else USE_ENSEMBLE
-        self._class_confidence_thresholds = _normalise_class_thresholds(
+        self._class_confidence_thresholds = _normalize_class_thresholds(
             PREDICTION_CLASS_THRESHOLDS
         )
         # Create Madgwick filter only when enabled via config to allow disabling
@@ -255,8 +201,20 @@ class LSTMGesturePredictor:
                 if not os.path.exists(ensemble_model_path):
                     break
                 
-                state_dict, arch_params, input_size, inferred_num_classes = (
-                    _load_model_checkpoint(ensemble_model_path)
+                model, arch_params, input_size, inferred_num_classes = (
+                    build_model_from_checkpoint(
+                        ensemble_model_path,
+                        self._device,
+                        encoder_num_classes=num_classes,
+                        hidden_size=LSTM_UNITS,
+                        num_layers=LSTM_LAYERS,
+                        dropout_rate=DROPOUT_RATE,
+                        model_type=MODEL_TYPE,
+                        bidirectional=USE_BIDIRECTIONAL,
+                        use_attention=USE_ATTENTION,
+                        use_batch_norm=USE_BATCH_NORM,
+                        use_cnn=False,
+                    )
                 )
                 self.expected_features = self._select_features(input_size)
 
@@ -280,22 +238,6 @@ class LSTMGesturePredictor:
                         # Update num_classes for subsequent ensemble members check
                         num_classes = len(self.classes)
 
-                resolved_type = arch_params.get("model_type", MODEL_TYPE)
-                model = build_lstm_model(
-                    input_size=input_size,
-                    num_classes=resolved_num_classes,
-                    hidden_size=arch_params.get("hidden_size", LSTM_UNITS),
-                    num_layers=arch_params.get("num_layers", LSTM_LAYERS),
-                    dropout_rate=arch_params.get("dropout_rate", DROPOUT_RATE),
-                    device=DEVICE,
-                    model_type=resolved_type,
-                    bidirectional=arch_params.get("bidirectional", USE_BIDIRECTIONAL),
-                    use_attention=arch_params.get("use_attention", USE_ATTENTION),
-                    use_batch_norm=arch_params.get("use_batch_norm", USE_BATCH_NORM),
-                    use_cnn=arch_params.get("use_cnn", False),
-                )
-                model.load_state_dict(state_dict)
-                model.eval()
                 self.ensemble_models.append(model)
                 ensemble_idx += 1
 
@@ -306,9 +248,21 @@ class LSTMGesturePredictor:
 
             logger.info(f"Loaded {len(self.ensemble_models)} ensemble models")
         else:
-            # Load single model
-            state_dict, arch_params, input_size, inferred_num_classes = (
-                _load_model_checkpoint(model_path)
+            # Load single model — single call to factory returns model + metadata
+            self.model, arch_params, input_size, inferred_num_classes = (
+                build_model_from_checkpoint(
+                    model_path,
+                    self._device,
+                    encoder_num_classes=num_classes,
+                    hidden_size=LSTM_UNITS,
+                    num_layers=LSTM_LAYERS,
+                    dropout_rate=DROPOUT_RATE,
+                    model_type=MODEL_TYPE,
+                    bidirectional=USE_BIDIRECTIONAL,
+                    use_attention=USE_ATTENTION,
+                    use_batch_norm=USE_BATCH_NORM,
+                    use_cnn=False,
+                )
             )
             self.expected_features = self._select_features(input_size)
 
@@ -329,24 +283,6 @@ class LSTMGesturePredictor:
                     new_names = [f"unknown_{i}" for i in range(extra)]
                     self.classes = np.concatenate([self.classes, new_names])
 
-            resolved_type = arch_params.get("model_type", MODEL_TYPE)
-            self.model = build_lstm_model(
-                input_size=input_size,
-                num_classes=resolved_num_classes,
-                hidden_size=arch_params.get("hidden_size", LSTM_UNITS),
-                num_layers=arch_params.get("num_layers", LSTM_LAYERS),
-                dropout_rate=arch_params.get("dropout_rate", DROPOUT_RATE),
-                device=DEVICE,
-                model_type=resolved_type,
-                bidirectional=arch_params.get("bidirectional", USE_BIDIRECTIONAL),
-                use_attention=arch_params.get("use_attention", USE_ATTENTION),
-                use_batch_norm=arch_params.get("use_batch_norm", USE_BATCH_NORM),
-                use_cnn=arch_params.get("use_cnn", False),
-            )
-
-            self.model.load_state_dict(state_dict)
-            self.model.eval()
-
         # Validate normalization dimensions match model input
         if self.norm_mean is not None and len(self.norm_mean) != input_size:
             logger.warning(
@@ -359,9 +295,9 @@ class LSTMGesturePredictor:
         # Move normalization stats to the inference device once, so the hot path
         # can stay in tensor land (no per-prediction NumPy subtract/divide).
         if self.norm_mean is not None and self.norm_std is not None:
-            self._norm_mean_t = torch.from_numpy(self.norm_mean).to(DEVICE)
+            self._norm_mean_t = torch.from_numpy(self.norm_mean).to(self._device)
             self._norm_std_t = torch.clamp(
-                torch.from_numpy(self.norm_std).to(DEVICE),
+                torch.from_numpy(self.norm_std).to(self._device),
                 min=1e-6,
             )
 
@@ -394,7 +330,7 @@ class LSTMGesturePredictor:
             logger.info(f"Using ensemble of {len(self.ensemble_models)} models")
         if self.use_onnx:
             logger.info("Using ONNX Runtime inference")
-        logger.info(f"Device: {DEVICE}")
+        logger.info(f"Device: {self._device}")
 
         # Start at zero so the first full buffer can be predicted immediately.
         self.last_prediction_time = 0.0
@@ -453,7 +389,7 @@ class LSTMGesturePredictor:
             dummy = torch.zeros(
                 (1, self.sequence_length, input_size),
                 dtype=torch.float32,
-                device=DEVICE,
+                device=self._device,
             )
             with torch.no_grad():
                 if self.use_ensemble:
@@ -654,7 +590,7 @@ class LSTMGesturePredictor:
             raise RuntimeError("ONNX Runtime session is not initialized")
         input_array = sequence_tensor.detach().cpu().numpy().astype(np.float32)
         outputs = self.onnx_session.run(None, {self._onnx_input_name: input_array})
-        logits = torch.from_numpy(np.asarray(outputs[0], dtype=np.float32)).to(DEVICE)
+        logits = torch.from_numpy(np.asarray(outputs[0], dtype=np.float32)).to(self._device)
         probabilities = torch.softmax(logits, dim=1)
         return self._probability_result(probabilities)
 
@@ -708,7 +644,7 @@ class LSTMGesturePredictor:
         # Convert to tensor and normalize
         t_c = time.perf_counter()
         sequence_tensor = (
-            torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(DEVICE)
+            torch.from_numpy(np.ascontiguousarray(sequence)).unsqueeze(0).to(self._device)
         )
         if self._norm_mean_t is not None:
             sequence_tensor = (sequence_tensor - self._norm_mean_t) / self._norm_std_t

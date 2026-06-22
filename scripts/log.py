@@ -13,7 +13,7 @@ from config.config import (
     COM_PORT,
     BAUD_RATE,
     TIMEOUT,
-    LOGS_DIR,
+    RAW_DATA_DIR,
     SERIAL_CONNECTION_DELAY,
     KEYBOARD_DEBOUNCE_DELAY,
     setup_logging,
@@ -81,8 +81,8 @@ def keyboard_listener():
 def main():
     setup_logging("log")
 
-    if not os.path.exists(LOGS_DIR):
-        os.makedirs(LOGS_DIR)
+    if not os.path.exists(RAW_DATA_DIR):
+        os.makedirs(RAW_DATA_DIR)
 
     logger.info(" GESTURE DATA RECORDER (THREAD-SAFE)")
 
@@ -109,7 +109,7 @@ def main():
     gesture_counts: dict[str, int] = {}
     for gesture_name in parsed_gestures:
         gesture_counts[gesture_name] = count_csv_samples(
-            gesture_name, base_dir=LOGS_DIR
+            gesture_name, base_dir=RAW_DATA_DIR
         )
 
     logger.info("Available gestures:")
@@ -149,7 +149,7 @@ def main():
     warning_beeper = ContinuousWarningBeeper()
     flex_zero_monitor = FlexZeroWarningMonitor(logger)
 
-    gesture_dir = os.path.join(LOGS_DIR, gesture_label)
+    gesture_dir = os.path.join(RAW_DATA_DIR, gesture_label)
     try:
         while not _quit_event.is_set():
             if _toggle_event.is_set():
@@ -159,7 +159,7 @@ def main():
                         os.makedirs(gesture_dir)
 
                     filename = str(
-                        build_recording_file_path(gesture_label, base_dir=LOGS_DIR)
+                        build_recording_file_path(gesture_label, base_dir=RAW_DATA_DIR)
                     )
                     csv_file = open(filename, "w", newline="")
                     csv_writer = csv.writer(csv_file)

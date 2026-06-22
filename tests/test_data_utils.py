@@ -22,11 +22,11 @@ class TestNormalizeValue:
         assert 0.0 <= result <= 1.0
 
     def test_flex_sensor_min(self):
-        result = normalize_value("flex0", 28)
+        result = normalize_value("flex0", 25)
         assert result == pytest.approx(0.0)
 
     def test_flex_sensor_max(self):
-        result = normalize_value("flex0", 224)
+        result = normalize_value("flex0", 300)
         assert result == pytest.approx(1.0)
 
     def test_accel_mid_range(self):

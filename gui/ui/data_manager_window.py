@@ -41,10 +41,16 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox
 
 from config.config import (
     BATCH_SIZE,
+    DATA_MANAGER_MIN_HEIGHT,
+    DATA_MANAGER_MIN_WIDTH,
+    DATA_MANAGER_WINDOW_HEIGHT,
+    DATA_MANAGER_WINDOW_WIDTH,
     EARLY_STOPPING_PATIENCE,
     EPOCHS,
+    GESTURES_EDITOR_DIALOG_HEIGHT,
+    GESTURES_EDITOR_DIALOG_WIDTH,
     LEARNING_RATE,
-    LOGS_DIR,
+    RAW_DATA_DIR,
     LOGS_OUTPUT_DIR,
 )
 from gui.services.data_processing_service import DataProcessingService
@@ -146,7 +152,7 @@ class DataManagerWindow(QMainWindow):
         super().__init__()
         self.project_root = project_root
         apply_app_icon(self, self.project_root)
-        self.raw_data_root = Path(LOGS_DIR)
+        self.raw_data_root = Path(RAW_DATA_DIR)
         self.samples: list[SampleRecord] = []
         self._task_active = False
         self._task_name = ""
@@ -161,6 +167,7 @@ class DataManagerWindow(QMainWindow):
         self._theme_name = "dark"
         self._last_record_preview_update = 0.0
         self._record_preview_update_interval = 0.05
+        self._live_preview_rows: list[dict[str, float | int]] | None = None
 
         self.event_queue: queue.Queue[dict] = queue.Queue()
         self.logger = configure_gui_logger(Path(LOGS_OUTPUT_DIR), self.event_queue)
@@ -181,8 +188,8 @@ class DataManagerWindow(QMainWindow):
         self.sample_service = SampleReviewService(self.raw_data_root)
 
         self.setWindowTitle("Sign2Speech - Dataset Manager")
-        self.resize(1560, 940)
-        self.setMinimumSize(1220, 760)
+        self.resize(DATA_MANAGER_WINDOW_WIDTH, DATA_MANAGER_WINDOW_HEIGHT)
+        self.setMinimumSize(DATA_MANAGER_MIN_WIDTH, DATA_MANAGER_MIN_HEIGHT)
 
         self._build_ui()
         self._build_shortcuts()
@@ -376,7 +383,9 @@ class DataManagerWindow(QMainWindow):
         action_row.addWidget(self.process_btn)
 
         self.process_cancel_btn = QPushButton("Cancel")
-        self.process_cancel_btn.clicked.connect(lambda: self.data_processing_service.stop())
+        self.process_cancel_btn.clicked.connect(
+            lambda: self.data_processing_service.stop()
+        )
         action_row.addWidget(self.process_cancel_btn)
         action_row.addStretch(1)
         layout.addLayout(action_row)
@@ -405,7 +414,9 @@ class DataManagerWindow(QMainWindow):
 
         # Connect stage actions to backend controls
         for w in stages:
-            w.retry_btn.clicked.connect(self.data_processing_service.retry_current_stage)
+            w.retry_btn.clicked.connect(
+                self.data_processing_service.retry_current_stage
+            )
             w.skip_btn.clicked.connect(self.data_processing_service.skip_current_stage)
 
         stages_layout.addWidget(self.stage_file_ingest, 0, 0)
@@ -424,7 +435,9 @@ class DataManagerWindow(QMainWindow):
             ["Gesture", "Files", "Samples", "Train Seq", "Test Seq"]
         )
         self.process_results_table.verticalHeader().setVisible(False)
-        self.process_results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.process_results_table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers
+        )
         self.process_results_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.process_results_table)
 
@@ -461,7 +474,9 @@ class DataManagerWindow(QMainWindow):
         self.train_epochs_spin = QSpinBox()
         self.train_epochs_spin.setRange(1, 2000)
         self.train_epochs_spin.setValue(EPOCHS)
-        self.train_epochs_spin.setToolTip(f"Max training epochs (config default: {EPOCHS})")
+        self.train_epochs_spin.setToolTip(
+            f"Max training epochs (config default: {EPOCHS})"
+        )
         override_form.addRow("Max Epochs:", self.train_epochs_spin)
 
         self.train_lr_spin = QDoubleSpinBox()
@@ -469,13 +484,17 @@ class DataManagerWindow(QMainWindow):
         self.train_lr_spin.setDecimals(6)
         self.train_lr_spin.setSingleStep(0.0001)
         self.train_lr_spin.setValue(LEARNING_RATE)
-        self.train_lr_spin.setToolTip(f"Initial learning rate (config default: {LEARNING_RATE})")
+        self.train_lr_spin.setToolTip(
+            f"Initial learning rate (config default: {LEARNING_RATE})"
+        )
         override_form.addRow("Learning Rate:", self.train_lr_spin)
 
         self.train_batch_spin = QSpinBox()
         self.train_batch_spin.setRange(1, 512)
         self.train_batch_spin.setValue(BATCH_SIZE)
-        self.train_batch_spin.setToolTip(f"Mini-batch size (config default: {BATCH_SIZE})")
+        self.train_batch_spin.setToolTip(
+            f"Mini-batch size (config default: {BATCH_SIZE})"
+        )
         override_form.addRow("Batch Size:", self.train_batch_spin)
 
         self.train_patience_spin = QSpinBox()
@@ -488,6 +507,7 @@ class DataManagerWindow(QMainWindow):
 
         self.train_ensemble_check = QCheckBox("Train as Ensemble")
         from config.config import USE_ENSEMBLE
+
         self.train_ensemble_check.setChecked(USE_ENSEMBLE)
         self.train_ensemble_check.setToolTip(
             f"Train an ensemble of multiple models (config default: {USE_ENSEMBLE})"
@@ -807,9 +827,58 @@ class DataManagerWindow(QMainWindow):
         else:
             self._set_status("Ready", "INFO")
 
-    def _poll_events(self) -> None:
-        live_preview_rows: list[dict[str, float | int]] | None = None
+    # ---- Event dispatch ----
 
+    _EVENT_HANDLER_NAMES: dict[str, str] = {
+        "record_started": "_on_record_started",
+        "record_progress": "_on_record_progress",
+        "record_error": "_on_record_error",
+        "record_warning": "_on_record_warning",
+        "record_ready_for_review": "_on_record_ready_for_review",
+        "process_started": "_on_process_started",
+        "process_total_gestures": "_on_process_total_gestures",
+        "process_gesture_summary": "_on_process_gesture_summary",
+        "process_stage_started": "_on_process_stage_started",
+        "process_stage_metrics": "_on_process_stage_metrics",
+        "process_stage_completed": "_on_process_stage_completed",
+        "process_stage_failed": "_on_process_stage_failed",
+        "process_stage_skipped": "_on_process_stage_skipped",
+        "process_train_sequences": "_on_process_train_sequences",
+        "process_test_sequences": "_on_process_test_sequences",
+        "process_progress": "_on_process_progress",
+        "process_completed": "_on_process_completed",
+        "process_failed": "_on_process_failed",
+        "process_cancelled": "_on_process_cancelled",
+        "train_started": "_on_train_started",
+        "train_epoch": "_on_train_epoch",
+        "train_model_dir": "_on_train_model_dir",
+        "train_completed": "_on_train_completed",
+        "train_cancelled": "_on_train_cancelled",
+        "train_failed": "_on_train_failed",
+        "log": "_on_log",
+    }
+
+    _STAGE_ATTR_MAP: dict[str, str] = {
+        "file_ingest": "stage_file_ingest",
+        "smoothing": "stage_smoothing",
+        "augmentation": "stage_augmentation",
+        "feature_extraction": "stage_feature",
+        "tensor_formatting": "stage_tensor",
+        "save_train": "stage_save_train",
+        "save_test": "stage_save_test",
+    }
+
+    def _get_stage_widget(self, stage: str) -> StageWidget | None:
+        """Resolve a stage widget by name, falling back to a name mapping."""
+        widget = getattr(self, f"stage_{stage}", None)
+        if widget is not None:
+            return widget
+        attr_name = self._STAGE_ATTR_MAP.get(stage)
+        if attr_name:
+            return getattr(self, attr_name, None)
+        return None
+
+    def _poll_events(self) -> None:
         while True:
             try:
                 event = self.event_queue.get_nowait()
@@ -817,320 +886,265 @@ class DataManagerWindow(QMainWindow):
                 break
 
             event_type = event.get("type")
-
-            # ------ Recording events ------
-            if event_type == "record_started":
-                port = str(event.get("port", "unknown"))
-                self.recording_status_label.setText(
-                    f"Recording status: capturing on {port}"
-                )
+            handler_name = self._EVENT_HANDLER_NAMES.get(event_type)
+            if handler_name is not None:
+                getattr(self, handler_name)(event)
                 continue
 
-            if event_type == "record_progress":
-                row_count = int(event.get("row_count", 0))
-                elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
-                self.record_row_count_label.setText(f"Rows captured: {row_count}")
-                self.recording_status_label.setText(
-                    f"Recording status: capturing ({elapsed_seconds:.1f}s)"
-                )
-                rows = event.get("rows")
-                if isinstance(rows, list) and rows:
-                    live_preview_rows = rows
-                continue
+            # Unknown event types are silently ignored
 
-            if event_type == "record_error":
-                message = str(event.get("message", "Recording failed"))
-                live_preview_rows = None
-                self._set_task_state(False)
-                self._set_status(f"Recording failed: {message}", "ERROR")
-                self.recording_status_label.setText("Recording status: error")
-                continue
+        if self._live_preview_rows is not None:
+            self._plot_recording_preview(self._live_preview_rows, force=False)
 
-            if event_type == "record_warning":
-                message = str(event.get("message", "")).strip()
-                if message:
-                    self._set_status(message, "WARNING")
-                continue
+    # ---- Event handlers ----
 
-            if event_type == "record_ready_for_review":
-                gesture = str(event.get("gesture", ""))
-                orientation = str(event.get("orientation", "unspecified"))
-                row_count = int(event.get("row_count", 0))
-                elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
-                rows = event.get("rows")
+    def _on_record_started(self, event: dict) -> None:
+        port = str(event.get("port", "unknown"))
+        self.recording_status_label.setText(
+            f"Recording status: capturing on {port}"
+        )
 
-                self._set_task_state(False)
-                self.record_row_count_label.setText(f"Rows captured: {row_count}")
+    def _on_record_progress(self, event: dict) -> None:
+        row_count = int(event.get("row_count", 0))
+        elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
+        self.record_row_count_label.setText(f"Rows captured: {row_count}")
+        self.recording_status_label.setText(
+            f"Recording status: capturing ({elapsed_seconds:.1f}s)"
+        )
+        rows = event.get("rows")
+        if isinstance(rows, list) and rows:
+            self._live_preview_rows = rows
 
-                if not isinstance(rows, list) or not rows:
-                    live_preview_rows = None
-                    self._set_status(
-                        "No valid sensor rows captured. Recording discarded.", "WARNING"
-                    )
-                    self.recording_status_label.setText("Recording status: discarded")
-                    continue
+    def _on_record_error(self, event: dict) -> None:
+        message = str(event.get("message", "Recording failed"))
+        self._live_preview_rows = None
+        self._set_task_state(False)
+        self._set_status(f"Recording failed: {message}", "ERROR")
+        self.recording_status_label.setText("Recording status: error")
 
-                live_preview_rows = None
-                self._plot_recording_preview(rows)
-                decision = QMessageBox.question(
-                    self,
-                    "Save Recording",
-                    f"Preview ready for gesture '{gesture}'.\n\nKeep and save this recording?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
+    def _on_record_warning(self, event: dict) -> None:
+        message = str(event.get("message", "")).strip()
+        if message:
+            self._set_status(message, "WARNING")
 
-                if decision == QMessageBox.StandardButton.Yes:
-                    path = self.recording_service.save_recording(
-                        gesture_label=gesture,
-                        orientation=orientation,
-                        rows=rows,
-                        elapsed_seconds=elapsed_seconds,
-                    )
-                    self.refresh_samples()
-                    self._refresh_record_count()
-                    self._set_status("Recording saved", "INFO")
-                    self.recording_status_label.setText("Recording status: completed")
-                    self.logger.info("[record] Saved path: %s", path)
-                else:
-                    self._set_status("Recording discarded by user", "WARNING")
-                    self.recording_status_label.setText("Recording status: discarded")
-                continue
+    def _on_record_ready_for_review(self, event: dict) -> None:
+        gesture = str(event.get("gesture", ""))
+        orientation = str(event.get("orientation", "unspecified"))
+        row_count = int(event.get("row_count", 0))
+        elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
+        rows = event.get("rows")
 
-            # ------ Processing events (stage-level) ------
-            if event_type == "process_started":
-                # Reset all stages
-                for stage in (
-                    self.stage_file_ingest,
-                    self.stage_smoothing,
-                    self.stage_augmentation,
-                    self.stage_feature,
-                    self.stage_tensor,
-                    self.stage_save_train,
-                    self.stage_save_test,
-                ):
-                    stage.set_metrics(None)
-                    stage.set_skipped()
-                self.stage_file_ingest.set_started("Preparing")
-                self._set_task_state(True, "process_data")
-                continue
+        self._set_task_state(False)
+        self.record_row_count_label.setText(f"Rows captured: {row_count}")
 
-            if event_type == "process_total_gestures":
-                total = int(event.get("total", 0))
-                self._process_total_gestures = total
-                # show in file ingest widget
-                self.stage_file_ingest.set_metrics({"gestures": total})
-                continue
+        if not isinstance(rows, list) or not rows:
+            self._live_preview_rows = None
+            self._set_status(
+                "No valid sensor rows captured. Recording discarded.", "WARNING"
+            )
+            self.recording_status_label.setText("Recording status: discarded")
+            return
 
-            if event_type == "process_gesture_summary":
-                gesture = str(event.get("gesture", ""))
-                files = int(event.get("files", 0))
-                samples = int(event.get("samples", 0))
-                self._set_process_table_value(gesture, 1, str(files))
-                self._set_process_table_value(gesture, 2, str(samples))
-                continue
+        self._live_preview_rows = None
+        self._plot_recording_preview(rows)
+        decision = QMessageBox.question(
+            self,
+            "Save Recording",
+            f"Preview ready for gesture '{gesture}'.\n\nKeep and save this recording?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
 
-            if event_type == "process_stage_started":
-                stage = str(event.get("stage", ""))
-                gesture = event.get("gesture")
-                widget = getattr(self, f"stage_{stage}", None)
-                if widget is None:
-                    # Map friendly names
-                    mapping = {
-                        "file_ingest": self.stage_file_ingest,
-                        "smoothing": self.stage_smoothing,
-                        "augmentation": self.stage_augmentation,
-                        "feature_extraction": self.stage_feature,
-                        "tensor_formatting": self.stage_tensor,
-                        "save_train": self.stage_save_train,
-                        "save_test": self.stage_save_test,
-                    }
-                    widget = mapping.get(stage)
-                if widget is not None:
-                    label = f"Running{': ' + str(gesture) if gesture else ''}"
-                    widget.set_started(label)
-                continue
+        if decision == QMessageBox.StandardButton.Yes:
+            path = self.recording_service.save_recording(
+                gesture_label=gesture,
+                orientation=orientation,
+                rows=rows,
+                elapsed_seconds=elapsed_seconds,
+            )
+            self.refresh_samples()
+            self._refresh_record_count()
+            self._set_status("Recording saved", "INFO")
+            self.recording_status_label.setText("Recording status: completed")
+            self.logger.info("[record] Saved path: %s", path)
+        else:
+            self._set_status("Recording discarded by user", "WARNING")
+            self.recording_status_label.setText("Recording status: discarded")
 
-            if event_type == "process_stage_metrics":
-                stage = str(event.get("stage", ""))
-                widget = getattr(self, f"stage_{stage}", None)
-                if widget is None:
-                    mapping = {
-                        "feature_extraction": self.stage_feature,
-                    }
-                    widget = mapping.get(stage)
-                if widget is not None:
-                    metrics = {k: v for k, v in event.items() if k not in {"type", "stage", "gesture"}}
-                    # stringify simple metrics
-                    widget.set_metrics(metrics)
-                continue
+    def _on_process_started(self, event: dict) -> None:
+        for stage in (
+            self.stage_file_ingest,
+            self.stage_smoothing,
+            self.stage_augmentation,
+            self.stage_feature,
+            self.stage_tensor,
+            self.stage_save_train,
+            self.stage_save_test,
+        ):
+            stage.set_metrics(None)
+            stage.set_skipped()
+        self.stage_file_ingest.set_started("Preparing")
+        self._set_task_state(True, "process_data")
 
-            if event_type == "process_stage_completed":
-                stage = str(event.get("stage", ""))
-                widget = getattr(self, f"stage_{stage}", None)
-                if widget is None:
-                    mapping = {
-                        "file_ingest": self.stage_file_ingest,
-                        "save_train": self.stage_save_train,
-                        "save_test": self.stage_save_test,
-                    }
-                    widget = mapping.get(stage)
-                if widget is not None:
-                    widget.set_completed()
-                continue
+    def _on_process_total_gestures(self, event: dict) -> None:
+        total = int(event.get("total", 0))
+        self._process_total_gestures = total
+        self.stage_file_ingest.set_metrics({"gestures": total})
 
-            if event_type == "process_stage_failed":
-                stage = str(event.get("stage", ""))
-                message = str(event.get("message", ""))
-                widget = getattr(self, f"stage_{stage}", None)
-                if widget is None:
-                    mapping = {
-                        "feature_extraction": self.stage_feature,
-                        "save_test": self.stage_save_test,
-                    }
-                    widget = mapping.get(stage)
-                if widget is not None:
-                    widget.set_failed(message)
-                # Show actionable message in status bar
-                self._set_status(f"Stage {stage} failed: {message}", "ERROR")
-                continue
+    def _on_process_gesture_summary(self, event: dict) -> None:
+        gesture = str(event.get("gesture", ""))
+        files = int(event.get("files", 0))
+        samples = int(event.get("samples", 0))
+        self._set_process_table_value(gesture, 1, str(files))
+        self._set_process_table_value(gesture, 2, str(samples))
 
-            if event_type == "process_stage_skipped":
-                stage = str(event.get("stage", ""))
-                widget = getattr(self, f"stage_{stage}", None)
-                if widget is None:
-                    widget = None
-                if widget is not None:
-                    widget.set_skipped()
-                continue
+    def _on_process_stage_started(self, event: dict) -> None:
+        stage = str(event.get("stage", ""))
+        gesture = event.get("gesture")
+        widget = self._get_stage_widget(stage)
+        if widget is not None:
+            label = f"Running{': ' + str(gesture) if gesture else ''}"
+            widget.set_started(label)
 
-            if event_type == "process_train_sequences":
-                gesture = str(event.get("gesture", ""))
-                count = int(event.get("count", 0))
-                self._set_process_table_value(gesture, 3, str(count))
-                # reflect in save_train widget
-                self.stage_save_train.set_metrics({"train_seq": count})
-                continue
+    def _on_process_stage_metrics(self, event: dict) -> None:
+        stage = str(event.get("stage", ""))
+        widget = self._get_stage_widget(stage)
+        if widget is not None:
+            metrics = {
+                k: v
+                for k, v in event.items()
+                if k not in {"type", "stage", "gesture"}
+            }
+            widget.set_metrics(metrics)
 
-            if event_type == "process_test_sequences":
-                gesture = str(event.get("gesture", ""))
-                count = int(event.get("count", 0))
-                self._set_process_table_value(gesture, 4, str(count))
-                self.stage_save_test.set_metrics({"test_seq": count})
-                continue
+    def _on_process_stage_completed(self, event: dict) -> None:
+        stage = str(event.get("stage", ""))
+        widget = self._get_stage_widget(stage)
+        if widget is not None:
+            widget.set_completed()
 
-            if event_type == "process_progress":
-                done = int(event.get("done", 0))
-                total = max(int(event.get("total", 1)), 1)
-                self._set_status(f"Status: processed {done}/{total}", "INFO")
-                continue
+    def _on_process_stage_failed(self, event: dict) -> None:
+        stage = str(event.get("stage", ""))
+        message = str(event.get("message", ""))
+        widget = self._get_stage_widget(stage)
+        if widget is not None:
+            widget.set_failed(message)
+        self._set_status(f"Stage {stage} failed: {message}", "ERROR")
 
-            if event_type == "process_completed":
-                processed = int(event.get("processed", 0))
-                total = int(event.get("total", 0))
-                # mark any incomplete stages as completed
-                for w in (
-                    self.stage_file_ingest,
-                    self.stage_smoothing,
-                    self.stage_augmentation,
-                    self.stage_feature,
-                    self.stage_tensor,
-                    self.stage_save_train,
-                    self.stage_save_test,
-                ):
-                    if w.status_label.text() != "Completed":
-                        w.set_completed()
-                self._set_status(f"Processing complete: {processed}/{total} gesture(s)", "INFO")
-                self._set_task_state(False)
-                self.refresh_samples()
-                self._refresh_record_count()
-                continue
+    def _on_process_stage_skipped(self, event: dict) -> None:
+        stage = str(event.get("stage", ""))
+        widget = self._get_stage_widget(stage)
+        if widget is not None:
+            widget.set_skipped()
 
-            if event_type == "process_failed":
-                message = str(event.get("message", "Processing failed"))
-                self._set_status(f"Processing failed: {message}", "ERROR")
-                self._set_task_state(False)
-                continue
+    def _on_process_train_sequences(self, event: dict) -> None:
+        gesture = str(event.get("gesture", ""))
+        count = int(event.get("count", 0))
+        self._set_process_table_value(gesture, 3, str(count))
+        self.stage_save_train.set_metrics({"train_seq": count})
 
-            if event_type == "process_cancelled":
-                self._set_status("Processing cancelled", "WARNING")
-                self._set_task_state(False)
-                continue
+    def _on_process_test_sequences(self, event: dict) -> None:
+        gesture = str(event.get("gesture", ""))
+        count = int(event.get("count", 0))
+        self._set_process_table_value(gesture, 4, str(count))
+        self.stage_save_test.set_metrics({"test_seq": count})
 
-            # ------ Training events ------
-            if event_type == "train_started":
-                self.train_status_label.setText("Status: running")
-                continue
+    def _on_process_progress(self, event: dict) -> None:
+        done = int(event.get("done", 0))
+        total = max(int(event.get("total", 1)), 1)
+        self._set_status(f"Status: processed {done}/{total}", "INFO")
 
-            if event_type == "train_epoch":
-                epoch = int(event.get("epoch", 0))
-                total = int(event.get("total", 1))
-                train_loss = float(event.get("train_loss", 0.0))
-                train_acc = float(event.get("train_acc", 0.0))
-                val_loss = float(event.get("val_loss", 0.0))
-                val_acc = float(event.get("val_acc", 0.0))
-                lr = float(event.get("lr", 0.0))
-                self._train_total_epochs = total
-                pct = int((epoch / max(total, 1)) * 100)
-                self.train_progress_bar.setRange(0, 100)
-                self.train_progress_bar.setValue(max(0, min(100, pct)))
-                self.train_progress_bar.setFormat(f"Epoch progress: {epoch}/{total}")
-                self.train_status_label.setText(f"Status: epoch {epoch}/{total}")
-                self._set_train_metric("train_loss", f"{train_loss:.4f}")
-                self._set_train_metric("train_acc", f"{train_acc:.2f}%")
-                self._set_train_metric("val_loss", f"{val_loss:.4f}")
-                self._set_train_metric("val_acc", f"{val_acc:.2f}%")
-                self._set_train_metric("lr", f"{lr:.6f}")
-                continue
+    def _on_process_completed(self, event: dict) -> None:
+        processed = int(event.get("processed", 0))
+        total = int(event.get("total", 0))
+        for w in (
+            self.stage_file_ingest,
+            self.stage_smoothing,
+            self.stage_augmentation,
+            self.stage_feature,
+            self.stage_tensor,
+            self.stage_save_train,
+            self.stage_save_test,
+        ):
+            if w.status_label.text() != "Completed":
+                w.set_completed()
+        self._set_status(
+            f"Processing complete: {processed}/{total} gesture(s)", "INFO"
+        )
+        self._set_task_state(False)
+        self.refresh_samples()
+        self._refresh_record_count()
 
-            if event_type == "train_model_dir":
-                self._train_model_dir = str(event.get("model_dir", ""))
-                continue
+    def _on_process_failed(self, event: dict) -> None:
+        message = str(event.get("message", "Processing failed"))
+        self._set_status(f"Processing failed: {message}", "ERROR")
+        self._set_task_state(False)
 
-            if event_type == "train_completed":
-                self._set_train_metric("Result", "Training complete")
-                self.train_progress_bar.setRange(0, 100)
-                self.train_progress_bar.setValue(100)
-                self.train_progress_bar.setFormat("Epoch progress: 100%")
-                self.train_status_label.setText("Status: completed")
-                self._set_status("Training complete", "INFO")
-                if self._train_model_dir:
-                    self._load_train_evaluation_metrics()
-                self._set_task_state(False)
-                self.refresh_samples()
-                self._refresh_record_count()
-                continue
+    def _on_process_cancelled(self, event: dict) -> None:
+        self._set_status("Processing cancelled", "WARNING")
+        self._set_task_state(False)
 
-            if event_type == "train_cancelled":
-                self.train_progress_bar.setRange(0, 100)
-                self.train_progress_bar.setValue(0)
-                self.train_progress_bar.setFormat("Epoch progress: cancelled")
-                self.train_status_label.setText("Status: cancelled")
-                self._set_status("Training cancelled", "WARNING")
-                self._set_task_state(False)
-                continue
+    def _on_train_started(self, event: dict) -> None:
+        self.train_status_label.setText("Status: running")
 
-            if event_type == "train_failed":
-                message = str(event.get("message", "Training failed"))
-                self.train_progress_bar.setRange(0, 100)
-                self.train_progress_bar.setValue(0)
-                self.train_progress_bar.setFormat("Epoch progress: failed")
-                self.train_status_label.setText("Status: failed")
-                self._set_status(f"Training failed: {message}", "ERROR")
-                self._set_task_state(False)
-                continue
+    def _on_train_epoch(self, event: dict) -> None:
+        epoch = int(event.get("epoch", 0))
+        total = int(event.get("total", 1))
+        train_loss = float(event.get("train_loss", 0.0))
+        train_acc = float(event.get("train_acc", 0.0))
+        val_loss = float(event.get("val_loss", 0.0))
+        val_acc = float(event.get("val_acc", 0.0))
+        lr = float(event.get("lr", 0.0))
+        self._train_total_epochs = total
+        pct = int((epoch / max(total, 1)) * 100)
+        self.train_progress_bar.setRange(0, 100)
+        self.train_progress_bar.setValue(max(0, min(100, pct)))
+        self.train_progress_bar.setFormat(f"Epoch progress: {epoch}/{total}")
+        self.train_status_label.setText(f"Status: epoch {epoch}/{total}")
+        self._set_train_metric("train_loss", f"{train_loss:.4f}")
+        self._set_train_metric("train_acc", f"{train_acc:.2f}%")
+        self._set_train_metric("val_loss", f"{val_loss:.4f}")
+        self._set_train_metric("val_acc", f"{val_acc:.2f}%")
+        self._set_train_metric("lr", f"{lr:.6f}")
 
-            # ------ Log events (display only) ------
-            if event_type != "log":
-                continue
+    def _on_train_model_dir(self, event: dict) -> None:
+        self._train_model_dir = str(event.get("model_dir", ""))
 
-            level = str(event.get("level", "INFO"))
-            timestamp = str(event.get("timestamp", ""))
-            source = str(event.get("source", "app"))
-            message = str(event.get("message", ""))
-            self.log_box.appendPlainText(f"[{timestamp}] [{level}] {source}: {message}")
+    def _on_train_completed(self, event: dict) -> None:
+        self._set_train_metric("Result", "Training complete")
+        self.train_progress_bar.setRange(0, 100)
+        self.train_progress_bar.setValue(100)
+        self.train_progress_bar.setFormat("Epoch progress: 100%")
+        self.train_status_label.setText("Status: completed")
+        self._set_status("Training complete", "INFO")
+        if self._train_model_dir:
+            self._load_train_evaluation_metrics()
+        self._set_task_state(False)
+        self.refresh_samples()
+        self._refresh_record_count()
 
-        if live_preview_rows is not None:
-            self._plot_recording_preview(live_preview_rows, force=False)
+    def _on_train_cancelled(self, event: dict) -> None:
+        self.train_progress_bar.setRange(0, 100)
+        self.train_progress_bar.setValue(0)
+        self.train_progress_bar.setFormat("Epoch progress: cancelled")
+        self.train_status_label.setText("Status: cancelled")
+        self._set_status("Training cancelled", "WARNING")
+        self._set_task_state(False)
+
+    def _on_train_failed(self, event: dict) -> None:
+        message = str(event.get("message", "Training failed"))
+        self.train_progress_bar.setRange(0, 100)
+        self.train_progress_bar.setValue(0)
+        self.train_progress_bar.setFormat("Epoch progress: failed")
+        self.train_status_label.setText("Status: failed")
+        self._set_status(f"Training failed: {message}", "ERROR")
+        self._set_task_state(False)
+
+    def _on_log(self, event: dict) -> None:
+        level = str(event.get("level", "INFO"))
+        timestamp = str(event.get("timestamp", ""))
+        source = str(event.get("source", "app"))
+        message = str(event.get("message", ""))
+        self.log_box.appendPlainText(f"[{timestamp}] [{level}] {source}: {message}")
 
     def _load_gesture_options(self) -> None:
         gestures = load_gesture_names(self.project_root)
@@ -1506,7 +1520,9 @@ class DataManagerWindow(QMainWindow):
         """Request cancellation of an in-progress training run."""
         self.training_service.cancel()
         self.train_cancel_btn.setEnabled(False)
-        self._set_status("Cancellation requested — stopping after current epoch…", "WARNING")
+        self._set_status(
+            "Cancellation requested — stopping after current epoch…", "WARNING"
+        )
 
     def _refresh_record_count(self) -> None:
         gesture = self.record_gesture_combo.currentText().strip()
@@ -1680,9 +1696,7 @@ class DataManagerWindow(QMainWindow):
 
         sample_count = len(samples)
         if sample_count == 1:
-            prompt = (
-                f"Restore sample back to raw dataset?\n\n{samples[0].file_name}"
-            )
+            prompt = f"Restore sample back to raw dataset?\n\n{samples[0].file_name}"
         else:
             prompt = f"Restore {sample_count} samples back to raw dataset?"
 
@@ -1715,14 +1729,18 @@ class GesturesEditorDialog(QDialog):
         super().__init__(parent)
         self.project_root = project_root
         self.setWindowTitle("Manage Gestures")
-        self.resize(600, 420)
+        self.resize(GESTURES_EDITOR_DIALOG_WIDTH, GESTURES_EDITOR_DIALOG_HEIGHT)
 
         layout = QVBoxLayout(self)
 
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["Name", "Translation"])
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked | QTableWidget.EditTrigger.SelectedClicked | QTableWidget.EditTrigger.EditKeyPressed)
+        self.table.setEditTriggers(
+            QTableWidget.EditTrigger.DoubleClicked
+            | QTableWidget.EditTrigger.SelectedClicked
+            | QTableWidget.EditTrigger.EditKeyPressed
+        )
         layout.addWidget(self.table, stretch=1)
 
         btn_row = QHBoxLayout()
@@ -1736,7 +1754,9 @@ class GesturesEditorDialog(QDialog):
 
         btn_row.addStretch(1)
 
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
+        )
         self.button_box.accepted.connect(self._on_save)
         self.button_box.rejected.connect(self.reject)
         btn_row.addWidget(self.button_box)
@@ -1789,11 +1809,19 @@ class GesturesEditorDialog(QDialog):
             name = (name_item.text() if name_item else "").strip()
             translation = (trans_item.text() if trans_item else "").strip()
             if not name:
-                QMessageBox.warning(self, "Invalid Entry", f"Row {row+1} has empty name. Please provide a name or delete the row.")
+                QMessageBox.warning(
+                    self,
+                    "Invalid Entry",
+                    f"Row {row+1} has empty name. Please provide a name or delete the row.",
+                )
                 return
             key = name.lower()
             if key in seen:
-                QMessageBox.warning(self, "Duplicate Entry", f"Duplicate gesture name: '{name}'. Names must be unique.")
+                QMessageBox.warning(
+                    self,
+                    "Duplicate Entry",
+                    f"Duplicate gesture name: '{name}'. Names must be unique.",
+                )
                 return
             seen.add(key)
             entries.append({"name": name, "translation": translation})

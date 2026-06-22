@@ -31,10 +31,8 @@ dev = ["pytest>=8,<9", "torchviz"]
 optimization = ["fastdtw>=0.3,<1", "onnx>=1.16,<2", "onnxruntime>=1.20,<2"]
 [project.scripts]
 sign-glove-gui = "main:main"
-sign-glove-manager = "data_manager_gui:main"
-sign-glove-train = "scripts.train_model:main"
+sign-glove-manager = "data_manager:main"
 sign-glove-predict = "scripts.predict:main"
-sign-glove-process = "scripts.process_data:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

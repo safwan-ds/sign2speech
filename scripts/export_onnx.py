@@ -10,17 +10,10 @@ import numpy as np
 import torch
 
 from config.config import (
-    DROPOUT_RATE,
-    LSTM_LAYERS,
-    LSTM_UNITS,
-    MODEL_TYPE,
     SEQUENCE_LENGTH,
-    USE_ATTENTION,
-    USE_BATCH_NORM,
-    USE_BIDIRECTIONAL,
 )
-from core.inference.gesture_predictor import MODEL_PATH, _load_model_checkpoint
-from core.models.lstm_model import build_lstm_model
+from core.models.model_factory import build_model_from_checkpoint, load_model_checkpoint
+from core.inference.gesture_predictor import MODEL_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +55,9 @@ def export_onnx(
     sequence_length: int = SEQUENCE_LENGTH,
     opset: int = 17,
 ) -> tuple[Path, str]:
-    state_dict, arch_params, input_size, inferred_num_classes = _load_model_checkpoint(
-        str(model_path)
+    # Resolve num_classes — checkpoint takes priority, encoder is fallback
+    _, arch_params, input_size, inferred_num_classes = load_model_checkpoint(
+        str(model_path), torch.device("cpu")
     )
     num_classes = inferred_num_classes or int(arch_params.get("num_classes", 0))
     if num_classes <= 0:
@@ -72,21 +66,11 @@ def export_onnx(
             raise ValueError("Could not infer num_classes and encoder.npy is missing")
         num_classes = len(np.load(encoder_path, allow_pickle=True))
 
-    model = build_lstm_model(
-        input_size=input_size,
-        num_classes=num_classes,
-        hidden_size=arch_params.get("hidden_size", LSTM_UNITS),
-        num_layers=arch_params.get("num_layers", LSTM_LAYERS),
-        dropout_rate=arch_params.get("dropout_rate", DROPOUT_RATE),
-        device=torch.device("cpu"),
-        model_type=arch_params.get("model_type", MODEL_TYPE),
-        bidirectional=arch_params.get("bidirectional", USE_BIDIRECTIONAL),
-        use_attention=arch_params.get("use_attention", USE_ATTENTION),
-        use_batch_norm=arch_params.get("use_batch_norm", USE_BATCH_NORM),
-        use_cnn=arch_params.get("use_cnn", False),
+    model, _, _, _ = build_model_from_checkpoint(
+        str(model_path),
+        torch.device("cpu"),
+        encoder_num_classes=num_classes,
     )
-    model.load_state_dict(state_dict)
-    model.eval()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     dummy = torch.zeros(1, sequence_length, input_size, dtype=torch.float32)

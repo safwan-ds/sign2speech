@@ -130,7 +130,7 @@ DEFAULT_VALIDATION_SIZE = 0.1
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(CONFIG_DIR)
-LOGS_DIR = os.path.join(BASE_DIR, "data", "raw")
+RAW_DATA_DIR = os.path.join(BASE_DIR, "data", "raw")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 TEST_DATA_DIR = os.path.join(BASE_DIR, "data", "test")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
@@ -211,6 +211,16 @@ GUI_PLOT_WSPACE = 0.30
 GUI_PLOT_TOP = 0.95
 GUI_PLOT_BOTTOM = 0.05
 GUI_THREAD_SLEEP = 0.01
+
+# Data Manager window dimensions
+DATA_MANAGER_WINDOW_WIDTH = 1560
+DATA_MANAGER_WINDOW_HEIGHT = 940
+DATA_MANAGER_MIN_WIDTH = 1220
+DATA_MANAGER_MIN_HEIGHT = 760
+
+# Gestures Editor dialog dimensions
+GESTURES_EDITOR_DIALOG_WIDTH = 600
+GESTURES_EDITOR_DIALOG_HEIGHT = 420
 
 DEFAULT_UI_LANGUAGE = "tr"
 SUPPORTED_UI_LANGUAGES = ("tr", "en")

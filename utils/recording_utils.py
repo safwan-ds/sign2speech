@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from config.config import LOGS_DIR
+from config.config import RAW_DATA_DIR
 
 SENSOR_COLUMNS = [
     "flex0",
@@ -36,12 +36,12 @@ def sanitize_gesture_label(label: str) -> str:
     return normalized or "gesture"
 
 
-def gesture_output_dir(gesture_label: str, base_dir: str = LOGS_DIR) -> Path:
+def gesture_output_dir(gesture_label: str, base_dir: str = RAW_DATA_DIR) -> Path:
     """Return gesture output directory under data/raw."""
     return Path(base_dir) / gesture_label
 
 
-def build_recording_file_path(gesture_label: str, base_dir: str = LOGS_DIR) -> Path:
+def build_recording_file_path(gesture_label: str, base_dir: str = RAW_DATA_DIR) -> Path:
     """Create a timestamped file path for a new recording."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return (
@@ -139,7 +139,9 @@ def load_gestures(project_root: str | Path) -> list[dict[str, str]]:
                         name = item.get("name")
                         trans = item.get("translation", "")
                         if name:
-                            entries.append({"name": str(name), "translation": str(trans)})
+                            entries.append(
+                                {"name": str(name), "translation": str(trans)}
+                            )
         except Exception:
             # ignore and try txt fallback
             entries = []
@@ -182,7 +184,7 @@ def save_gestures(project_root: str | Path, entries: list[dict[str, str]]) -> Pa
     return json_file
 
 
-def count_csv_samples(gesture_label: str, base_dir: str = LOGS_DIR) -> int:
+def count_csv_samples(gesture_label: str, base_dir: str = RAW_DATA_DIR) -> int:
     """Count saved samples for one gesture folder."""
     target_dir = gesture_output_dir(gesture_label, base_dir)
     if not target_dir.exists():

@@ -19,7 +19,7 @@ from config.config import (
     INCLUDE_ACCELERATION,
     INCLUDE_ROLLING_STATS,
     INCLUDE_VELOCITY,
-    LOGS_DIR,
+    RAW_DATA_DIR,
     PROCESSED_DIR,
     RANDOM_STATE,
     SEQUENCE_LENGTH,
@@ -94,14 +94,14 @@ def load_log_file(filepath: str) -> pd.DataFrame | None:
 
 def load_all_logs() -> dict[str, list[pd.DataFrame]]:
     """Load all CSV files from gesture sub-folders in the logs directory."""
-    if not os.path.exists(LOGS_DIR):
-        logger.error("Logs directory not found: %s", LOGS_DIR)
+    if not os.path.exists(RAW_DATA_DIR):
+        logger.error("Logs directory not found: %s", RAW_DATA_DIR)
         return {}
 
     gestures_data: dict[str, list[pd.DataFrame]] = {}
 
-    for gesture_folder in os.listdir(LOGS_DIR):
-        gesture_path = os.path.join(LOGS_DIR, gesture_folder)
+    for gesture_folder in os.listdir(RAW_DATA_DIR):
+        gesture_path = os.path.join(RAW_DATA_DIR, gesture_folder)
 
         if not os.path.isdir(gesture_path):
             continue
@@ -129,7 +129,7 @@ def load_all_logs() -> dict[str, list[pd.DataFrame]]:
                 gestures_data[gesture_folder].append(df)
 
     if not gestures_data:
-        logger.error("No log files found in %s", LOGS_DIR)
+        logger.error("No log files found in %s", RAW_DATA_DIR)
 
     return gestures_data
 

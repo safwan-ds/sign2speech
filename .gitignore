@@ -28,3 +28,4 @@ launcher.cpp
 *.rc
 
 gestures.json
+/graphify-out/
