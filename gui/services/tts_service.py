@@ -4,25 +4,24 @@ Audio playback uses Windows MCI directly via ctypes to avoid spawning a fresh
 PowerShell process per utterance (which adds 300-500ms of latency on every
 spoken word). The Edge worker keeps a persistent asyncio event loop so that
 edge-tts can reuse its HTTPS session across requests.
+
+Playback logic is delegated to :mod:`gui.services.audio_player`.
 """
 
 from __future__ import annotations
 
 import asyncio
-import ctypes
 import logging
 import os
-import platform
 import queue
-import sys
 import tempfile
 import threading
-import time
-import uuid
 from dataclasses import dataclass
 
 import diskcache
 import edge_tts
+
+from gui.services.audio_player import play_audio_file
 
 try:
     import pyttsx3
@@ -37,28 +36,6 @@ class TTSRequest:
     text: str
     language: str
     backend: str = "local"
-
-
-def _winmm_mci():
-    """Return the Windows MCI ``mciSendStringW`` callable, or None elsewhere."""
-    if platform.system() != "Windows":
-        return None
-    try:
-        winmm = ctypes.WinDLL("winmm")
-    except (OSError, AttributeError):  # pragma: no cover - non-Windows
-        return None
-    fn = winmm.mciSendStringW
-    fn.argtypes = [
-        ctypes.c_wchar_p,
-        ctypes.c_wchar_p,
-        ctypes.c_uint,
-        ctypes.c_void_p,
-    ]
-    fn.restype = ctypes.c_uint
-    return fn
-
-
-_MCI_SEND = _winmm_mci()
 
 
 class TTSService:
@@ -175,61 +152,14 @@ class TTSService:
         await communicate.save(audio_path)
 
     def _play_audio_file(self, audio_path: str) -> None:
-        """Play an MP3 file using Windows MCI (native, no subprocess)."""
-        mci_send = _MCI_SEND
-        if mci_send is None:
-            # Non-Windows fallback: best-effort, will not block.
-            self._logger.error(
-                "Audio playback unsupported on this platform: %s", sys.platform
-            )
-            self._set_status("error", "edge", "Audio playback unsupported")
-            return
-
-        # Each utterance gets a unique alias so concurrent calls don't clash.
-        alias = f"sgglove_{uuid.uuid4().hex[:12]}"
-        # MCI does not handle paths with spaces unless quoted; alias must not be quoted.
-        open_cmd = f'open "{audio_path}" type mpegvideo alias {alias}'
-
-        def _send(cmd: str, return_buf: bool = False) -> tuple[int, str]:
-            buf = ctypes.create_unicode_buffer(128) if return_buf else None
-            err = mci_send(cmd, buf, 128 if buf else 0, None)
-            return err, (buf.value if buf else "")
-
-        with self._mci_lock:
-            err, _ = _send(open_cmd)
-            if err != 0:
-                self._logger.error("MCI open failed (%d) for %s", err, audio_path)
-                self._set_status("error", "edge", f"Playback open failed ({err})")
-                return
-
-            try:
-                # Query duration so we can wait the right amount.
-                err, length_str = _send(f"status {alias} length", return_buf=True)
-                length_ms = 0
-                if err == 0 and length_str:
-                    try:
-                        length_ms = int(length_str)
-                    except ValueError:
-                        length_ms = 0
-
-                err, _ = _send(f"play {alias}")
-                if err != 0:
-                    self._logger.error("MCI play failed (%d)", err)
-                    self._set_status("error", "edge", f"Playback failed ({err})")
-                    return
-
-                self._logger.debug("MCI playing: %s (%d ms)", audio_path, length_ms)
-
-                # Sleep slightly longer than the clip to ensure clean tail.
-                # If length is unknown, 5s is a safe fallback for most sentences.
-                wait_s = (length_ms / 1000.0) + 0.15 if length_ms > 0 else 5.0
-
-                # Sleep in small increments to remain responsive to stop events.
-                end_time = time.time() + wait_s
-                while time.time() < end_time and not self._stop_event.is_set():
-                    time.sleep(0.1)
-            finally:
-                _send(f"close {alias}")
+        """Play an MP3 file using Windows MCI (delegated to audio_player)."""
+        play_audio_file(
+            audio_path=audio_path,
+            logger=self._logger,
+            stop_event=self._stop_event,
+            mci_lock=self._mci_lock,
+            set_status=self._set_status,
+        )
 
     def _speak_with_voice(
         self,

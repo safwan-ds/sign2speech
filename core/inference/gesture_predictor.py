@@ -7,6 +7,7 @@ from collections import deque
 
 import numpy as np
 import torch
+from core.inference.onnx_predictor import ONNXBackend
 from core.models.model_factory import build_model_from_checkpoint
 
 from config.config import (
@@ -152,8 +153,7 @@ class LSTMGesturePredictor:
         self._last_dtw_template: str | None = None
         self._last_dtw_distance: float | None = None
         self.use_onnx = str(model_path).lower().endswith(".onnx")
-        self.onnx_session = None
-        self._onnx_input_name: str | None = None
+        self._onnx_backend: ONNXBackend | None = None
 
         self.norm_mean = None
         self.norm_std = None
@@ -186,7 +186,10 @@ class LSTMGesturePredictor:
 
         if self.use_onnx:
             self.use_ensemble = False
-            input_size = self._load_onnx_model(model_path)
+            self._onnx_backend = ONNXBackend(
+                model_path, self._device, norm_mean=self.norm_mean
+            )
+            input_size = self._onnx_backend.input_size
             self.expected_features = self._select_features(input_size)
         elif self.use_ensemble:
             # Load ensemble models
@@ -334,34 +337,6 @@ class LSTMGesturePredictor:
 
         # Start at zero so the first full buffer can be predicted immediately.
         self.last_prediction_time = 0.0
-
-    def _load_onnx_model(self, model_path: str) -> int:
-        try:
-            import onnxruntime as ort  # type: ignore
-        except ImportError as exc:
-            raise ImportError(
-                "onnxruntime is required to load .onnx gesture models"
-            ) from exc
-
-        available = set(ort.get_available_providers())
-        providers = (
-            ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            if "CUDAExecutionProvider" in available
-            else ["CPUExecutionProvider"]
-        )
-        self.onnx_session = ort.InferenceSession(model_path, providers=providers)
-        input_meta = self.onnx_session.get_inputs()[0]
-        self._onnx_input_name = input_meta.name
-        input_shape = list(input_meta.shape)
-        feature_dim = input_shape[-1] if input_shape else None
-        if isinstance(feature_dim, int) and feature_dim > 0:
-            return feature_dim
-        if self.norm_mean is not None:
-            return int(len(self.norm_mean))
-        raise ValueError(
-            "Could not infer ONNX input feature size. Export with a static feature "
-            "dimension or provide matching normalization.npz."
-        )
 
     def _maybe_compile_models(self, input_size: int) -> None:
         flag = os.environ.get("SIGN2SPEECH_TORCH_COMPILE", "1").strip().lower()
@@ -586,12 +561,9 @@ class LSTMGesturePredictor:
         self,
         sequence_tensor: torch.Tensor,
     ) -> tuple[int, float, float, dict[str, float]]:
-        if self.onnx_session is None or self._onnx_input_name is None:
-            raise RuntimeError("ONNX Runtime session is not initialized")
-        input_array = sequence_tensor.detach().cpu().numpy().astype(np.float32)
-        outputs = self.onnx_session.run(None, {self._onnx_input_name: input_array})
-        logits = torch.from_numpy(np.asarray(outputs[0], dtype=np.float32)).to(self._device)
-        probabilities = torch.softmax(logits, dim=1)
+        if self._onnx_backend is None:
+            raise RuntimeError("ONNX backend is not initialized")
+        probabilities = self._onnx_backend.predict(sequence_tensor)
         return self._probability_result(probabilities)
 
     def predict(self):

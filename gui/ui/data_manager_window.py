@@ -13,45 +13,25 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QAction, QBrush, QKeySequence, QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
-    QComboBox,
-    QDoubleSpinBox,
-    QFormLayout,
-    QGridLayout,
-    QGroupBox,
-    QHeaderView,
-    QHBoxLayout,
+    QDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
-    QPlainTextEdit,
-    QProgressBar,
-    QPushButton,
-    QSpinBox,
     QSplitter,
     QStatusBar,
-    QTabWidget,
-    QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
-    QSizePolicy,
 )
-from PySide6.QtWidgets import QDialog, QDialogButtonBox
 
 from config.config import (
-    BATCH_SIZE,
     DATA_MANAGER_MIN_HEIGHT,
     DATA_MANAGER_MIN_WIDTH,
     DATA_MANAGER_WINDOW_HEIGHT,
     DATA_MANAGER_WINDOW_WIDTH,
-    EARLY_STOPPING_PATIENCE,
-    EPOCHS,
-    GESTURES_EDITOR_DIALOG_HEIGHT,
-    GESTURES_EDITOR_DIALOG_WIDTH,
-    LEARNING_RATE,
-    RAW_DATA_DIR,
     LOGS_OUTPUT_DIR,
+    RAW_DATA_DIR,
 )
 from gui.services.data_processing_service import DataProcessingService
 from gui.services.logging_service import configure_gui_logger
@@ -60,6 +40,9 @@ from gui.services.sample_review_service import SampleRecord, SampleReviewService
 from gui.services.serial_service import SerialService
 from gui.services.training_service import TrainingOverrides, TrainingService
 from gui.ui.custom_widgets_adapter import apply_custom_widgets_theme
+from gui.ui.data_manager_event_handlers import DataManagerEventHandlersMixin
+from gui.ui.data_manager_tabs import DataManagerTabsMixin
+from gui.ui.gestures_editor_dialog import GesturesEditorDialog
 from gui.ui.theme_manager import (
     build_data_manager_stylesheet,
     get_confusion_cell_color,
@@ -67,85 +50,16 @@ from gui.ui.theme_manager import (
     get_plot_palette,
     get_status_banner_style,
 )
-from gui.ui.trace_preview_widget import TracePreviewWidget
 from gui.utils.icon_utils import apply_app_icon, resolve_app_icon_path
 from utils.recording_utils import (
     count_csv_samples,
     load_gesture_names,
-    load_gestures,
-    save_gestures,
     sanitize_gesture_label,
 )
 from utils.serial_utils import select_serial_port
 
 
-class StageWidget(QGroupBox):
-    """Small helper widget that visualizes a pipeline stage.
-
-    Contains an independent progress bar, status and metrics text and two
-    actionable buttons (Retry / Skip) that map to backend control methods.
-    """
-
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
-        super().__init__(title, parent)
-        self.setObjectName(f"stage_{title}")
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(6, 6, 6, 6)
-        self._layout.setSpacing(6)
-
-        self.status_label = QLabel("Idle")
-        self._layout.addWidget(self.status_label)
-
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        self._layout.addWidget(self.progress)
-
-        self.metrics_label = QLabel("")
-        self.metrics_label.setWordWrap(True)
-        self._layout.addWidget(self.metrics_label)
-
-        btn_row = QHBoxLayout()
-        self.retry_btn = QPushButton("Retry")
-        self.skip_btn = QPushButton("Skip")
-        btn_row.addWidget(self.retry_btn)
-        btn_row.addWidget(self.skip_btn)
-        btn_row.addStretch(1)
-        self._layout.addLayout(btn_row)
-
-    def set_started(self, message: str | None = None) -> None:
-        self.status_label.setText(message or "Running")
-        self.progress.setRange(0, 0)  # busy
-
-    def set_progress(self, done: int, total: int) -> None:
-        self.progress.setRange(0, max(1, total))
-        self.progress.setValue(max(0, min(total, done)))
-        self.status_label.setText(f"{done}/{total}")
-
-    def set_completed(self) -> None:
-        self.status_label.setText("Completed")
-        self.progress.setRange(0, 100)
-        self.progress.setValue(100)
-
-    def set_failed(self, message: str | None = None) -> None:
-        self.status_label.setText(f"Failed: {message or 'error'}")
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-
-    def set_skipped(self) -> None:
-        self.status_label.setText("Skipped")
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-
-    def set_metrics(self, metrics: dict | None) -> None:
-        if not metrics:
-            self.metrics_label.setText("")
-            return
-        lines = [f"{k}: {v}" for k, v in metrics.items()]
-        self.metrics_label.setText("; ".join(lines))
-
-
-class DataManagerWindow(QMainWindow):
+class DataManagerWindow(DataManagerTabsMixin, DataManagerEventHandlersMixin, QMainWindow):
     """Standalone GUI for recording, processing, training, and data cleaning."""
 
     def __init__(self, project_root: Path) -> None:
@@ -252,101 +166,6 @@ class DataManagerWindow(QMainWindow):
 
         self.setStatusBar(QStatusBar(self))
 
-    def _build_record_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(10)
-
-        record_port = QHBoxLayout()
-
-        self.record_group = QGroupBox("Record New Samples")
-        form = QFormLayout(self.record_group)
-
-        self.record_gesture_combo = QComboBox()
-        self.record_gesture_combo.setEditable(False)
-        self.record_gesture_combo.currentTextChanged.connect(
-            lambda _text: self._refresh_record_count()
-        )
-
-        # Provide a small manager button to edit the gestures list
-        self.manage_gestures_btn = QPushButton("Manage")
-        self.manage_gestures_btn.setToolTip("Edit gestures list")
-        self.manage_gestures_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.manage_gestures_btn.clicked.connect(self._open_gestures_editor)
-
-        gesture_host = QWidget()
-        gesture_layout = QHBoxLayout(gesture_host)
-        gesture_layout.setContentsMargins(0, 0, 0, 0)
-        gesture_layout.setSpacing(6)
-        gesture_layout.addWidget(self.record_gesture_combo)
-        gesture_layout.addWidget(self.manage_gestures_btn)
-
-        form.addRow("Gesture", gesture_host)
-
-        record_port.addWidget(self.record_group)
-
-        self.record_port_group = QGroupBox("Serial Port Management")
-        port_layout = QHBoxLayout(self.record_port_group)
-        port_layout.setSpacing(6)
-
-        self.record_port_combo = QComboBox()
-        self.record_port_combo.setToolTip("Select serial port used for recording")
-        port_layout.addWidget(self.record_port_combo)
-
-        self.record_refresh_ports_btn = QPushButton("Refresh Ports")
-        self.record_refresh_ports_btn.setSizePolicy(
-            QSizePolicy.Fixed, QSizePolicy.Preferred
-        )
-        self.record_refresh_ports_btn.clicked.connect(self.refresh_record_ports)
-        port_layout.addWidget(self.record_refresh_ports_btn)
-
-        record_port.addWidget(self.record_port_group)
-        layout.addLayout(record_port)
-
-        action_row = QHBoxLayout()
-        self.record_btn = QPushButton("Start Recording")
-        self.record_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.record_btn.clicked.connect(self.start_recording)
-        self.record_btn.setToolTip("Start recording (Ctrl+R)")
-        action_row.addWidget(self.record_btn)
-
-        self.record_stop_btn = QPushButton("Stop")
-        self.record_stop_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        self.record_stop_btn.clicked.connect(self.stop_recording)
-        self.record_stop_btn.setToolTip(
-            "Stop recording and review before save (Ctrl+T)"
-        )
-        self.record_stop_btn.setEnabled(False)
-        action_row.addWidget(self.record_stop_btn)
-
-        record_port.addLayout(action_row)
-        layout.addLayout(record_port)
-
-        self.recording_status_label = QLabel("Recording status: idle")
-        layout.addWidget(self.recording_status_label)
-
-        self.record_row_count_label = QLabel("Rows captured: 0")
-        layout.addWidget(self.record_row_count_label)
-
-        self.record_stats_label = QLabel("Samples for selected gesture: 0")
-        layout.addWidget(self.record_stats_label)
-
-        self.record_hint_label = QLabel(
-            "Use Start to begin capture and Stop to review before save. Shortcuts: Ctrl+R start, Ctrl+T stop."
-        )
-        self.record_hint_label.setWordWrap(True)
-        layout.addWidget(self.record_hint_label)
-
-        preview_group = QGroupBox("Live Capture Preview")
-        preview_layout = QVBoxLayout(preview_group)
-        preview_layout.setContentsMargins(8, 8, 8, 8)
-        preview_layout.setSpacing(6)
-        self.record_preview_plot = TracePreviewWidget(minimum_height=540)
-        preview_layout.addWidget(self.record_preview_plot, stretch=1)
-        layout.addWidget(preview_group, stretch=2)
-
-        return tab
-
     def _build_shortcuts(self) -> None:
         self.start_recording_action = QAction(self)
         self.start_recording_action.setShortcut(QKeySequence("Ctrl+R"))
@@ -361,437 +180,6 @@ class DataManagerWindow(QMainWindow):
         self.stop_recording_action.setShortcutContext(Qt.ShortcutContext.WindowShortcut)
         self.stop_recording_action.triggered.connect(self.stop_recording)
         self.addAction(self.stop_recording_action)
-
-    def _build_process_tab(self) -> QWidget:
-        """Build the process tab with dedicated stage widgets.
-
-        Each stage has its own small widget (StageWidget) that presents
-        status/progress/metrics and actionable Retry/Skip buttons.
-        """
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(10)
-
-        header = QLabel("Processing Pipeline — Live Telemetry")
-        header.setObjectName("panelTitle")
-        layout.addWidget(header)
-
-        # Top action row
-        action_row = QHBoxLayout()
-        self.process_btn = QPushButton("Run Processing")
-        self.process_btn.clicked.connect(self.run_processing)
-        action_row.addWidget(self.process_btn)
-
-        self.process_cancel_btn = QPushButton("Cancel")
-        self.process_cancel_btn.clicked.connect(
-            lambda: self.data_processing_service.stop()
-        )
-        action_row.addWidget(self.process_cancel_btn)
-        action_row.addStretch(1)
-        layout.addLayout(action_row)
-
-        # Stage widgets grid
-        stages_layout = QGridLayout()
-        stages_layout.setSpacing(8)
-
-        self.stage_file_ingest = StageWidget("File Ingestion")
-        self.stage_smoothing = StageWidget("Signal Smoothing")
-        self.stage_augmentation = StageWidget("Data Augmentation")
-        self.stage_feature = StageWidget("Feature Extraction")
-        self.stage_tensor = StageWidget("Tensor Formatting")
-        self.stage_save_train = StageWidget("Save Training Sequences")
-        self.stage_save_test = StageWidget("Save Test Sequences")
-
-        stages = [
-            self.stage_file_ingest,
-            self.stage_smoothing,
-            self.stage_augmentation,
-            self.stage_feature,
-            self.stage_tensor,
-            self.stage_save_train,
-            self.stage_save_test,
-        ]
-
-        # Connect stage actions to backend controls
-        for w in stages:
-            w.retry_btn.clicked.connect(
-                self.data_processing_service.retry_current_stage
-            )
-            w.skip_btn.clicked.connect(self.data_processing_service.skip_current_stage)
-
-        stages_layout.addWidget(self.stage_file_ingest, 0, 0)
-        stages_layout.addWidget(self.stage_smoothing, 0, 1)
-        stages_layout.addWidget(self.stage_augmentation, 1, 0)
-        stages_layout.addWidget(self.stage_feature, 1, 1)
-        stages_layout.addWidget(self.stage_tensor, 2, 0)
-        stages_layout.addWidget(self.stage_save_train, 2, 1)
-        stages_layout.addWidget(self.stage_save_test, 3, 0)
-
-        layout.addLayout(stages_layout)
-
-        # Results table (keeps previous functionality)
-        self.process_results_table = QTableWidget(0, 5)
-        self.process_results_table.setHorizontalHeaderLabels(
-            ["Gesture", "Files", "Samples", "Train Seq", "Test Seq"]
-        )
-        self.process_results_table.verticalHeader().setVisible(False)
-        self.process_results_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
-        )
-        self.process_results_table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.process_results_table)
-
-        # Compact summary
-        self.process_summary_label = QLabel(
-            f"Raw directory: {self.raw_data_root}\nProcessed output: {self.project_root / 'data' / 'processed'}"
-        )
-        self.process_summary_label.setWordWrap(True)
-        layout.addWidget(self.process_summary_label)
-
-        return tab
-
-    def _build_train_tab(self) -> QWidget:
-        tab = QWidget()
-        mainLayout = QVBoxLayout(tab)
-        mainLayout.setSpacing(8)
-        mainLayout.setContentsMargins(10, 10, 10, 10)
-
-        # ========== TOP SECTION: Controls ==========
-        base_group = QGroupBox("Train New Model")
-        form = QFormLayout(base_group)
-
-        train_config_label = QLabel("Training uses the default project configuration.")
-        train_config_label.setWordWrap(True)
-        form.addRow(train_config_label)
-
-        mainLayout.addWidget(base_group)
-
-        # ========== CONFIG OVERRIDES SECTION ==========
-        override_group = QGroupBox("Training Configuration Overrides")
-        override_form = QFormLayout(override_group)
-        override_form.setSpacing(6)
-
-        self.train_epochs_spin = QSpinBox()
-        self.train_epochs_spin.setRange(1, 2000)
-        self.train_epochs_spin.setValue(EPOCHS)
-        self.train_epochs_spin.setToolTip(
-            f"Max training epochs (config default: {EPOCHS})"
-        )
-        override_form.addRow("Max Epochs:", self.train_epochs_spin)
-
-        self.train_lr_spin = QDoubleSpinBox()
-        self.train_lr_spin.setRange(0.00001, 0.1)
-        self.train_lr_spin.setDecimals(6)
-        self.train_lr_spin.setSingleStep(0.0001)
-        self.train_lr_spin.setValue(LEARNING_RATE)
-        self.train_lr_spin.setToolTip(
-            f"Initial learning rate (config default: {LEARNING_RATE})"
-        )
-        override_form.addRow("Learning Rate:", self.train_lr_spin)
-
-        self.train_batch_spin = QSpinBox()
-        self.train_batch_spin.setRange(1, 512)
-        self.train_batch_spin.setValue(BATCH_SIZE)
-        self.train_batch_spin.setToolTip(
-            f"Mini-batch size (config default: {BATCH_SIZE})"
-        )
-        override_form.addRow("Batch Size:", self.train_batch_spin)
-
-        self.train_patience_spin = QSpinBox()
-        self.train_patience_spin.setRange(1, 200)
-        self.train_patience_spin.setValue(EARLY_STOPPING_PATIENCE)
-        self.train_patience_spin.setToolTip(
-            f"Early stopping patience in epochs (config default: {EARLY_STOPPING_PATIENCE})"
-        )
-        override_form.addRow("Early Stop Patience:", self.train_patience_spin)
-
-        self.train_ensemble_check = QCheckBox("Train as Ensemble")
-        from config.config import USE_ENSEMBLE
-
-        self.train_ensemble_check.setChecked(USE_ENSEMBLE)
-        self.train_ensemble_check.setToolTip(
-            f"Train an ensemble of multiple models (config default: {USE_ENSEMBLE})"
-        )
-        override_form.addRow("Ensemble Mode:", self.train_ensemble_check)
-
-        mainLayout.addWidget(override_group)
-
-        action_row = QHBoxLayout()
-        self.train_btn = QPushButton("Start Training")
-        self.train_btn.clicked.connect(self.start_training)
-        action_row.addWidget(self.train_btn)
-
-        self.train_cancel_btn = QPushButton("Cancel Training")
-        self.train_cancel_btn.clicked.connect(self.cancel_training)
-        self.train_cancel_btn.setEnabled(False)
-        action_row.addWidget(self.train_cancel_btn)
-
-        action_row.addStretch(1)
-        mainLayout.addLayout(action_row)
-
-        # ========== PROGRESS SECTION ==========
-        self.train_status_label = QLabel("Status: idle")
-        self.train_status_label.setMaximumHeight(20)
-        mainLayout.addWidget(self.train_status_label)
-
-        self.train_progress_bar = QProgressBar()
-        self.train_progress_bar.setRange(0, 100)
-        self.train_progress_bar.setValue(0)
-        self.train_progress_bar.setFormat("Epoch progress: 0%")
-        self.train_progress_bar.setMaximumHeight(25)
-        mainLayout.addWidget(self.train_progress_bar)
-
-        # ========== METRICS SECTION (compact grid) ==========
-        metrics_group = QGroupBox("Live Training Metrics")
-        metrics_grid = QGridLayout(metrics_group)
-        metrics_grid.setSpacing(8)
-        metrics_grid.setContentsMargins(8, 8, 8, 8)
-
-        # Row 0: Loss metrics (side by side)
-        self.train_loss_box = QPlainTextEdit()
-        self.train_loss_box.setReadOnly(True)
-        self.train_loss_box.setPlaceholderText("-")
-        self.train_loss_box.setMaximumHeight(35)
-        self.train_loss_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Train Loss:"), 0, 0)
-        metrics_grid.addWidget(self.train_loss_box, 0, 1)
-
-        self.val_loss_box = QPlainTextEdit()
-        self.val_loss_box.setReadOnly(True)
-        self.val_loss_box.setPlaceholderText("-")
-        self.val_loss_box.setMaximumHeight(35)
-        self.val_loss_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Val Loss:"), 0, 2)
-        metrics_grid.addWidget(self.val_loss_box, 0, 3)
-
-        # Row 1: Accuracy metrics (side by side)
-        self.train_acc_box = QPlainTextEdit()
-        self.train_acc_box.setReadOnly(True)
-        self.train_acc_box.setPlaceholderText("-")
-        self.train_acc_box.setMaximumHeight(35)
-        self.train_acc_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Train Acc:"), 1, 0)
-        metrics_grid.addWidget(self.train_acc_box, 1, 1)
-
-        self.val_acc_box = QPlainTextEdit()
-        self.val_acc_box.setReadOnly(True)
-        self.val_acc_box.setPlaceholderText("-")
-        self.val_acc_box.setMaximumHeight(35)
-        self.val_acc_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Val Acc:"), 1, 2)
-        metrics_grid.addWidget(self.val_acc_box, 1, 3)
-
-        # Row 2: Learning rate and best accuracy (side by side)
-        self.train_lr_box = QPlainTextEdit()
-        self.train_lr_box.setReadOnly(True)
-        self.train_lr_box.setPlaceholderText("-")
-        self.train_lr_box.setMaximumHeight(35)
-        self.train_lr_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Learning Rate:"), 2, 0)
-        metrics_grid.addWidget(self.train_lr_box, 2, 1)
-
-        self.train_best_val_box = QPlainTextEdit()
-        self.train_best_val_box.setReadOnly(True)
-        self.train_best_val_box.setPlaceholderText("-")
-        self.train_best_val_box.setMaximumHeight(35)
-        self.train_best_val_box.setMinimumHeight(35)
-        metrics_grid.addWidget(QLabel("Best Val Acc:"), 2, 2)
-        metrics_grid.addWidget(self.train_best_val_box, 2, 3)
-
-        metrics_group.setMaximumHeight(140)
-        mainLayout.addWidget(metrics_group)
-
-        # ========== BOTTOM SECTION: HORIZONTAL SPLITTER ==========
-        # Results on LEFT, Confusion Matrix on RIGHT
-        hsplitter = QSplitter(Qt.Orientation.Horizontal)
-        hsplitter.setChildrenCollapsible(False)
-
-        # LEFT: Results & Metrics Tables (vertical splitter)
-        vsplitter = QSplitter(Qt.Orientation.Vertical)
-        vsplitter.setChildrenCollapsible(False)
-
-        # Results Table
-        self.train_results_table = QTableWidget(0, 2)
-        self.train_results_table.setHorizontalHeaderLabels(["Metric", "Value"])
-        self.train_results_table.verticalHeader().setVisible(False)
-        self.train_results_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
-        )
-        self.train_results_table.horizontalHeader().setStretchLastSection(True)
-        self.train_results_table.setMinimumHeight(80)
-        results_label = QLabel("Training Results:")
-        results_container = QWidget()
-        results_layout = QVBoxLayout(results_container)
-        results_layout.setContentsMargins(0, 0, 0, 0)
-        results_layout.setSpacing(4)
-        results_layout.addWidget(results_label)
-        results_layout.addWidget(self.train_results_table)
-        vsplitter.addWidget(results_container)
-
-        # Evaluation Metrics Table
-        self.train_eval_metrics_table = QTableWidget(0, 2)
-        self.train_eval_metrics_table.setHorizontalHeaderLabels(["Metric", "Value"])
-        self.train_eval_metrics_table.verticalHeader().setVisible(False)
-        self.train_eval_metrics_table.setEditTriggers(
-            QTableWidget.EditTrigger.NoEditTriggers
-        )
-        self.train_eval_metrics_table.horizontalHeader().setStretchLastSection(True)
-        self.train_eval_metrics_table.setMinimumHeight(80)
-        eval_label = QLabel("Evaluation Metrics:")
-        eval_container = QWidget()
-        eval_layout = QVBoxLayout(eval_container)
-        eval_layout.setContentsMargins(0, 0, 0, 0)
-        eval_layout.setSpacing(4)
-        eval_layout.addWidget(eval_label)
-        eval_layout.addWidget(self.train_eval_metrics_table)
-        vsplitter.addWidget(eval_container)
-
-        vsplitter.setStretchFactor(0, 1)
-        vsplitter.setStretchFactor(1, 1)
-
-        # RIGHT: Confusion Matrix
-        cm_container = QWidget()
-        cm_layout = QVBoxLayout(cm_container)
-        cm_layout.setContentsMargins(0, 0, 0, 0)
-        cm_layout.setSpacing(4)
-        cm_label = QLabel("Confusion Matrix (Validation):")
-        cm_layout.addWidget(cm_label)
-
-        self.train_cm_table = QTableWidget(0, 0)
-        self.train_cm_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.train_cm_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
-        self.train_cm_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.train_cm_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.train_cm_table.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.train_cm_table.setMinimumWidth(320)
-        self.train_cm_table.setMinimumHeight(260)
-        cm_layout.addWidget(self.train_cm_table, stretch=1)
-
-        self.train_cm_legend_label = QLabel("Cell format: normalized value (count)")
-        self.train_cm_legend_label.setWordWrap(True)
-        cm_layout.addWidget(self.train_cm_legend_label)
-
-        # Add both sections to horizontal splitter
-        hsplitter.addWidget(vsplitter)
-        hsplitter.addWidget(cm_container)
-        hsplitter.setStretchFactor(0, 2)  # Tables get more space
-        hsplitter.setStretchFactor(1, 1)  # Confusion matrix
-
-        mainLayout.addWidget(hsplitter, stretch=1)
-
-        return tab
-
-    def _build_review_tab(self) -> QWidget:
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(10)
-
-        controls = QHBoxLayout()
-
-        controls.addWidget(QLabel("Gesture Filter"))
-        self.review_gesture_filter = QComboBox()
-        self.review_gesture_filter.addItem("All", "__all__")
-        self.review_gesture_filter.currentIndexChanged.connect(
-            self._render_sample_table
-        )
-        controls.addWidget(self.review_gesture_filter)
-
-        self.include_quarantine_checkbox = QCheckBox("Include quarantine")
-        self.include_quarantine_checkbox.toggled.connect(self.refresh_samples)
-        controls.addWidget(self.include_quarantine_checkbox)
-
-        self.refresh_samples_btn = QPushButton("Refresh")
-        self.refresh_samples_btn.clicked.connect(self.refresh_samples)
-        controls.addWidget(self.refresh_samples_btn)
-
-        controls.addStretch(1)
-
-        self.quarantine_btn = QPushButton("Quarantine Selected")
-        self.quarantine_btn.clicked.connect(self.quarantine_selected)
-        controls.addWidget(self.quarantine_btn)
-
-        self.restore_btn = QPushButton("Restore Selected")
-        self.restore_btn.clicked.connect(self.restore_selected)
-        controls.addWidget(self.restore_btn)
-
-        layout.addLayout(controls)
-
-        self.review_summary_label = QLabel("Samples loaded: 0")
-        layout.addWidget(self.review_summary_label)
-
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        splitter.setChildrenCollapsible(False)
-
-        self.samples_table = QTableWidget(0, 7)
-        self.samples_table.setHorizontalHeaderLabels(
-            [
-                "Gesture",
-                "File",
-                "Rows",
-                "Orientation",
-                "Recorded At",
-                "Source",
-                "Quality",
-            ]
-        )
-        self.samples_table.verticalHeader().setVisible(False)
-        self.samples_table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
-        self.samples_table.setSelectionMode(
-            QTableWidget.SelectionMode.ExtendedSelection
-        )
-        self.samples_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.samples_table.horizontalHeader().setStretchLastSection(True)
-        self.samples_table.itemSelectionChanged.connect(self._on_sample_selected)
-
-        table_host = QWidget()
-        table_layout = QVBoxLayout(table_host)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.addWidget(self.samples_table)
-
-        plot_host = QWidget()
-        plot_layout = QVBoxLayout(plot_host)
-        plot_layout.setContentsMargins(0, 0, 0, 0)
-        self.plot_title_label = QLabel("Select a sample to inspect traces")
-        plot_layout.addWidget(self.plot_title_label)
-        self.sample_trace_plot = TracePreviewWidget(minimum_height=420)
-        plot_layout.addWidget(self.sample_trace_plot)
-
-        splitter.addWidget(table_host)
-        splitter.addWidget(plot_host)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 3)
-        splitter.setSizes([360, 520])
-        layout.addWidget(splitter, stretch=1)
-
-        return tab
-
-    def _build_log_panel(self) -> QWidget:
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
-        layout.setSpacing(8)
-
-        title = QLabel("Task Logs")
-        title.setObjectName("panelTitle")
-        layout.addWidget(title)
-
-        self.log_box = QPlainTextEdit()
-        self.log_box.setReadOnly(True)
-        layout.addWidget(self.log_box, stretch=1)
-
-        row = QHBoxLayout()
-        self.clear_logs_btn = QPushButton("Clear Logs")
-        self.clear_logs_btn.clicked.connect(lambda: self.log_box.setPlainText(""))
-        row.addWidget(self.clear_logs_btn)
-        row.addStretch(1)
-        layout.addLayout(row)
-
-        return panel
 
     def _apply_window_styles(self, theme: str) -> None:
         self._theme_name = theme
@@ -827,324 +215,7 @@ class DataManagerWindow(QMainWindow):
         else:
             self._set_status("Ready", "INFO")
 
-    # ---- Event dispatch ----
-
-    _EVENT_HANDLER_NAMES: dict[str, str] = {
-        "record_started": "_on_record_started",
-        "record_progress": "_on_record_progress",
-        "record_error": "_on_record_error",
-        "record_warning": "_on_record_warning",
-        "record_ready_for_review": "_on_record_ready_for_review",
-        "process_started": "_on_process_started",
-        "process_total_gestures": "_on_process_total_gestures",
-        "process_gesture_summary": "_on_process_gesture_summary",
-        "process_stage_started": "_on_process_stage_started",
-        "process_stage_metrics": "_on_process_stage_metrics",
-        "process_stage_completed": "_on_process_stage_completed",
-        "process_stage_failed": "_on_process_stage_failed",
-        "process_stage_skipped": "_on_process_stage_skipped",
-        "process_train_sequences": "_on_process_train_sequences",
-        "process_test_sequences": "_on_process_test_sequences",
-        "process_progress": "_on_process_progress",
-        "process_completed": "_on_process_completed",
-        "process_failed": "_on_process_failed",
-        "process_cancelled": "_on_process_cancelled",
-        "train_started": "_on_train_started",
-        "train_epoch": "_on_train_epoch",
-        "train_model_dir": "_on_train_model_dir",
-        "train_completed": "_on_train_completed",
-        "train_cancelled": "_on_train_cancelled",
-        "train_failed": "_on_train_failed",
-        "log": "_on_log",
-    }
-
-    _STAGE_ATTR_MAP: dict[str, str] = {
-        "file_ingest": "stage_file_ingest",
-        "smoothing": "stage_smoothing",
-        "augmentation": "stage_augmentation",
-        "feature_extraction": "stage_feature",
-        "tensor_formatting": "stage_tensor",
-        "save_train": "stage_save_train",
-        "save_test": "stage_save_test",
-    }
-
-    def _get_stage_widget(self, stage: str) -> StageWidget | None:
-        """Resolve a stage widget by name, falling back to a name mapping."""
-        widget = getattr(self, f"stage_{stage}", None)
-        if widget is not None:
-            return widget
-        attr_name = self._STAGE_ATTR_MAP.get(stage)
-        if attr_name:
-            return getattr(self, attr_name, None)
-        return None
-
-    def _poll_events(self) -> None:
-        while True:
-            try:
-                event = self.event_queue.get_nowait()
-            except queue.Empty:
-                break
-
-            event_type = event.get("type")
-            handler_name = self._EVENT_HANDLER_NAMES.get(event_type)
-            if handler_name is not None:
-                getattr(self, handler_name)(event)
-                continue
-
-            # Unknown event types are silently ignored
-
-        if self._live_preview_rows is not None:
-            self._plot_recording_preview(self._live_preview_rows, force=False)
-
-    # ---- Event handlers ----
-
-    def _on_record_started(self, event: dict) -> None:
-        port = str(event.get("port", "unknown"))
-        self.recording_status_label.setText(
-            f"Recording status: capturing on {port}"
-        )
-
-    def _on_record_progress(self, event: dict) -> None:
-        row_count = int(event.get("row_count", 0))
-        elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
-        self.record_row_count_label.setText(f"Rows captured: {row_count}")
-        self.recording_status_label.setText(
-            f"Recording status: capturing ({elapsed_seconds:.1f}s)"
-        )
-        rows = event.get("rows")
-        if isinstance(rows, list) and rows:
-            self._live_preview_rows = rows
-
-    def _on_record_error(self, event: dict) -> None:
-        message = str(event.get("message", "Recording failed"))
-        self._live_preview_rows = None
-        self._set_task_state(False)
-        self._set_status(f"Recording failed: {message}", "ERROR")
-        self.recording_status_label.setText("Recording status: error")
-
-    def _on_record_warning(self, event: dict) -> None:
-        message = str(event.get("message", "")).strip()
-        if message:
-            self._set_status(message, "WARNING")
-
-    def _on_record_ready_for_review(self, event: dict) -> None:
-        gesture = str(event.get("gesture", ""))
-        orientation = str(event.get("orientation", "unspecified"))
-        row_count = int(event.get("row_count", 0))
-        elapsed_seconds = float(event.get("elapsed_seconds", 0.0))
-        rows = event.get("rows")
-
-        self._set_task_state(False)
-        self.record_row_count_label.setText(f"Rows captured: {row_count}")
-
-        if not isinstance(rows, list) or not rows:
-            self._live_preview_rows = None
-            self._set_status(
-                "No valid sensor rows captured. Recording discarded.", "WARNING"
-            )
-            self.recording_status_label.setText("Recording status: discarded")
-            return
-
-        self._live_preview_rows = None
-        self._plot_recording_preview(rows)
-        decision = QMessageBox.question(
-            self,
-            "Save Recording",
-            f"Preview ready for gesture '{gesture}'.\n\nKeep and save this recording?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if decision == QMessageBox.StandardButton.Yes:
-            path = self.recording_service.save_recording(
-                gesture_label=gesture,
-                orientation=orientation,
-                rows=rows,
-                elapsed_seconds=elapsed_seconds,
-            )
-            self.refresh_samples()
-            self._refresh_record_count()
-            self._set_status("Recording saved", "INFO")
-            self.recording_status_label.setText("Recording status: completed")
-            self.logger.info("[record] Saved path: %s", path)
-        else:
-            self._set_status("Recording discarded by user", "WARNING")
-            self.recording_status_label.setText("Recording status: discarded")
-
-    def _on_process_started(self, event: dict) -> None:
-        for stage in (
-            self.stage_file_ingest,
-            self.stage_smoothing,
-            self.stage_augmentation,
-            self.stage_feature,
-            self.stage_tensor,
-            self.stage_save_train,
-            self.stage_save_test,
-        ):
-            stage.set_metrics(None)
-            stage.set_skipped()
-        self.stage_file_ingest.set_started("Preparing")
-        self._set_task_state(True, "process_data")
-
-    def _on_process_total_gestures(self, event: dict) -> None:
-        total = int(event.get("total", 0))
-        self._process_total_gestures = total
-        self.stage_file_ingest.set_metrics({"gestures": total})
-
-    def _on_process_gesture_summary(self, event: dict) -> None:
-        gesture = str(event.get("gesture", ""))
-        files = int(event.get("files", 0))
-        samples = int(event.get("samples", 0))
-        self._set_process_table_value(gesture, 1, str(files))
-        self._set_process_table_value(gesture, 2, str(samples))
-
-    def _on_process_stage_started(self, event: dict) -> None:
-        stage = str(event.get("stage", ""))
-        gesture = event.get("gesture")
-        widget = self._get_stage_widget(stage)
-        if widget is not None:
-            label = f"Running{': ' + str(gesture) if gesture else ''}"
-            widget.set_started(label)
-
-    def _on_process_stage_metrics(self, event: dict) -> None:
-        stage = str(event.get("stage", ""))
-        widget = self._get_stage_widget(stage)
-        if widget is not None:
-            metrics = {
-                k: v
-                for k, v in event.items()
-                if k not in {"type", "stage", "gesture"}
-            }
-            widget.set_metrics(metrics)
-
-    def _on_process_stage_completed(self, event: dict) -> None:
-        stage = str(event.get("stage", ""))
-        widget = self._get_stage_widget(stage)
-        if widget is not None:
-            widget.set_completed()
-
-    def _on_process_stage_failed(self, event: dict) -> None:
-        stage = str(event.get("stage", ""))
-        message = str(event.get("message", ""))
-        widget = self._get_stage_widget(stage)
-        if widget is not None:
-            widget.set_failed(message)
-        self._set_status(f"Stage {stage} failed: {message}", "ERROR")
-
-    def _on_process_stage_skipped(self, event: dict) -> None:
-        stage = str(event.get("stage", ""))
-        widget = self._get_stage_widget(stage)
-        if widget is not None:
-            widget.set_skipped()
-
-    def _on_process_train_sequences(self, event: dict) -> None:
-        gesture = str(event.get("gesture", ""))
-        count = int(event.get("count", 0))
-        self._set_process_table_value(gesture, 3, str(count))
-        self.stage_save_train.set_metrics({"train_seq": count})
-
-    def _on_process_test_sequences(self, event: dict) -> None:
-        gesture = str(event.get("gesture", ""))
-        count = int(event.get("count", 0))
-        self._set_process_table_value(gesture, 4, str(count))
-        self.stage_save_test.set_metrics({"test_seq": count})
-
-    def _on_process_progress(self, event: dict) -> None:
-        done = int(event.get("done", 0))
-        total = max(int(event.get("total", 1)), 1)
-        self._set_status(f"Status: processed {done}/{total}", "INFO")
-
-    def _on_process_completed(self, event: dict) -> None:
-        processed = int(event.get("processed", 0))
-        total = int(event.get("total", 0))
-        for w in (
-            self.stage_file_ingest,
-            self.stage_smoothing,
-            self.stage_augmentation,
-            self.stage_feature,
-            self.stage_tensor,
-            self.stage_save_train,
-            self.stage_save_test,
-        ):
-            if w.status_label.text() != "Completed":
-                w.set_completed()
-        self._set_status(
-            f"Processing complete: {processed}/{total} gesture(s)", "INFO"
-        )
-        self._set_task_state(False)
-        self.refresh_samples()
-        self._refresh_record_count()
-
-    def _on_process_failed(self, event: dict) -> None:
-        message = str(event.get("message", "Processing failed"))
-        self._set_status(f"Processing failed: {message}", "ERROR")
-        self._set_task_state(False)
-
-    def _on_process_cancelled(self, event: dict) -> None:
-        self._set_status("Processing cancelled", "WARNING")
-        self._set_task_state(False)
-
-    def _on_train_started(self, event: dict) -> None:
-        self.train_status_label.setText("Status: running")
-
-    def _on_train_epoch(self, event: dict) -> None:
-        epoch = int(event.get("epoch", 0))
-        total = int(event.get("total", 1))
-        train_loss = float(event.get("train_loss", 0.0))
-        train_acc = float(event.get("train_acc", 0.0))
-        val_loss = float(event.get("val_loss", 0.0))
-        val_acc = float(event.get("val_acc", 0.0))
-        lr = float(event.get("lr", 0.0))
-        self._train_total_epochs = total
-        pct = int((epoch / max(total, 1)) * 100)
-        self.train_progress_bar.setRange(0, 100)
-        self.train_progress_bar.setValue(max(0, min(100, pct)))
-        self.train_progress_bar.setFormat(f"Epoch progress: {epoch}/{total}")
-        self.train_status_label.setText(f"Status: epoch {epoch}/{total}")
-        self._set_train_metric("train_loss", f"{train_loss:.4f}")
-        self._set_train_metric("train_acc", f"{train_acc:.2f}%")
-        self._set_train_metric("val_loss", f"{val_loss:.4f}")
-        self._set_train_metric("val_acc", f"{val_acc:.2f}%")
-        self._set_train_metric("lr", f"{lr:.6f}")
-
-    def _on_train_model_dir(self, event: dict) -> None:
-        self._train_model_dir = str(event.get("model_dir", ""))
-
-    def _on_train_completed(self, event: dict) -> None:
-        self._set_train_metric("Result", "Training complete")
-        self.train_progress_bar.setRange(0, 100)
-        self.train_progress_bar.setValue(100)
-        self.train_progress_bar.setFormat("Epoch progress: 100%")
-        self.train_status_label.setText("Status: completed")
-        self._set_status("Training complete", "INFO")
-        if self._train_model_dir:
-            self._load_train_evaluation_metrics()
-        self._set_task_state(False)
-        self.refresh_samples()
-        self._refresh_record_count()
-
-    def _on_train_cancelled(self, event: dict) -> None:
-        self.train_progress_bar.setRange(0, 100)
-        self.train_progress_bar.setValue(0)
-        self.train_progress_bar.setFormat("Epoch progress: cancelled")
-        self.train_status_label.setText("Status: cancelled")
-        self._set_status("Training cancelled", "WARNING")
-        self._set_task_state(False)
-
-    def _on_train_failed(self, event: dict) -> None:
-        message = str(event.get("message", "Training failed"))
-        self.train_progress_bar.setRange(0, 100)
-        self.train_progress_bar.setValue(0)
-        self.train_progress_bar.setFormat("Epoch progress: failed")
-        self.train_status_label.setText("Status: failed")
-        self._set_status(f"Training failed: {message}", "ERROR")
-        self._set_task_state(False)
-
-    def _on_log(self, event: dict) -> None:
-        level = str(event.get("level", "INFO"))
-        timestamp = str(event.get("timestamp", ""))
-        source = str(event.get("source", "app"))
-        message = str(event.get("message", ""))
-        self.log_box.appendPlainText(f"[{timestamp}] [{level}] {source}: {message}")
+    # ---- Gesture options ---------------------------------------------------
 
     def _load_gesture_options(self) -> None:
         gestures = load_gesture_names(self.project_root)
@@ -1181,6 +252,8 @@ class DataManagerWindow(QMainWindow):
         if result == QDialog.Accepted:
             # Refresh options after a successful save
             self._load_gesture_options()
+
+    # ---- Recording helpers -------------------------------------------------
 
     def _selected_record_port(self) -> str:
         data = self.record_port_combo.currentData()
@@ -1288,6 +361,8 @@ class DataManagerWindow(QMainWindow):
 
         self.record_preview_plot.plot_rows(rows)
         self._last_record_preview_update = now
+
+    # ---- Process helpers ---------------------------------------------------
 
     def _reset_process_ui(self) -> None:
         self._process_total_gestures = 0
@@ -1414,13 +489,13 @@ class DataManagerWindow(QMainWindow):
                         ]
                     )
 
-                for idx, (label, value) in enumerate(metrics_to_display):
+                for idx, (label_text, metric_value) in enumerate(metrics_to_display):
                     self.train_eval_metrics_table.insertRow(idx)
                     self.train_eval_metrics_table.setItem(
-                        idx, 0, QTableWidgetItem(label)
+                        idx, 0, QTableWidgetItem(label_text)
                     )
                     self.train_eval_metrics_table.setItem(
-                        idx, 1, QTableWidgetItem(value)
+                        idx, 1, QTableWidgetItem(metric_value)
                     )
 
                 # Display confusion matrix
@@ -1484,6 +559,8 @@ class DataManagerWindow(QMainWindow):
         """Resolve confusion-matrix background color from theme manager."""
         return get_confusion_cell_color(ratio, self._theme_name)
 
+    # ---- Processing --------------------------------------------------------
+
     def run_processing(self) -> None:
         """Start the data processing pipeline via the native service."""
         if self._task_active:
@@ -1495,6 +572,8 @@ class DataManagerWindow(QMainWindow):
             return
         self._set_task_state(True, "process_data")
         self._set_status("Processing started", "INFO")
+
+    # ---- Training ----------------------------------------------------------
 
     def start_training(self) -> None:
         """Start the training pipeline via the native service."""
@@ -1524,6 +603,8 @@ class DataManagerWindow(QMainWindow):
             "Cancellation requested — stopping after current epoch…", "WARNING"
         )
 
+    # ---- Record stats ------------------------------------------------------
+
     def _refresh_record_count(self) -> None:
         gesture = self.record_gesture_combo.currentText().strip()
         if not gesture:
@@ -1531,6 +612,8 @@ class DataManagerWindow(QMainWindow):
             return
         sample_count = count_csv_samples(gesture, base_dir=str(self.raw_data_root))
         self.record_stats_label.setText(f"Samples for selected gesture: {sample_count}")
+
+    # ---- Sample review -----------------------------------------------------
 
     def refresh_samples(self) -> None:
         include_quarantine = self.include_quarantine_checkbox.isChecked()
@@ -1720,120 +803,6 @@ class DataManagerWindow(QMainWindow):
         else:
             self._set_status(f"{moved_count} samples restored to raw dataset", "INFO")
         self.refresh_samples()
-
-
-class GesturesEditorDialog(QDialog):
-    """Dialog to view and edit the gestures list stored in config/gestures.json."""
-
-    def __init__(self, project_root: Path, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.project_root = project_root
-        self.setWindowTitle("Manage Gestures")
-        self.resize(GESTURES_EDITOR_DIALOG_WIDTH, GESTURES_EDITOR_DIALOG_HEIGHT)
-
-        layout = QVBoxLayout(self)
-
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["Name", "Translation"])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setEditTriggers(
-            QTableWidget.EditTrigger.DoubleClicked
-            | QTableWidget.EditTrigger.SelectedClicked
-            | QTableWidget.EditTrigger.EditKeyPressed
-        )
-        layout.addWidget(self.table, stretch=1)
-
-        btn_row = QHBoxLayout()
-        self.add_btn = QPushButton("Add")
-        self.add_btn.clicked.connect(self._add_row)
-        btn_row.addWidget(self.add_btn)
-
-        self.delete_btn = QPushButton("Delete Selected")
-        self.delete_btn.clicked.connect(self._delete_selected)
-        btn_row.addWidget(self.delete_btn)
-
-        btn_row.addStretch(1)
-
-        self.button_box = QDialogButtonBox(
-            QDialogButtonBox.Save | QDialogButtonBox.Cancel
-        )
-        self.button_box.accepted.connect(self._on_save)
-        self.button_box.rejected.connect(self.reject)
-        btn_row.addWidget(self.button_box)
-
-        layout.addLayout(btn_row)
-
-        self._load()
-
-    def _load(self) -> None:
-        self.table.setRowCount(0)
-        entries = []
-        try:
-            entries = load_gestures(self.project_root)
-        except Exception:
-            entries = []
-
-        for entry in entries:
-            name = entry.get("name", "") if isinstance(entry, dict) else ""
-            trans = entry.get("translation", "") if isinstance(entry, dict) else ""
-            self._insert_row(str(name), str(trans))
-
-    def _insert_row(self, name: str = "", translation: str = "") -> None:
-        row = self.table.rowCount()
-        self.table.insertRow(row)
-        name_item = QTableWidgetItem(name)
-        trans_item = QTableWidgetItem(translation)
-        self.table.setItem(row, 0, name_item)
-        self.table.setItem(row, 1, trans_item)
-
-    def _add_row(self) -> None:
-        self._insert_row()
-        # Start editing the name cell of the new row
-        new_row = self.table.rowCount() - 1
-        self.table.editItem(self.table.item(new_row, 0))
-
-    def _delete_selected(self) -> None:
-        rows = sorted({idx.row() for idx in self.table.selectedIndexes()}, reverse=True)
-        if not rows:
-            return
-        for r in rows:
-            self.table.removeRow(r)
-
-    def _on_save(self) -> None:
-        # Collect entries
-        entries: list[dict[str, str]] = []
-        seen: set[str] = set()
-        for row in range(self.table.rowCount()):
-            name_item = self.table.item(row, 0)
-            trans_item = self.table.item(row, 1)
-            name = (name_item.text() if name_item else "").strip()
-            translation = (trans_item.text() if trans_item else "").strip()
-            if not name:
-                QMessageBox.warning(
-                    self,
-                    "Invalid Entry",
-                    f"Row {row+1} has empty name. Please provide a name or delete the row.",
-                )
-                return
-            key = name.lower()
-            if key in seen:
-                QMessageBox.warning(
-                    self,
-                    "Duplicate Entry",
-                    f"Duplicate gesture name: '{name}'. Names must be unique.",
-                )
-                return
-            seen.add(key)
-            entries.append({"name": name, "translation": translation})
-
-        try:
-            save_gestures(self.project_root, entries)
-        except Exception as exc:
-            QMessageBox.critical(self, "Save Failed", f"Could not save gestures: {exc}")
-            return
-
-        QMessageBox.information(self, "Saved", "Gestures saved successfully.")
-        self.accept()
 
 
 def run_data_manager(project_root: Path) -> None:
