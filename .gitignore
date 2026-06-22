@@ -11,10 +11,10 @@ __pycache__/
 .coverage
 htmlcov/
 
-models/
-data/
-graphs/
-logs/
+/models/
+/data/
+/graphs/
+/logs/
 
 dist/
 build/
