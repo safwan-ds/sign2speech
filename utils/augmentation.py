@@ -10,21 +10,12 @@ import numpy as np
 from scipy.interpolate import interp1d  # type: ignore
 from scipy.ndimage import gaussian_filter1d  # type: ignore
 
+from config.architecture import architecture
 from config.config import (
     ACCEL_X_IDX,
     ACCEL_Y_IDX,
     GYRO_X_IDX,
     GYRO_Y_IDX,
-    TIME_WARP_KNOT,
-    MAGNITUDE_WARP_KNOT,
-    NOISE_LEVEL,
-    TIME_WARP_SIGMA,
-    MAGNITUDE_WARP_SIGMA,
-    SCALE_RANGE,
-    TIME_SHIFT_RANGE,
-    ROTATION_MAX_ANGLE,
-    AUGMENTATION_PROB,
-    NUM_AUGMENTATIONS_PER_SAMPLE,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +36,7 @@ class TimeSeriesAugmenter:
         self.rng = np.random.RandomState(random_state)
 
     def time_warp(
-        self, sequence: np.ndarray, sigma: float = 0.2, knot: int = TIME_WARP_KNOT
+        self, sequence: np.ndarray, sigma: float = 0.2, knot: int = architecture.augmentation.time_warp_knot
     ):
         """
         Apply time warping to sequence
@@ -84,7 +75,7 @@ class TimeSeriesAugmenter:
         return warped_sequence.astype(np.float32)
 
     def magnitude_warp(
-        self, sequence: np.ndarray, sigma: float = 0.2, knot: int = MAGNITUDE_WARP_KNOT
+        self, sequence: np.ndarray, sigma: float = 0.2, knot: int = architecture.augmentation.magnitude_warp_knot
     ):
         """
         Apply magnitude warping to sequence
@@ -268,8 +259,8 @@ class TimeSeriesAugmenter:
     def augment_batch(
         self,
         sequences: np.ndarray,
-        augmentation_prob: float = AUGMENTATION_PROB,
-        num_augmentations: int = NUM_AUGMENTATIONS_PER_SAMPLE,
+        augmentation_prob: float = architecture.augmentation.augmentation_prob,
+        num_augmentations: int = architecture.augmentation.num_augmentations_per_sample,
     ) -> np.ndarray:
         """
         Apply random augmentations to a batch of sequences
@@ -290,28 +281,28 @@ class TimeSeriesAugmenter:
 
             if self.rng.random() < augmentation_prob:
                 augmentations.append(
-                    lambda x: self.add_noise(x, noise_level=NOISE_LEVEL)
+                    lambda x: self.add_noise(x, noise_level=architecture.augmentation.noise_level)
                 )
 
             if self.rng.random() < augmentation_prob:
-                augmentations.append(lambda x: self.time_warp(x, sigma=TIME_WARP_SIGMA))
+                augmentations.append(lambda x: self.time_warp(x, sigma=architecture.augmentation.time_warp_sigma))
 
             if self.rng.random() < augmentation_prob:
                 augmentations.append(
-                    lambda x: self.magnitude_warp(x, sigma=MAGNITUDE_WARP_SIGMA)
+                    lambda x: self.magnitude_warp(x, sigma=architecture.augmentation.magnitude_warp_sigma)
                 )
 
             if self.rng.random() < augmentation_prob:
-                augmentations.append(lambda x: self.scale(x, scale_range=SCALE_RANGE))
+                augmentations.append(lambda x: self.scale(x, scale_range=architecture.augmentation.scale_range))
 
             if self.rng.random() < augmentation_prob:
                 augmentations.append(
-                    lambda x: self.time_shift(x, shift_range=TIME_SHIFT_RANGE)
+                    lambda x: self.time_shift(x, shift_range=architecture.augmentation.time_shift_range)
                 )
 
             if self.rng.random() < augmentation_prob:
                 augmentations.append(
-                    lambda x: self.rotation(x, max_angle=ROTATION_MAX_ANGLE)
+                    lambda x: self.rotation(x, max_angle=architecture.augmentation.rotation_max_angle)
                 )
 
             # Apply selected augmentations
@@ -361,8 +352,8 @@ def create_augmented_dataset(
     for _ in range(augmentation_factor):
         X_aug = augmenter.augment_batch(
             X,
-            augmentation_prob=AUGMENTATION_PROB,
-            num_augmentations=NUM_AUGMENTATIONS_PER_SAMPLE,
+            augmentation_prob=architecture.augmentation.augmentation_prob,
+            num_augmentations=architecture.augmentation.num_augmentations_per_sample,
         )
         X_augmented_list.append(X_aug)
         y_augmented_list.append(y)

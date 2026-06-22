@@ -1,0 +1,191 @@
+# Architecture configuration for Sign2Speech
+# This file is the source of truth for all architecture constants.
+# Auto-loaded by config.architecture on import.
+#
+# To override at runtime, set environment variables (see config.py)
+# or pass a custom path to load_architecture().
+
+hardware:
+  com_port: COM9
+  baud_rate: 115200
+  timeout: 3
+  serial_connection_delay: 2
+  num_flex_sensors: 5
+  num_imu_axes: 6
+  expected_sensor_count: 11
+  flex_sensor_ranges:
+    0: [25, 300]
+    1: [25, 300]
+    2: [25, 300]
+    3: [25, 300]
+    4: [25, 300]
+  flex_sensor_calibration:
+    0: [28, 224]
+    1: [56, 293]
+    2: [39, 240]
+    3: [53, 239]
+    4: [44, 261]
+  flex_sensor_default_range: [0, 1023]
+  min_accel_value: -32768
+  max_accel_value: 32767
+  min_gyro_value: -32768
+  max_gyro_value: 32767
+
+motion_detection:
+  detect_gesture_motion: true
+  motion_threshold: 0.02
+  motion_detection_min_duration: 5
+  motion_detection_smoothing_window: 2
+  sequence_overlap: 0.1
+  motion_padding_ratio: 0.2
+  enable_madgwick: true
+
+model:
+  lstm_units: 64
+  lstm_layers: 2
+  dropout_rate: 0.4
+  model_type: enhanced
+  use_bidirectional: true
+  use_attention: true
+  use_batch_norm: true
+  use_enhanced_features: false
+  include_velocity: true
+  include_acceleration: true
+  include_rolling_stats: true
+  rolling_window_size: 5
+
+training:
+  batch_size: 32
+  epochs: 150
+  learning_rate: 0.0005
+  sequence_length: 20
+  weight_decay: 0.0005
+  use_weighted_loss: true
+  use_label_smoothing: true
+  label_smoothing_factor: 0.1
+  use_cosine_annealing: true
+  cosine_t_0: 10
+  cosine_t_mult: 2
+  cosine_eta_min: 0.000001
+  lr_plateau_factor: 0.5
+  lr_plateau_patience: 5
+  lr_plateau_min: 0.000001
+  use_warmup: true
+  warmup_epochs: 5
+  warmup_start_factor: 0.1
+  early_stopping_patience: 15
+  min_delta: 0.0001
+  gradient_clip_value: 1.0
+  min_validation_samples_per_class: 5
+  use_ensemble: false
+  ensemble_size: 3
+  random_state: 42
+  use_test_split: false
+  test_size: 0.1
+  test_data_split_percentage: 0.1
+  min_stratify_samples: 2
+  default_validation_size: 0.1
+
+augmentation:
+  use_augmentation: true
+  augmentation_factor: 2
+  augmentation_prob: 0.7
+  num_augmentations_per_sample: 2
+  time_warp_sigma: 0.2
+  time_warp_knot: 4
+  magnitude_warp_sigma: 0.2
+  magnitude_warp_knot: 4
+  noise_level: 0.01
+  scale_range: [0.9, 1.1]
+  time_shift_range: 0.1
+  rotation_max_angle: 10
+
+prediction:
+  prediction_interval: 0.08
+  prediction_motion_threshold: 1000
+  confidence_threshold: 0.74
+  prediction_class_thresholds:
+    DEFAULT: 0.74
+  prediction_consensus_frames: 5
+  prediction_avg_motion_threshold: 600
+  prediction_motion_variance_min: 150
+  prediction_significant_motion_min_ratio: 0.35
+  prediction_min_confidence_gap: 0.15
+  prediction_debug_mode: false
+  min_consecutive_rest: 5
+  min_gestures_for_llm: 2
+  prediction_switch_consensus_frames: 3
+  prediction_initial_consensus_frames: 2
+  prediction_keep_last_stable_frames: 2
+  prediction_uncertain_token: UNKNOWN
+  prediction_rest_weight: 0.75
+  enable_sequence_decoder: false
+  sequence_decoder_switch_penalty: 0.0
+  sequence_decoder_rest_switch_penalty: 0.0
+
+normalization:
+  norm_min: 0.0
+  norm_max: 1.0
+
+general:
+  use_tts: true
+
+llm:
+  use_qwen_llm: true
+  qwen_model_filename: qwen2.5-7b-instruct-q6_k-00001-of-00002.gguf
+  qwen_n_ctx: 2048
+  qwen_n_gpu_layers: -1
+  qwen_n_batch: 512
+  qwen_force_gpu: true
+  qwen_max_tokens: 64
+  qwen_inference_temperature: 0.25
+  llm_backend: local
+  llm_remote_url: https://api.deepseek.com
+  llm_remote_api_key: ""
+  llm_remote_model: deepseek-v4-flash
+  llm_remote_timeout: 15.0
+  llm_remote_format: chat
+  llm_remote_max_tokens: 1024
+
+gui:
+  keyboard_debounce_delay: 0.3
+  keyboard_poll_interval: 0.05
+  gui_min_width: 900
+  gui_min_height: 600
+  gui_padding: 20
+  gui_small_padding: 10
+  gui_font_size: 12
+  gui_title_font_size: 14
+  gui_review_batch_size: 4
+  gui_plot_rows_calc: 14
+  gui_plot_height_multiplier: 3
+  gui_plot_hspace: 0.45
+  gui_plot_wspace: 0.30
+  gui_plot_top: 0.95
+  gui_plot_bottom: 0.05
+  gui_thread_sleep: 0.01
+  data_manager_window_width: 1560
+  data_manager_window_height: 940
+  data_manager_min_width: 1220
+  data_manager_min_height: 760
+  gestures_editor_dialog_width: 600
+  gestures_editor_dialog_height: 420
+  default_ui_language: tr
+  supported_ui_languages:
+    - tr
+    - en
+
+evaluation:
+  evaluation_dpi: 300
+  confusion_matrix_figsize: [10, 8]
+  roc_curve_figsize: [10, 8]
+  evaluation_class_weight_epsilon: 0.000001
+
+plot:
+  plot_figure_width: 12
+  plot_figure_height: 10
+  plot_num_rows: 3
+  plot_num_cols: 1
+  plot_font_size: 14
+  plot_marker_size: 2
+  plot_grid_alpha: 0.3

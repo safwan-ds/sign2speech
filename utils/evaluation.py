@@ -19,7 +19,7 @@ from sklearn.metrics import (
     precision_recall_fscore_support,  # type: ignore
 )
 
-from config.config import EVALUATION_CLASS_WEIGHT_EPSILON
+from config.architecture import architecture
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def compute_class_weights(y: np.ndarray, num_classes: int):
     # Compute weights (inverse frequency)
     total = np.sum(class_counts)
     class_weights = total / (
-        num_classes * class_counts + EVALUATION_CLASS_WEIGHT_EPSILON
+        num_classes * class_counts + architecture.evaluation.evaluation_class_weight_epsilon
     )
 
     # Normalize weights

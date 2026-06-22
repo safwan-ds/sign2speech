@@ -7,9 +7,7 @@ import serial
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 
-from config.config import (
-    BAUD_RATE,
-)
+from config.architecture import architecture
 from gui.ui.trace_preview_widget import TracePreviewWidget
 from utils.serial_utils import (
     detect_glove_ports,
@@ -131,10 +129,10 @@ def main():
         print("Error: No serial ports detected. Please check your connection.")
         return
 
-    print(f"Connecting to {selected_port} at {BAUD_RATE} baud...")
+    print(f"Connecting to {selected_port} at {architecture.hardware.baud_rate} baud...")
 
     try:
-        ser = connect_serial(selected_port, BAUD_RATE)
+        ser = connect_serial(selected_port, architecture.hardware.baud_rate)
         print("Connected. Opening GUI...")
 
         app = QApplication(sys.argv)

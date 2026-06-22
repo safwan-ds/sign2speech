@@ -10,11 +10,10 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow
 
+from config.architecture import architecture
 from config.config import (
-    DEFAULT_UI_LANGUAGE,
     LOGS_OUTPUT_DIR,
     MODELS_DIR,
-    SUPPORTED_UI_LANGUAGES,
 )
 from core.inference.gesture_translations import load_gesture_translations
 from gui.services.llm_service import LLMService
@@ -52,8 +51,8 @@ class Sign2SpeechDashboard(
         apply_app_icon(self, self.project_root)
         self._i18n = LOCALIZATION
         self.ui_language = (
-            DEFAULT_UI_LANGUAGE
-            if DEFAULT_UI_LANGUAGE in SUPPORTED_UI_LANGUAGES
+            architecture.gui.default_ui_language
+            if architecture.gui.default_ui_language in architecture.gui.supported_ui_languages
             else "tr"
         )
         self.llm_language = "auto"
@@ -228,7 +227,7 @@ class Sign2SpeechDashboard(
     def _on_language_changed(self, _index: int) -> None:
         selected = self.ui_language_combo.currentData()
         language = str(selected) if isinstance(selected, str) else "tr"
-        if language not in SUPPORTED_UI_LANGUAGES or language == self.ui_language:
+        if language not in architecture.gui.supported_ui_languages or language == self.ui_language:
             return
 
         self.ui_language = language
@@ -245,7 +244,7 @@ class Sign2SpeechDashboard(
     def _on_llm_language_changed(self, _index: int) -> None:
         selected = self.llm_language_combo.currentData()
         language = str(selected) if isinstance(selected, str) else "auto"
-        if language not in {"auto", *SUPPORTED_UI_LANGUAGES}:
+        if language not in {"auto", *architecture.gui.supported_ui_languages}:
             return
         self.llm_language = language
 

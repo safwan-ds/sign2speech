@@ -10,29 +10,8 @@ import torch
 from core.inference.onnx_predictor import ONNXBackend
 from core.models.model_factory import build_model_from_checkpoint
 
-from config.config import (
-    MODELS_DIR,
-    SEQUENCE_LENGTH,
-    PREDICTION_INTERVAL,
-    LSTM_UNITS,
-    LSTM_LAYERS,
-    DROPOUT_RATE,
-    MODEL_TYPE,
-    USE_BIDIRECTIONAL,
-    USE_ATTENTION,
-    USE_BATCH_NORM,
-    USE_ENHANCED_FEATURES,
-    INCLUDE_VELOCITY,
-    INCLUDE_ACCELERATION,
-    INCLUDE_ROLLING_STATS,
-    ROLLING_WINDOW_SIZE,
-    # Control computation of Madgwick quaternions (yaw normalization)
-    ENABLE_MADGWICK,
-    USE_ENSEMBLE,
-    ENSEMBLE_SIZE,
-    CONFIDENCE_THRESHOLD,
-    MAX_GYRO_VALUE,
-)
+from config.architecture import architecture
+from config.config import MODELS_DIR
 from utils.data_utils import (
     QUATERNION_FEATURE_NAMES,
     MadgwickFilter,
@@ -46,8 +25,8 @@ from utils.data_utils import (
 )
 
 try:
-    from config.config import PREDICTION_CLASS_THRESHOLDS
-except ImportError:  # pragma: no cover - backward compatibility for old configs
+    PREDICTION_CLASS_THRESHOLDS = architecture.prediction.prediction_class_thresholds
+except AttributeError:  # pragma: no cover - backward compatibility for old configs
     PREDICTION_CLASS_THRESHOLDS = {}
 
 logger = logging.getLogger(__name__)
@@ -127,7 +106,7 @@ class LSTMGesturePredictor:
         self,
         model_path: str = MODEL_PATH,
         encoder_path: str = ENCODER_PATH,
-        sequence_length: int = SEQUENCE_LENGTH,
+        sequence_length: int = architecture.training.sequence_length,
         use_ensemble: bool | None = None,
         device: torch.device | None = None,
     ):
@@ -137,18 +116,18 @@ class LSTMGesturePredictor:
         self.sequence_length = sequence_length
         self.buffer: deque[list[float]] = deque(maxlen=sequence_length)
         self._lock = threading.Lock()
-        self.use_enhanced_features = USE_ENHANCED_FEATURES
-        self.include_velocity = INCLUDE_VELOCITY
-        self.include_acceleration = INCLUDE_ACCELERATION
-        self.include_rolling_stats = INCLUDE_ROLLING_STATS
-        self.rolling_window_size = ROLLING_WINDOW_SIZE
-        self.use_ensemble = use_ensemble if use_ensemble is not None else USE_ENSEMBLE
+        self.use_enhanced_features = architecture.model.use_enhanced_features
+        self.include_velocity = architecture.model.include_velocity
+        self.include_acceleration = architecture.model.include_acceleration
+        self.include_rolling_stats = architecture.model.include_rolling_stats
+        self.rolling_window_size = architecture.model.rolling_window_size
+        self.use_ensemble = use_ensemble if use_ensemble is not None else architecture.training.use_ensemble
         self._class_confidence_thresholds = _normalize_class_thresholds(
             PREDICTION_CLASS_THRESHOLDS
         )
         # Create Madgwick filter only when enabled via config to allow disabling
         # the yaw/orientation normalization for latency-sensitive deployments.
-        self._madgwick_filter = MadgwickFilter() if ENABLE_MADGWICK else None
+        self._madgwick_filter = MadgwickFilter() if architecture.motion_detection.enable_madgwick else None
         self._dtw_templates: dict[str, np.ndarray] = {}
         self._last_dtw_template: str | None = None
         self._last_dtw_distance: float | None = None
@@ -209,13 +188,13 @@ class LSTMGesturePredictor:
                         ensemble_model_path,
                         self._device,
                         encoder_num_classes=num_classes,
-                        hidden_size=LSTM_UNITS,
-                        num_layers=LSTM_LAYERS,
-                        dropout_rate=DROPOUT_RATE,
-                        model_type=MODEL_TYPE,
-                        bidirectional=USE_BIDIRECTIONAL,
-                        use_attention=USE_ATTENTION,
-                        use_batch_norm=USE_BATCH_NORM,
+                        hidden_size=architecture.model.lstm_units,
+                        num_layers=architecture.model.lstm_layers,
+                        dropout_rate=architecture.model.dropout_rate,
+                        model_type=architecture.model.model_type,
+                        bidirectional=architecture.model.use_bidirectional,
+                        use_attention=architecture.model.use_attention,
+                        use_batch_norm=architecture.model.use_batch_norm,
                         use_cnn=False,
                     )
                 )
@@ -257,13 +236,13 @@ class LSTMGesturePredictor:
                     model_path,
                     self._device,
                     encoder_num_classes=num_classes,
-                    hidden_size=LSTM_UNITS,
-                    num_layers=LSTM_LAYERS,
-                    dropout_rate=DROPOUT_RATE,
-                    model_type=MODEL_TYPE,
-                    bidirectional=USE_BIDIRECTIONAL,
-                    use_attention=USE_ATTENTION,
-                    use_batch_norm=USE_BATCH_NORM,
+                    hidden_size=architecture.model.lstm_units,
+                    num_layers=architecture.model.lstm_layers,
+                    dropout_rate=architecture.model.dropout_rate,
+                    model_type=architecture.model.model_type,
+                    bidirectional=architecture.model.use_bidirectional,
+                    use_attention=architecture.model.use_attention,
+                    use_batch_norm=architecture.model.use_batch_norm,
                     use_cnn=False,
                 )
             )
@@ -316,7 +295,7 @@ class LSTMGesturePredictor:
 
         logger.info(f"Model loaded: {len(self.classes)} classes")
         logger.info(f"Classes: {', '.join(self.classes)}")
-        logger.info(f"Model type: {MODEL_TYPE}")
+        logger.info(f"Model type: {architecture.model.model_type}")
         logger.info(f"Sequence length: {sequence_length}")
         logger.info(f"Input size: {input_size} features")
         logger.info(f"Base sensors: {', '.join(self.expected_features)}")
@@ -437,7 +416,7 @@ class LSTMGesturePredictor:
             f"Unsupported input size {input_size}. Expected one of: "
             f"4, 5, 6, 11, 15, 22, 30, 33, 45, 75, {expected}, {expected_with_quat}.\n"
             "Model was likely trained with enhanced features. "
-            "Check USE_ENHANCED_FEATURES / INCLUDE_ROLLING_STATS in config.py"
+            "Check architecture.model.use_enhanced_features / architecture.model.include_rolling_stats in config.py"
         )
 
     def _sanitize_sensor_dict(self, sensor_dict: dict[str, float]) -> dict[str, float]:
@@ -465,7 +444,7 @@ class LSTMGesturePredictor:
 
         accel = np.array([sensor_dict[name] for name in required[:3]], dtype=np.float32)
         gyro_raw = np.array([sensor_dict[name] for name in required[3:]], dtype=np.float32)
-        gyro_dps = gyro_raw / max(float(MAX_GYRO_VALUE), 1.0) * 2000.0
+        gyro_dps = gyro_raw / max(float(architecture.hardware.max_gyro_value), 1.0) * 2000.0
         quaternion = self._madgwick_filter.update_imu(
             accel,
             gyro_dps,
@@ -504,7 +483,7 @@ class LSTMGesturePredictor:
     def _can_predict_unlocked(self):
         current_time = time.time()
         has_data = len(self.buffer) == self.sequence_length
-        time_elapsed = (current_time - self.last_prediction_time) >= PREDICTION_INTERVAL
+        time_elapsed = (current_time - self.last_prediction_time) >= architecture.prediction.prediction_interval
 
         return has_data and time_elapsed
 
@@ -535,7 +514,7 @@ class LSTMGesturePredictor:
         return float(
             thresholds.get(
                 key,
-                thresholds.get("DEFAULT", thresholds.get("*", CONFIDENCE_THRESHOLD)),
+                thresholds.get("DEFAULT", thresholds.get("*", architecture.prediction.confidence_threshold)),
             )
         )
 

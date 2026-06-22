@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import serial
 import serial.tools.list_ports
 
-from config.config import BAUD_RATE
+from config.architecture import architecture
 from utils.serial_utils import detect_glove_ports, parse_sensor_data
 
 
@@ -20,7 +20,7 @@ class SerialSettings:
     """Connection parameters for the glove device."""
 
     port: str
-    baud_rate: int = BAUD_RATE
+    baud_rate: int = architecture.hardware.baud_rate
     timeout: float = 0.2
 
 

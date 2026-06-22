@@ -10,17 +10,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from config.config import (
-    FLEX_SENSOR_DEFAULT_RANGE,
-    FLEX_SENSOR_RANGES,
-    MAX_ACCEL_VALUE,
-    MAX_GYRO_VALUE,
-    MIN_ACCEL_VALUE,
-    MIN_GYRO_VALUE,
-    NORM_MAX,
-    NORM_MIN,
-    NUM_FLEX_SENSORS,
-)
+from config.architecture import architecture
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +29,22 @@ def normalize_value(name: str, value: float) -> float | None:
     if name.startswith("flex"):
         # Per-sensor normalization for flex sensors
         sensor_idx = int(name[4:])  # Extract index from "flexN"
-        min_val, max_val = FLEX_SENSOR_RANGES.get(sensor_idx, FLEX_SENSOR_DEFAULT_RANGE)
+        min_val, max_val = architecture.hardware.flex_sensor_ranges.get(sensor_idx, architecture.hardware.flex_sensor_default_range)
         value = max(min_val, min(max_val, value))  # Clip
         normalized = (value - min_val) / (max_val - min_val)
     elif name.startswith("accel"):
         # Accelerometer normalization
-        value = max(MIN_ACCEL_VALUE, min(MAX_ACCEL_VALUE, value))  # Clip
-        normalized = (value - MIN_ACCEL_VALUE) / (MAX_ACCEL_VALUE - MIN_ACCEL_VALUE)
+        value = max(architecture.hardware.min_accel_value, min(architecture.hardware.max_accel_value, value))  # Clip
+        normalized = (value - architecture.hardware.min_accel_value) / (architecture.hardware.max_accel_value - architecture.hardware.min_accel_value)
     elif name.startswith("gyro"):
         # Gyroscope normalization
-        value = max(MIN_GYRO_VALUE, min(MAX_GYRO_VALUE, value))  # Clip
-        normalized = (value - MIN_GYRO_VALUE) / (MAX_GYRO_VALUE - MIN_GYRO_VALUE)
+        value = max(architecture.hardware.min_gyro_value, min(architecture.hardware.max_gyro_value, value))  # Clip
+        normalized = (value - architecture.hardware.min_gyro_value) / (architecture.hardware.max_gyro_value - architecture.hardware.min_gyro_value)
     else:
         return None
 
     # Scale to NORM_MIN - NORM_MAX range
-    return normalized * (NORM_MAX - NORM_MIN) + NORM_MIN
+    return normalized * (architecture.normalization.norm_max - architecture.normalization.norm_min) + architecture.normalization.norm_min
 
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -70,16 +60,16 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Normalize flex sensors
-    for i in range(NUM_FLEX_SENSORS):
+    for i in range(architecture.hardware.num_flex_sensors):
         raw_col = f"flex{i}" if f"flex{i}" in df.columns else f"sensor{i}"
         norm_col = f"flex{i}_norm"
 
         if raw_col in df.columns:
-            min_val, max_val = FLEX_SENSOR_RANGES.get(i, (0, 1023))
+            min_val, max_val = architecture.hardware.flex_sensor_ranges.get(i, (0, 1023))
             # Clip values to range, then normalize to 0-1
             df[norm_col] = df[raw_col].clip(min_val, max_val)
             df[norm_col] = (df[norm_col] - min_val) / (max_val - min_val)
-            df[norm_col] = df[norm_col] * (NORM_MAX - NORM_MIN) + NORM_MIN
+            df[norm_col] = df[norm_col] * (architecture.normalization.norm_max - architecture.normalization.norm_min) + architecture.normalization.norm_min
 
     # Normalize accelerometer data
     for axis in ["X", "Y", "Z"]:
@@ -87,11 +77,11 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         norm_col = f"accel{axis}_norm"
 
         if raw_col in df.columns:
-            df[norm_col] = df[raw_col].clip(MIN_ACCEL_VALUE, MAX_ACCEL_VALUE)
-            df[norm_col] = (df[norm_col] - MIN_ACCEL_VALUE) / (
-                MAX_ACCEL_VALUE - MIN_ACCEL_VALUE
+            df[norm_col] = df[raw_col].clip(architecture.hardware.min_accel_value, architecture.hardware.max_accel_value)
+            df[norm_col] = (df[norm_col] - architecture.hardware.min_accel_value) / (
+                architecture.hardware.max_accel_value - architecture.hardware.min_accel_value
             )
-            df[norm_col] = df[norm_col] * (NORM_MAX - NORM_MIN) + NORM_MIN
+            df[norm_col] = df[norm_col] * (architecture.normalization.norm_max - architecture.normalization.norm_min) + architecture.normalization.norm_min
 
     # Normalize gyroscope data
     for axis in ["X", "Y", "Z"]:
@@ -99,11 +89,11 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         norm_col = f"gyro{axis}_norm"
 
         if raw_col in df.columns:
-            df[norm_col] = df[raw_col].clip(MIN_GYRO_VALUE, MAX_GYRO_VALUE)
-            df[norm_col] = (df[norm_col] - MIN_GYRO_VALUE) / (
-                MAX_GYRO_VALUE - MIN_GYRO_VALUE
+            df[norm_col] = df[raw_col].clip(architecture.hardware.min_gyro_value, architecture.hardware.max_gyro_value)
+            df[norm_col] = (df[norm_col] - architecture.hardware.min_gyro_value) / (
+                architecture.hardware.max_gyro_value - architecture.hardware.min_gyro_value
             )
-            df[norm_col] = df[norm_col] * (NORM_MAX - NORM_MIN) + NORM_MIN
+            df[norm_col] = df[norm_col] * (architecture.normalization.norm_max - architecture.normalization.norm_min) + architecture.normalization.norm_min
 
     return df
 
@@ -121,7 +111,7 @@ def extract_normalized_features(df: pd.DataFrame):
     expected_cols: list[str] = []
 
     # Flex sensors
-    for i in range(NUM_FLEX_SENSORS):
+    for i in range(architecture.hardware.num_flex_sensors):
         expected_cols.append(f"flex{i}_norm")
 
     # IMU data
@@ -159,7 +149,7 @@ def get_feature_names():
     features: list[str] = []
 
     # Flex sensors
-    for i in range(NUM_FLEX_SENSORS):
+    for i in range(architecture.hardware.num_flex_sensors):
         features.append(f"flex{i}")
 
     # IMU sensors

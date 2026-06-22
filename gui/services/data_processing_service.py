@@ -36,17 +36,10 @@ from queue import Queue
 
 import numpy as np
 
+from config.architecture import architecture
 from config.config import (
     PROCESSED_DIR,
-    RANDOM_STATE,
     TEST_DATA_DIR,
-    TEST_DATA_SPLIT_PERCENTAGE,
-    USE_TEST_SPLIT,
-    USE_ENHANCED_FEATURES,
-    INCLUDE_VELOCITY,
-    INCLUDE_ACCELERATION,
-    INCLUDE_ROLLING_STATS,
-    ROLLING_WINDOW_SIZE,
 )
 from core.pipeline.data_processor import (
     clear_previous_sequence_files,
@@ -174,15 +167,15 @@ class DataProcessingService:
                 self._logger.info("[process] Processing gesture: '%s'", gesture)
 
                 n_files = len(dataframes)
-                rng = np.random.RandomState(RANDOM_STATE)
+                rng = np.random.RandomState(architecture.training.random_state)
                 shuffled = rng.permutation(n_files)
 
-                if not USE_TEST_SPLIT:
+                if not architecture.training.use_test_split:
                     train_dfs = dataframes
                     test_dfs: list = []
                 elif n_files >= 2:
                     split_idx = max(
-                        1, int(n_files * (1 - TEST_DATA_SPLIT_PERCENTAGE))
+                        1, int(n_files * (1 - architecture.training.test_data_split_percentage))
                     )
                     if split_idx >= n_files:
                         split_idx = n_files - 1
@@ -201,11 +194,11 @@ class DataProcessingService:
 
                     self._current_stage = "augmentation"
                     aug_params = {
-                        "use_enhanced_features": bool(USE_ENHANCED_FEATURES),
-                        "include_velocity": bool(INCLUDE_VELOCITY),
-                        "include_acceleration": bool(INCLUDE_ACCELERATION),
-                        "include_rolling_stats": bool(INCLUDE_ROLLING_STATS),
-                        "rolling_window_size": int(ROLLING_WINDOW_SIZE),
+                        "use_enhanced_features": bool(architecture.model.use_enhanced_features),
+                        "include_velocity": bool(architecture.model.include_velocity),
+                        "include_acceleration": bool(architecture.model.include_acceleration),
+                        "include_rolling_stats": bool(architecture.model.include_rolling_stats),
+                        "rolling_window_size": int(architecture.model.rolling_window_size),
                     }
                     self._emit("process_stage_started", stage="augmentation", gesture=gesture, params=aug_params)
                     if self._skip_current_stage.is_set():

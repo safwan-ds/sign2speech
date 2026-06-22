@@ -13,43 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import TensorDataset, DataLoader
 
-from config.config import (
-    RANDOM_STATE,
-    USE_TEST_SPLIT,
-    TEST_SIZE,
-    LSTM_UNITS,
-    LSTM_LAYERS,
-    DROPOUT_RATE,
-    BATCH_SIZE,
-    EPOCHS,
-    LEARNING_RATE,
-    WEIGHT_DECAY,
-    USE_AUGMENTATION,
-    AUGMENTATION_FACTOR,
-    USE_WEIGHTED_LOSS,
-    USE_LABEL_SMOOTHING,
-    LABEL_SMOOTHING_FACTOR,
-    USE_COSINE_ANNEALING,
-    COSINE_T_0,
-    COSINE_T_MULT,
-    COSINE_ETA_MIN,
-    LR_PLATEAU_FACTOR,
-    LR_PLATEAU_PATIENCE,
-    LR_PLATEAU_MIN,
-    USE_WARMUP,
-    WARMUP_EPOCHS,
-    WARMUP_START_FACTOR,
-    EARLY_STOPPING_PATIENCE,
-    MIN_DELTA,
-    GRADIENT_CLIP_VALUE,
-    MODEL_TYPE,
-    USE_BIDIRECTIONAL,
-    USE_ATTENTION,
-    USE_BATCH_NORM,
-    MIN_STRATIFY_SAMPLES,
-    DEFAULT_VALIDATION_SIZE,
-    MIN_VALIDATION_SAMPLES_PER_CLASS,
-)
+from config.architecture import architecture
 from utils.augmentation import create_augmented_dataset
 from utils.evaluation import compute_class_weights
 
@@ -64,36 +28,36 @@ def prepare_data_split(X, y, label_encoder, separate_test_X=None, separate_test_
     # Check if stratification is possible (need at least 2 samples per class)
     unique, counts = np.unique(y, return_counts=True)
     min_samples = min(counts)
-    use_stratify = min_samples >= MIN_STRATIFY_SAMPLES
+    use_stratify = min_samples >= architecture.training.min_stratify_samples
 
     if not use_stratify:
         logger.warning(f"Some classes have only {min_samples} sample(s).")
         logger.warning("Using regular split instead of stratified split.")
 
     # Split data - always create a proper validation split to avoid evaluating on training data
-    if not USE_TEST_SPLIT:
+    if not architecture.training.use_test_split:
         # No holdout — use a small validation split only for early stopping
-        val_size = DEFAULT_VALIDATION_SIZE
+        val_size = architecture.training.default_validation_size
         logger.info(
-            f"USE_TEST_SPLIT is False. Using {val_size*100:.0f}% validation split (no holdout test set)"
+            f"architecture.training.use_test_split is False. Using {val_size*100:.0f}% validation split (no holdout test set)"
         )
-    elif TEST_SIZE <= 0.0 or (separate_test_X is not None and TEST_SIZE < 0.1):
+    elif architecture.training.test_size <= 0.0 or (separate_test_X is not None and architecture.training.test_size < 0.1):
         # Use default validation size
-        val_size = DEFAULT_VALIDATION_SIZE
+        val_size = architecture.training.default_validation_size
         logger.info(
-            f"TEST_SIZE is small/zero. Using {val_size*100:.0f}% for validation split"
+            f"architecture.training.test_size is small/zero. Using {val_size*100:.0f}% for validation split"
         )
         if separate_test_X is not None:
             logger.info("Will also evaluate on separate holdout test set")
     else:
-        val_size = TEST_SIZE
+        val_size = architecture.training.test_size
 
     # Always do a stratified random split (not sequential!) to avoid data leakage
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=val_size,
-        random_state=RANDOM_STATE,
+        random_state=architecture.training.random_state,
         stratify=y if use_stratify else None,
     )
 
@@ -101,7 +65,7 @@ def prepare_data_split(X, y, label_encoder, separate_test_X=None, separate_test_
     logger.info(f"Validation samples: {len(X_test)}")
 
     # Warn if validation set is too small (less than configured samples per class on average)
-    if len(X_test) < len(label_encoder.classes_) * MIN_VALIDATION_SAMPLES_PER_CLASS:
+    if len(X_test) < len(label_encoder.classes_) * architecture.training.min_validation_samples_per_class:
         logger.warning(f"Validation set is VERY SMALL ({len(X_test)} samples)!")
 
     # Check for NaN or Inf values
@@ -168,10 +132,10 @@ def train_lstm_model(
         cancel_event: Optional :class:`threading.Event`; when set the training
             loop exits cleanly after the current epoch and returns *None* for
             all results to signal cancellation.
-        n_epochs: Override for ``EPOCHS`` config value.
-        learning_rate: Override for ``LEARNING_RATE`` config value.
-        batch_size: Override for ``BATCH_SIZE`` config value.
-        patience: Override for ``EARLY_STOPPING_PATIENCE`` config value.
+        n_epochs: Override for ``architecture.training.epochs`` config value.
+        learning_rate: Override for ``architecture.training.learning_rate`` config value.
+        batch_size: Override for ``architecture.training.batch_size`` config value.
+        patience: Override for ``architecture.training.early_stopping_patience`` config value.
 
     Returns:
         Tuple of (model, label_encoder, X_test, y_test, history, mean, std,
@@ -179,10 +143,10 @@ def train_lstm_model(
         training was cancelled.
     """
     # Resolve effective hyper-parameter values (override > config default)
-    _n_epochs: int = n_epochs if n_epochs is not None else EPOCHS
-    _learning_rate: float = learning_rate if learning_rate is not None else LEARNING_RATE
-    _batch_size: int = batch_size if batch_size is not None else BATCH_SIZE
-    _patience: int = patience if patience is not None else EARLY_STOPPING_PATIENCE
+    _n_epochs: int = n_epochs if n_epochs is not None else architecture.training.epochs
+    _learning_rate: float = learning_rate if learning_rate is not None else architecture.training.learning_rate
+    _batch_size: int = batch_size if batch_size is not None else architecture.training.batch_size
+    _patience: int = patience if patience is not None else architecture.training.early_stopping_patience
 
     logger.info("TRAINING LSTM MODEL")
     logger.info(f"Using device: {device}")
@@ -229,15 +193,15 @@ def train_lstm_model(
         separate_test_y = separate_test_y_encoded
 
     # Apply data augmentation ONLY to training data (after split)
-    if USE_AUGMENTATION and AUGMENTATION_FACTOR > 0:
+    if architecture.augmentation.use_augmentation and architecture.augmentation.augmentation_factor > 0:
         logger.info(
-            f"Applying data augmentation to training set (factor={AUGMENTATION_FACTOR})..."
+            f"Applying data augmentation to training set (factor={architecture.augmentation.augmentation_factor})..."
         )
         X_train, y_train = create_augmented_dataset(
             X_train,
             np.asarray(y_train),
-            augmentation_factor=AUGMENTATION_FACTOR,
-            random_state=RANDOM_STATE,
+            augmentation_factor=architecture.augmentation.augmentation_factor,
+            random_state=architecture.training.random_state,
         )
 
     # Convert to PyTorch tensors
@@ -260,14 +224,14 @@ def train_lstm_model(
     model = build_lstm_model(
         input_size,
         num_classes,
-        LSTM_UNITS,
-        LSTM_LAYERS,
-        DROPOUT_RATE,
+        architecture.model.lstm_units,
+        architecture.model.lstm_layers,
+        architecture.model.dropout_rate,
         device=device,
-        model_type=MODEL_TYPE,
-        bidirectional=USE_BIDIRECTIONAL,
-        use_attention=USE_ATTENTION,
-        use_batch_norm=USE_BATCH_NORM,
+        model_type=architecture.model.model_type,
+        bidirectional=architecture.model.use_bidirectional,
+        use_attention=architecture.model.use_attention,
+        use_batch_norm=architecture.model.use_batch_norm,
     )
 
     logger.info("MODEL ARCHITECTURE")
@@ -280,61 +244,61 @@ def train_lstm_model(
     logger.info(f"Trainable parameters: {trainable_params:,}")
 
     # Loss and optimizer
-    if USE_WEIGHTED_LOSS:
+    if architecture.training.use_weighted_loss:
         class_weights = compute_class_weights(y_train, num_classes).to(device)
         logger.info(f"Using weighted loss with class weights:")
         for i, (cls, weight) in enumerate(zip(label_encoder.classes_, class_weights)):
             logger.info(f"  {cls}: {weight:.3f}")
         criterion = nn.CrossEntropyLoss(
             weight=class_weights,
-            label_smoothing=LABEL_SMOOTHING_FACTOR if USE_LABEL_SMOOTHING else 0.0,
+            label_smoothing=architecture.training.label_smoothing_factor if architecture.training.use_label_smoothing else 0.0,
         )
     else:
         criterion = nn.CrossEntropyLoss(
-            label_smoothing=LABEL_SMOOTHING_FACTOR if USE_LABEL_SMOOTHING else 0.0
+            label_smoothing=architecture.training.label_smoothing_factor if architecture.training.use_label_smoothing else 0.0
         )
 
     optimizer = optim.AdamW(
-        model.parameters(), lr=_learning_rate, weight_decay=WEIGHT_DECAY
+        model.parameters(), lr=_learning_rate, weight_decay=architecture.training.weight_decay
     )
 
     # Learning rate scheduler (with optional warmup chained via SequentialLR)
     warmup_scheduler = None
-    if USE_COSINE_ANNEALING:
+    if architecture.training.use_cosine_annealing:
         cosine_scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, T_0=COSINE_T_0, T_mult=COSINE_T_MULT, eta_min=COSINE_ETA_MIN
+            optimizer, T_0=architecture.training.cosine_t_0, T_mult=architecture.training.cosine_t_mult, eta_min=architecture.training.cosine_eta_min
         )
-        if USE_WARMUP:
+        if architecture.training.use_warmup:
             warmup_sched = optim.lr_scheduler.LinearLR(
-                optimizer, start_factor=WARMUP_START_FACTOR, total_iters=WARMUP_EPOCHS
+                optimizer, start_factor=architecture.training.warmup_start_factor, total_iters=architecture.training.warmup_epochs
             )
             scheduler = optim.lr_scheduler.SequentialLR(
                 optimizer,
                 schedulers=[warmup_sched, cosine_scheduler],
-                milestones=[WARMUP_EPOCHS],
+                milestones=[architecture.training.warmup_epochs],
             )
             logger.info(
-                f"Using Cosine Annealing (T_0={COSINE_T_0}, T_mult={COSINE_T_MULT}) "
-                f"with warmup for {WARMUP_EPOCHS} epochs"
+                f"Using Cosine Annealing (T_0={architecture.training.cosine_t_0}, T_mult={architecture.training.cosine_t_mult}) "
+                f"with warmup for {architecture.training.warmup_epochs} epochs"
             )
         else:
             scheduler = cosine_scheduler
             logger.info(
-                f"Using Cosine Annealing with Warm Restarts (T_0={COSINE_T_0}, T_mult={COSINE_T_MULT})"
+                f"Using Cosine Annealing with Warm Restarts (T_0={architecture.training.cosine_t_0}, T_mult={architecture.training.cosine_t_mult})"
             )
     else:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=LR_PLATEAU_FACTOR,
-            patience=LR_PLATEAU_PATIENCE,
-            min_lr=LR_PLATEAU_MIN,
+            factor=architecture.training.lr_plateau_factor,
+            patience=architecture.training.lr_plateau_patience,
+            min_lr=architecture.training.lr_plateau_min,
         )
-        if USE_WARMUP:
+        if architecture.training.use_warmup:
             warmup_scheduler = optim.lr_scheduler.LinearLR(
-                optimizer, start_factor=WARMUP_START_FACTOR, total_iters=WARMUP_EPOCHS
+                optimizer, start_factor=architecture.training.warmup_start_factor, total_iters=architecture.training.warmup_epochs
             )
-            logger.info(f"Using ReduceLROnPlateau + warmup for {WARMUP_EPOCHS} epochs")
+            logger.info(f"Using ReduceLROnPlateau + warmup for {architecture.training.warmup_epochs} epochs")
         else:
             logger.info("Using ReduceLROnPlateau scheduler")
 
@@ -371,7 +335,7 @@ def train_lstm_model(
 
             # Gradient clipping to prevent exploding gradients
             torch.nn.utils.clip_grad_norm_(
-                model.parameters(), max_norm=GRADIENT_CLIP_VALUE
+                model.parameters(), max_norm=architecture.training.gradient_clip_value
             )
 
             optimizer.step()
@@ -410,9 +374,9 @@ def train_lstm_model(
         val_accs.append(val_acc)
 
         # Update learning rate
-        if USE_COSINE_ANNEALING:
+        if architecture.training.use_cosine_annealing:
             scheduler.step()
-        elif warmup_scheduler is not None and epoch < WARMUP_EPOCHS:
+        elif warmup_scheduler is not None and epoch < architecture.training.warmup_epochs:
             warmup_scheduler.step()
         else:
             scheduler.step(val_loss)  # type: ignore
@@ -438,8 +402,8 @@ def train_lstm_model(
                 current_lr,
             )
 
-        # Early stopping based on validation accuracy (with MIN_DELTA threshold)
-        if val_acc > best_val_acc + MIN_DELTA:
+        # Early stopping based on validation accuracy (with architecture.training.min_delta threshold)
+        if val_acc > best_val_acc + architecture.training.min_delta:
             best_val_acc = val_acc
             patience_counter = 0
             best_model_state = model.state_dict().copy()

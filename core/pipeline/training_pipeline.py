@@ -9,13 +9,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Literal
 
+from config.architecture import architecture
 from config.config import (
-    BATCH_SIZE,
-    EARLY_STOPPING_PATIENCE,
-    EPOCHS,
-    LEARNING_RATE,
     MODELS_DIR,
-    USE_ENSEMBLE,
     setup_logging,
 )
 
@@ -73,11 +69,11 @@ def run_training_pipeline(
 
     active_logger.info("LSTM MODEL TRAINING")
 
-    eff_epochs = n_epochs if n_epochs is not None else EPOCHS
-    eff_lr = learning_rate if learning_rate is not None else LEARNING_RATE
-    eff_batch = batch_size if batch_size is not None else BATCH_SIZE
-    eff_patience = patience if patience is not None else EARLY_STOPPING_PATIENCE
-    eff_use_ensemble = use_ensemble if use_ensemble is not None else USE_ENSEMBLE
+    eff_epochs = n_epochs if n_epochs is not None else architecture.training.epochs
+    eff_lr = learning_rate if learning_rate is not None else architecture.training.learning_rate
+    eff_batch = batch_size if batch_size is not None else architecture.training.batch_size
+    eff_patience = patience if patience is not None else architecture.training.early_stopping_patience
+    eff_use_ensemble = use_ensemble if use_ensemble is not None else architecture.training.use_ensemble
 
     X, y, test_X, test_y = load_processed_sequences()
     if X is None:

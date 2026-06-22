@@ -23,14 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.config import (
-    BAUD_RATE,
-    CONFIDENCE_THRESHOLD,
-    USE_QWEN_LLM,
-    MOTION_DETECTION_SMOOTHING_WINDOW,
-    USE_TTS,
-    USE_ENSEMBLE,
-)
+from config.architecture import architecture
 
 
 class AppWindowSettingsTabMixin:
@@ -191,14 +184,14 @@ class AppWindowSettingsTabMixin:
 
         self.baud_rate_label = QLabel("")
         settings_layout.addWidget(self.baud_rate_label, 3, 0)
-        self.baud_edit = QLineEdit(str(BAUD_RATE))
+        self.baud_edit = QLineEdit(str(architecture.hardware.baud_rate))
         settings_layout.addWidget(self.baud_edit, 4, 0, 1, 2)
 
         self.threshold_label = QLabel("")
         settings_layout.addWidget(self.threshold_label, 5, 0, 1, 2)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setRange(30, 99)
-        self.threshold_slider.setValue(int(CONFIDENCE_THRESHOLD * 100))
+        self.threshold_slider.setValue(int(architecture.prediction.confidence_threshold * 100))
         self.threshold_slider.valueChanged.connect(self._on_threshold_change)
         settings_layout.addWidget(self.threshold_slider, 6, 0, 1, 2)
 
@@ -207,12 +200,12 @@ class AppWindowSettingsTabMixin:
         self.smoothing_slider = QSlider(Qt.Orientation.Horizontal)
         self.smoothing_slider.setRange(1, 12)
         self.smoothing_slider.valueChanged.connect(self._on_smoothing_change)
-        self.smoothing_slider.setValue(MOTION_DETECTION_SMOOTHING_WINDOW)
+        self.smoothing_slider.setValue(architecture.motion_detection.motion_detection_smoothing_window)
         settings_layout.addWidget(self.smoothing_slider, 8, 0, 1, 2)
 
         self.llm_checkbox = QCheckBox("")
         self.llm_checkbox.stateChanged.connect(self._on_llm_changed)
-        self.llm_checkbox.setChecked(USE_QWEN_LLM)
+        self.llm_checkbox.setChecked(architecture.llm.use_qwen_llm)
         settings_layout.addWidget(self.llm_checkbox, 9, 0, 1, 2)
 
         from config.config import LLM_BACKEND as _DEFAULT_LLM_BE
@@ -233,12 +226,12 @@ class AppWindowSettingsTabMixin:
         self.tts_status_value_label = QLabel("")
         self.tts_checkbox = QCheckBox("")
         self.tts_checkbox.stateChanged.connect(self._on_tts_changed)
-        self.tts_checkbox.setChecked(USE_TTS)
+        self.tts_checkbox.setChecked(architecture.general.use_tts)
         settings_layout.addWidget(self.tts_checkbox, 12, 0, 1, 2)
 
         self.ensemble_checkbox = QCheckBox("")
         self.ensemble_checkbox.stateChanged.connect(self._on_ensemble_changed)
-        self.ensemble_checkbox.setChecked(USE_ENSEMBLE)
+        self.ensemble_checkbox.setChecked(architecture.training.use_ensemble)
         settings_layout.addWidget(self.ensemble_checkbox, 13, 0, 1, 2)
 
         settings_layout.addWidget(self.tts_mode_label, 14, 0, 1, 2)

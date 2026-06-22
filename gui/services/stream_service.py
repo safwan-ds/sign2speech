@@ -11,22 +11,7 @@ from dataclasses import dataclass, field
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from config.config import (
-    ENABLE_SEQUENCE_DECODER,
-    MIN_CONSECUTIVE_REST,
-    MIN_GESTURES_FOR_LLM,
-    PREDICTION_CLASS_THRESHOLDS,
-    PREDICTION_CONSENSUS_FRAMES,
-    PREDICTION_INITIAL_CONSENSUS_FRAMES,
-    PREDICTION_KEEP_LAST_STABLE_FRAMES,
-    PREDICTION_MIN_CONFIDENCE_GAP,
-    PREDICTION_REST_WEIGHT,
-    PREDICTION_SWITCH_CONSENSUS_FRAMES,
-    PREDICTION_UNCERTAIN_TOKEN,
-    SEQUENCE_DECODER_REST_SWITCH_PENALTY,
-    SEQUENCE_DECODER_SWITCH_PENALTY,
-    SEQUENCE_LENGTH,
-)
+from config.architecture import architecture
 from core.inference.gesture_translations import (
     GestureTransitionStateMachine,
     load_gesture_translations,
@@ -55,11 +40,11 @@ class TransitionHysteresis:
     """Asymmetric transition policy with uncertain fallback."""
 
     initial_consensus_frames: int = max(
-        1, PREDICTION_INITIAL_CONSENSUS_FRAMES, PREDICTION_CONSENSUS_FRAMES
+        1, architecture.prediction.prediction_initial_consensus_frames, architecture.prediction.prediction_consensus_frames
     )
-    switch_consensus_frames: int = PREDICTION_SWITCH_CONSENSUS_FRAMES
-    keep_last_stable_frames: int = PREDICTION_KEEP_LAST_STABLE_FRAMES
-    uncertain_token: str = PREDICTION_UNCERTAIN_TOKEN
+    switch_consensus_frames: int = architecture.prediction.prediction_switch_consensus_frames
+    keep_last_stable_frames: int = architecture.prediction.prediction_keep_last_stable_frames
+    uncertain_token: str = architecture.prediction.prediction_uncertain_token
     stable_token: str | None = None
     candidate_token: str | None = None
     candidate_count: int = 0
@@ -127,9 +112,9 @@ class SequenceDecoder:
         self,
         classes: list[str],
         *,
-        enabled: bool = ENABLE_SEQUENCE_DECODER,
-        switch_penalty: float = SEQUENCE_DECODER_SWITCH_PENALTY,
-        rest_switch_penalty: float = SEQUENCE_DECODER_REST_SWITCH_PENALTY,
+        enabled: bool = architecture.prediction.enable_sequence_decoder,
+        switch_penalty: float = architecture.prediction.sequence_decoder_switch_penalty,
+        rest_switch_penalty: float = architecture.prediction.sequence_decoder_rest_switch_penalty,
     ) -> None:
         self.enabled = enabled
         self.classes = [str(c) for c in classes]
@@ -245,7 +230,7 @@ class StreamWorker(threading.Thread):
         self._config = config
         self._stop_event = threading.Event()
         self._smoother = PredictionSmoother(
-            config.smoothing_window, rest_weight=PREDICTION_REST_WEIGHT
+            config.smoothing_window, rest_weight=architecture.prediction.prediction_rest_weight
         )
         self._sentence = SentenceAssembler()
         self._translations = load_gesture_translations()
@@ -257,7 +242,7 @@ class StreamWorker(threading.Thread):
         self._per_class_thresholds = _load_per_class_thresholds(model_dir)
         self._config_class_thresholds = {
             str(key).strip().upper(): float(value)
-            for key, value in PREDICTION_CLASS_THRESHOLDS.items()
+            for key, value in architecture.prediction.prediction_class_thresholds.items()
         }
         self._decoder: SequenceDecoder | None = None
         self._flex_zero_monitor = FlexZeroWarningMonitor(
@@ -272,7 +257,7 @@ class StreamWorker(threading.Thread):
         normalized = token.strip().upper()
         per_class = self._per_class_thresholds.get(normalized)
         conf_threshold = self._config.confidence_threshold
-        gap_threshold = PREDICTION_MIN_CONFIDENCE_GAP
+        gap_threshold = architecture.prediction.prediction_min_confidence_gap
         config_threshold = self._config_class_thresholds.get(
             normalized,
             self._config_class_thresholds.get("DEFAULT"),
@@ -314,7 +299,7 @@ class StreamWorker(threading.Thread):
             stream_input_emitted = False
             stream_started_emitted = False
             last_llm_text: str | None = None
-            motion_samples: deque[float] = deque(maxlen=SEQUENCE_LENGTH)
+            motion_samples: deque[float] = deque(maxlen=architecture.training.sequence_length)
 
             class_list = _extract_class_list(predictor)
             self._decoder = SequenceDecoder(class_list or ["REST"])
@@ -395,7 +380,7 @@ class StreamWorker(threading.Thread):
                     is_rest=is_rest,
                 )
                 filtered_is_uncertain = (
-                    filtered_token.strip().upper() == PREDICTION_UNCERTAIN_TOKEN
+                    filtered_token.strip().upper() == architecture.prediction.prediction_uncertain_token
                 )
                 filtered_is_rest = filtered_token.strip().upper() == "REST"
                 emit_token = filtered_token
@@ -446,8 +431,8 @@ class StreamWorker(threading.Thread):
                     consecutive_rest_frames += 1
 
                     if (
-                        consecutive_rest_frames == MIN_CONSECUTIVE_REST
-                        and len(collected_gestures) >= MIN_GESTURES_FOR_LLM
+                        consecutive_rest_frames == architecture.prediction.min_consecutive_rest
+                        and len(collected_gestures) >= architecture.prediction.min_gestures_for_llm
                     ):
                         gesture_names = [name for name, _ in collected_gestures]
                         translated_gestures = translate_gestures(

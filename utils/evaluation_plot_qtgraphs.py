@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config.config import EVALUATION_DPI
+from config.architecture import architecture
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ def _ensure_qapplication() -> QApplication:
 def _render_qtgraphs_widget_to_file(
     widget: QQuickWidget,
     save_path: str,
-    dpi: int = EVALUATION_DPI,
+    dpi: int = architecture.evaluation.evaluation_dpi,
 ) -> None:
     """Render a QQuickWidget to a file (PDF or image)."""
     app = _ensure_qapplication()

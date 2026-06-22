@@ -9,13 +9,10 @@ import keyboard
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.architecture import architecture
 from config.config import (
     COM_PORT,
-    BAUD_RATE,
-    TIMEOUT,
     RAW_DATA_DIR,
-    SERIAL_CONNECTION_DELAY,
-    KEYBOARD_DEBOUNCE_DELAY,
     setup_logging,
 )
 
@@ -71,7 +68,7 @@ def keyboard_listener():
             continue
         if keyboard.is_pressed("s"):
             _toggle_event.set()
-            time.sleep(KEYBOARD_DEBOUNCE_DELAY)
+            time.sleep(architecture.gui.keyboard_debounce_delay)
         elif keyboard.is_pressed("esc"):
             _quit_event.set()
             break
@@ -93,8 +90,8 @@ def main():
             return
 
         logger.info(f"Connecting to {selected_port}...")
-        ser = serial.Serial(selected_port, BAUD_RATE, timeout=TIMEOUT)
-        time.sleep(SERIAL_CONNECTION_DELAY)
+        ser = serial.Serial(selected_port, architecture.hardware.baud_rate, timeout=architecture.hardware.timeout)
+        time.sleep(architecture.hardware.serial_connection_delay)
         logger.info("Connected!")
     except Exception as e:
         logger.error(f"Error connecting: {e}")

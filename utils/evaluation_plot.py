@@ -21,7 +21,7 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize
 
-from config.config import EVALUATION_CLASS_WEIGHT_EPSILON, EVALUATION_DPI
+from config.architecture import architecture
 from utils.evaluation_plot_qtgraphs import (
     EVALUATION_PLOT_BACKEND,
     QTGRAPHS_AVAILABLE,
@@ -51,7 +51,7 @@ def plot_confusion_matrix(
     """
     if normalize:
         cm = cm.astype("float") / (
-            cm.sum(axis=1)[:, np.newaxis] + EVALUATION_CLASS_WEIGHT_EPSILON
+            cm.sum(axis=1)[:, np.newaxis] + architecture.evaluation.evaluation_class_weight_epsilon
         )
         fmt = ".2f"
         title = "Normalized Confusion Matrix"
@@ -89,7 +89,7 @@ def plot_confusion_matrix(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, format="pdf", dpi=EVALUATION_DPI, bbox_inches="tight")
+        plt.savefig(save_path, format="pdf", dpi=architecture.evaluation.evaluation_dpi, bbox_inches="tight")
         logger.info(f"Confusion matrix saved to: {save_path}")
     else:
         plt.show()
@@ -180,7 +180,7 @@ def plot_roc_curves(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, format="pdf", dpi=EVALUATION_DPI, bbox_inches="tight")
+        plt.savefig(save_path, format="pdf", dpi=architecture.evaluation.evaluation_dpi, bbox_inches="tight")
         logger.info(f"ROC curves saved to: {save_path}")
     else:
         plt.show()
@@ -278,7 +278,7 @@ def plot_per_class_metrics(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, format="pdf", dpi=EVALUATION_DPI, bbox_inches="tight")
+        plt.savefig(save_path, format="pdf", dpi=architecture.evaluation.evaluation_dpi, bbox_inches="tight")
         logger.info(f"Per-class metrics saved to: {save_path}")
     else:
         plt.show()
@@ -317,7 +317,7 @@ def plot_training_history(history: dict, save_path: str | None = None):
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, format="pdf", dpi=EVALUATION_DPI, bbox_inches="tight")
+        plt.savefig(save_path, format="pdf", dpi=architecture.evaluation.evaluation_dpi, bbox_inches="tight")
         logger.info(f"Training history saved to: {save_path}")
     else:
         plt.show()

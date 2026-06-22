@@ -28,13 +28,7 @@ import threading
 from dataclasses import dataclass
 from queue import Queue
 
-from config.config import (
-    BATCH_SIZE,
-    EARLY_STOPPING_PATIENCE,
-    EPOCHS,
-    LEARNING_RATE,
-    USE_ENSEMBLE,
-)
+from config.architecture import architecture
 from core.pipeline.training_pipeline import run_training_pipeline
 
 
@@ -126,26 +120,26 @@ class TrainingService:
             self._logger.info("[train] Starting training pipeline")
 
             # Log effective hyper-parameters
-            eff_epochs = overrides.epochs if overrides.epochs is not None else EPOCHS
+            eff_epochs = overrides.epochs if overrides.epochs is not None else architecture.training.epochs
             eff_lr = (
                 overrides.learning_rate
                 if overrides.learning_rate is not None
-                else LEARNING_RATE
+                else architecture.training.learning_rate
             )
             eff_batch = (
                 overrides.batch_size
                 if overrides.batch_size is not None
-                else BATCH_SIZE
+                else architecture.training.batch_size
             )
             eff_patience = (
                 overrides.early_stopping_patience
                 if overrides.early_stopping_patience is not None
-                else EARLY_STOPPING_PATIENCE
+                else architecture.training.early_stopping_patience
             )
             eff_use_ensemble = (
                 overrides.use_ensemble
                 if overrides.use_ensemble is not None
-                else USE_ENSEMBLE
+                else architecture.training.use_ensemble
             )
             self._logger.info(
                 "[train] Overrides — epochs=%d, lr=%.6f, batch=%d, patience=%d, ensemble=%s",

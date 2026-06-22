@@ -25,11 +25,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from config.architecture import architecture
 from config.config import (
-    DATA_MANAGER_MIN_HEIGHT,
-    DATA_MANAGER_MIN_WIDTH,
-    DATA_MANAGER_WINDOW_HEIGHT,
-    DATA_MANAGER_WINDOW_WIDTH,
     LOGS_OUTPUT_DIR,
     RAW_DATA_DIR,
 )
@@ -102,8 +99,8 @@ class DataManagerWindow(DataManagerTabsMixin, DataManagerEventHandlersMixin, QMa
         self.sample_service = SampleReviewService(self.raw_data_root)
 
         self.setWindowTitle("Sign2Speech - Dataset Manager")
-        self.resize(DATA_MANAGER_WINDOW_WIDTH, DATA_MANAGER_WINDOW_HEIGHT)
-        self.setMinimumSize(DATA_MANAGER_MIN_WIDTH, DATA_MANAGER_MIN_HEIGHT)
+        self.resize(architecture.gui.data_manager_window_width, architecture.gui.data_manager_window_height)
+        self.setMinimumSize(architecture.gui.data_manager_min_width, architecture.gui.data_manager_min_height)
 
         self._build_ui()
         self._build_shortcuts()

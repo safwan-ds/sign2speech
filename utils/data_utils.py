@@ -17,14 +17,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from config.config import (
-    DETECT_GESTURE_MOTION,
-    MOTION_DETECTION_MIN_DURATION,
-    MOTION_DETECTION_SMOOTHING_WINDOW,
-    MOTION_PADDING_RATIO,
-    MOTION_THRESHOLD,
-    SEQUENCE_OVERLAP,
-)
+from config.architecture import architecture
 
 # ---------------------------------------------------------------------------
 # Re-exports from submodules
@@ -68,8 +61,8 @@ def convert_to_snake_case(label: str) -> str:
 
 def detect_motion_boundaries(
     sequence: np.ndarray,
-    threshold: float = MOTION_THRESHOLD,
-    min_duration: int = MOTION_DETECTION_MIN_DURATION,
+    threshold: float = architecture.motion_detection.motion_threshold,
+    min_duration: int = architecture.motion_detection.motion_detection_min_duration,
 ):
     """
     Detect start and end of gesture motion based on sensor activity
@@ -87,7 +80,7 @@ def detect_motion_boundaries(
     motion_energy = np.mean(motion, axis=1)
 
     # Smooth motion signal
-    window = MOTION_DETECTION_SMOOTHING_WINDOW
+    window = architecture.motion_detection.motion_detection_smoothing_window
     if len(motion_energy) >= window:
         motion_smooth = np.convolve(
             motion_energy, np.ones(window) / window, mode="same"
@@ -128,9 +121,9 @@ def detect_motion_boundaries(
 def segment_sequences(
     df: pd.DataFrame,
     sequence_length: int,
-    overlap: float = SEQUENCE_OVERLAP,
-    detect_motion: bool = DETECT_GESTURE_MOTION,
-    motion_threshold: float = MOTION_THRESHOLD,
+    overlap: float = architecture.motion_detection.sequence_overlap,
+    detect_motion: bool = architecture.motion_detection.detect_gesture_motion,
+    motion_threshold: float = architecture.motion_detection.motion_threshold,
 ) -> list[np.ndarray]:
     """
     Segment continuous sensor data into overlapping sequences for LSTM
@@ -163,7 +156,7 @@ def segment_sequences(
         if motion_region:
             start_idx, end_idx = motion_region
             # Add some padding around detected motion
-            padding = int(sequence_length * MOTION_PADDING_RATIO)
+            padding = int(sequence_length * architecture.motion_detection.motion_padding_ratio)
             start_idx = max(0, start_idx - padding)
             end_idx = min(len(sequence), end_idx + padding)
             trimmed = sequence[start_idx:end_idx]
@@ -354,8 +347,8 @@ def segment_sequences_with_enhanced_features(
     df: pd.DataFrame,
     sequence_length: int,
     overlap: float = 0.5,
-    detect_motion: bool = DETECT_GESTURE_MOTION,
-    motion_threshold: float = MOTION_THRESHOLD,
+    detect_motion: bool = architecture.motion_detection.detect_gesture_motion,
+    motion_threshold: float = architecture.motion_detection.motion_threshold,
     use_enhanced_features: bool = False,
     include_derivatives: bool = True,
     include_stats: bool = False,
@@ -407,7 +400,7 @@ def segment_sequences_with_enhanced_features(
         if motion_region:
             start_idx, end_idx = motion_region
             # Add some padding around detected motion
-            padding = int(sequence_length * MOTION_PADDING_RATIO)
+            padding = int(sequence_length * architecture.motion_detection.motion_padding_ratio)
             start_idx = max(0, start_idx - padding)
             end_idx = min(len(sequence), end_idx + padding)
             trimmed = sequence[start_idx:end_idx]

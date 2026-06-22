@@ -9,17 +9,11 @@ from pathlib import Path
 
 import numpy as np
 
-from config.config import (
-    PREDICTION_AVG_MOTION_THRESHOLD,
-    PREDICTION_MOTION_THRESHOLD,
-    PREDICTION_MOTION_VARIANCE_MIN,
-    PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO,
-    SEQUENCE_LENGTH,
-)
+from config.architecture import architecture
 
 
 _SIGNIFICANT_MOTION_MIN_FRAMES = int(
-    SEQUENCE_LENGTH * PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO
+    architecture.training.sequence_length * architecture.prediction.prediction_significant_motion_min_ratio
 )
 
 
@@ -38,19 +32,19 @@ def calculate_motion_magnitude(sensor_dict: dict[str, float]) -> float:
 
 def validate_motion_consistency(motion_samples: deque[float]) -> bool:
     """Validate that motion remains meaningful over the prediction window."""
-    if len(motion_samples) < SEQUENCE_LENGTH // 2:
+    if len(motion_samples) < architecture.training.sequence_length // 2:
         return False
 
     motion_array = np.asarray(motion_samples, dtype=float)
     avg_motion = float(np.mean(motion_array))
-    if avg_motion < PREDICTION_AVG_MOTION_THRESHOLD:
+    if avg_motion < architecture.prediction.prediction_avg_motion_threshold:
         return False
 
     motion_variance = float(np.var(motion_array))
-    if motion_variance < PREDICTION_MOTION_VARIANCE_MIN:
+    if motion_variance < architecture.prediction.prediction_motion_variance_min:
         return False
 
-    significant_motion_frames = int(np.sum(motion_array > PREDICTION_MOTION_THRESHOLD))
+    significant_motion_frames = int(np.sum(motion_array > architecture.prediction.prediction_motion_threshold))
     return significant_motion_frames >= _SIGNIFICANT_MOTION_MIN_FRAMES
 
 

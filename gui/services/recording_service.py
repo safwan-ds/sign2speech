@@ -9,12 +9,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from queue import Queue
 
+from config.architecture import architecture
 from config.config import (
-    BAUD_RATE,
     COM_PORT,
     RAW_DATA_DIR,
-    SERIAL_CONNECTION_DELAY,
-    TIMEOUT,
 )
 from gui.services.serial_service import SerialService, SerialSettings
 from utils.recording_utils import (
@@ -105,13 +103,13 @@ class RecordingService:
             self._logger.info(
                 "[record] Connecting to %s at %s baud",
                 selected_port,
-                BAUD_RATE,
+                architecture.hardware.baud_rate,
             )
             opened = self._serial_service.connect(
-                SerialSettings(port=selected_port, baud_rate=BAUD_RATE, timeout=TIMEOUT)
+                SerialSettings(port=selected_port, baud_rate=architecture.hardware.baud_rate, timeout=architecture.hardware.timeout)
             )
             if opened:
-                time.sleep(SERIAL_CONNECTION_DELAY)
+                time.sleep(architecture.hardware.serial_connection_delay)
             self._serial_service.reset_input_buffer()
 
             self._event_queue.put(

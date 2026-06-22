@@ -101,9 +101,9 @@ def _make_remote_callable(
     model: str = "test-model",
     api_key: str = "sk-test",
 ) -> tuple[object, MagicMock]:
-    monkeypatch.setattr(llm_utils, "LLM_REMOTE_URL", url)
-    monkeypatch.setattr(llm_utils, "LLM_REMOTE_API_KEY", api_key)
-    monkeypatch.setattr(llm_utils, "LLM_REMOTE_MODEL", model)
+    monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_url", url)
+    monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_api_key", api_key)
+    monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_model", model)
 
     # Mock the OpenAI client
     mock_client_instance = MagicMock()
@@ -171,9 +171,9 @@ class TestRemoteCallable:
         assert result == "Ben üniversiteye gidiyorum."
 
     def test_remote_model_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(llm_utils, "LLM_REMOTE_MODEL", "test-model")
-        monkeypatch.setattr(llm_utils, "LLM_REMOTE_URL", "https://x.com/v1")
-        monkeypatch.setattr(llm_utils, "LLM_REMOTE_API_KEY", "k")
+        monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_model", "test-model")
+        monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_url", "https://x.com/v1")
+        monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_api_key", "k")
         
         mock_openai_class = MagicMock()
         monkeypatch.setattr("openai.OpenAI", mock_openai_class)
@@ -183,14 +183,14 @@ class TestRemoteCallable:
 
 
 def test_load_qwen_model_returns_none_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", False)
+    monkeypatch.setattr(llm_utils.architecture.llm, "use_qwen_llm", False)
     assert llm_utils.load_qwen_model() is None
 
 
 def test_load_qwen_model_returns_none_when_path_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", True)
+    monkeypatch.setattr(llm_utils.architecture.llm, "use_qwen_llm", True)
     monkeypatch.setattr(llm_utils, "QWEN_MODEL_PATH", "/tmp/does-not-exist.gguf")
     monkeypatch.setattr(llm_utils.os.path, "exists", lambda _: False)
     assert llm_utils.load_qwen_model() is None
@@ -199,10 +199,10 @@ def test_load_qwen_model_returns_none_when_path_missing(
 def test_load_qwen_model_raises_when_gpu_forced_with_zero_layers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", True)
+    monkeypatch.setattr(llm_utils.architecture.llm, "use_qwen_llm", True)
     monkeypatch.setattr(llm_utils.os.path, "exists", lambda _: True)
-    monkeypatch.setattr(llm_utils, "QWEN_FORCE_GPU", True)
-    monkeypatch.setattr(llm_utils, "QWEN_N_GPU_LAYERS", 0)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_force_gpu", True)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_n_gpu_layers", 0)
 
     with pytest.raises(ValueError):
         llm_utils.load_qwen_model()
@@ -211,9 +211,9 @@ def test_load_qwen_model_raises_when_gpu_forced_with_zero_layers(
 def test_load_qwen_model_returns_none_when_llama_cpp_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", True)
+    monkeypatch.setattr(llm_utils.architecture.llm, "use_qwen_llm", True)
     monkeypatch.setattr(llm_utils.os.path, "exists", lambda _: True)
-    monkeypatch.setattr(llm_utils, "QWEN_FORCE_GPU", False)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_force_gpu", False)
     monkeypatch.setitem(sys.modules, "llama_cpp", types.ModuleType("llama_cpp"))
 
     assert llm_utils.load_qwen_model() is None
@@ -222,13 +222,13 @@ def test_load_qwen_model_returns_none_when_llama_cpp_missing(
 def test_load_qwen_model_builds_llama_with_expected_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(llm_utils, "USE_QWEN_LLM", True)
+    monkeypatch.setattr(llm_utils.architecture.llm, "use_qwen_llm", True)
     monkeypatch.setattr(llm_utils.os.path, "exists", lambda _: True)
-    monkeypatch.setattr(llm_utils, "QWEN_FORCE_GPU", False)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_force_gpu", False)
     monkeypatch.setattr(llm_utils, "QWEN_MODEL_PATH", "/tmp/model.gguf")
-    monkeypatch.setattr(llm_utils, "QWEN_N_CTX", 4096)
-    monkeypatch.setattr(llm_utils, "QWEN_N_GPU_LAYERS", -1)
-    monkeypatch.setattr(llm_utils, "QWEN_N_BATCH", 256)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_n_ctx", 4096)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_n_gpu_layers", -1)
+    monkeypatch.setattr(llm_utils.architecture.llm, "qwen_n_batch", 256)
 
     class _FakeLlama:
         def __init__(self, **kwargs):

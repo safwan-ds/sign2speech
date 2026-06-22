@@ -9,9 +9,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from config.config import (
-    SEQUENCE_LENGTH,
-)
+from config.architecture import architecture
 from core.models.model_factory import build_model_from_checkpoint, load_model_checkpoint
 from core.inference.gesture_predictor import MODEL_PATH
 
@@ -52,7 +50,7 @@ def export_onnx(
     model_path: Path,
     output_path: Path,
     *,
-    sequence_length: int = SEQUENCE_LENGTH,
+    sequence_length: int = architecture.training.sequence_length,
     opset: int = 17,
 ) -> tuple[Path, str]:
     # Resolve num_classes — checkpoint takes priority, encoder is fallback
@@ -130,7 +128,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, default=Path(MODEL_PATH))
     parser.add_argument("--output", type=Path, default=None)
-    parser.add_argument("--sequence-length", type=int, default=SEQUENCE_LENGTH)
+    parser.add_argument("--sequence-length", type=int, default=architecture.training.sequence_length)
     parser.add_argument("--opset", type=int, default=17)
     parser.add_argument("--calibration-npz", type=Path, default=None)
     parser.add_argument("--quantized-output", type=Path, default=None)

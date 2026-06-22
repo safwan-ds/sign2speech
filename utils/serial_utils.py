@@ -10,7 +10,7 @@ from collections.abc import Callable, Mapping
 import serial
 import serial.tools.list_ports
 
-from config.config import BAUD_RATE, EXPECTED_SENSOR_COUNT
+from config.architecture import architecture
 
 FLEX_SENSOR_NAMES = ("flex0", "flex1", "flex2", "flex3", "flex4")
 SENSOR_NAMES = (
@@ -155,7 +155,7 @@ def parse_sensor_data(line: str) -> dict[str, float] | None:
     if line.startswith(">"):
         try:
             values = line[1:].split(",")
-            if len(values) == EXPECTED_SENSOR_COUNT:
+            if len(values) == architecture.hardware.expected_sensor_count:
                 return {
                     name: float(val.strip()) for name, val in zip(SENSOR_NAMES, values)
                 }
@@ -198,7 +198,7 @@ def select_serial_port(preferred_port: str | None = None):
 
 
 def detect_glove_ports(
-    baud_rate: int = BAUD_RATE,
+    baud_rate: int = architecture.hardware.baud_rate,
     timeout: float = 0.12,
     read_attempts: int = 3,
     settle_delay: float = 0.15,

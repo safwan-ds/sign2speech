@@ -11,22 +11,9 @@ import numpy as np
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.architecture import architecture
 from config.config import (
     COM_PORT,
-    BAUD_RATE,
-    TIMEOUT,
-    SEQUENCE_LENGTH,
-    CONFIDENCE_THRESHOLD,
-    PREDICTION_MOTION_THRESHOLD,
-    PREDICTION_CONSENSUS_FRAMES,
-    PREDICTION_AVG_MOTION_THRESHOLD,
-    PREDICTION_MOTION_VARIANCE_MIN,
-    PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO,
-    PREDICTION_MIN_CONFIDENCE_GAP,
-    PREDICTION_DEBUG_MODE,
-    SERIAL_CONNECTION_DELAY,
-    MIN_CONSECUTIVE_REST,
-    MIN_GESTURES_FOR_LLM,
     setup_logging,
 )
 from utils.serial_utils import (
@@ -49,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Precompute constant for motion validation
 _SIGNIFICANT_MOTION_MIN_FRAMES = int(
-    SEQUENCE_LENGTH * PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO
+    architecture.training.sequence_length * architecture.prediction.prediction_significant_motion_min_ratio
 )
 
 
@@ -71,40 +58,40 @@ def validate_motion_consistency(motion_samples: Sequence[float]) -> bool:
     Validate that motion is consistent and meaningful throughout the sequence.
     Returns True if motion characteristics support a gesture prediction.
     """
-    if len(motion_samples) < SEQUENCE_LENGTH // 2:
+    if len(motion_samples) < architecture.training.sequence_length // 2:
         return False
 
     motion_array = np.array(motion_samples)
 
     # Check 1: Average motion
     avg_motion = np.mean(motion_array)
-    if avg_motion < PREDICTION_AVG_MOTION_THRESHOLD:
-        if PREDICTION_DEBUG_MODE:
+    if avg_motion < architecture.prediction.prediction_avg_motion_threshold:
+        if architecture.prediction.prediction_debug_mode:
             logger.debug(
-                f"Motion check: avg_motion={avg_motion:.1f} < threshold={PREDICTION_AVG_MOTION_THRESHOLD}"
+                f"Motion check: avg_motion={avg_motion:.1f} < threshold={architecture.prediction.prediction_avg_motion_threshold}"
             )
         return False
 
     # Check 2: Motion variance (motion should vary, not be constant)
     motion_variance = np.var(motion_array)
-    if motion_variance < PREDICTION_MOTION_VARIANCE_MIN:
-        if PREDICTION_DEBUG_MODE:
+    if motion_variance < architecture.prediction.prediction_motion_variance_min:
+        if architecture.prediction.prediction_debug_mode:
             logger.debug(
-                f"Motion check: variance={motion_variance:.1f} < threshold={PREDICTION_MOTION_VARIANCE_MIN}"
+                f"Motion check: variance={motion_variance:.1f} < threshold={architecture.prediction.prediction_motion_variance_min}"
             )
         return False
 
     # Check 3: Motion should not be just noise - require peaks
     # At least some frames should have significant motion
-    significant_motion_frames = np.sum(motion_array > PREDICTION_MOTION_THRESHOLD)
+    significant_motion_frames = np.sum(motion_array > architecture.prediction.prediction_motion_threshold)
     if significant_motion_frames < _SIGNIFICANT_MOTION_MIN_FRAMES:
-        if PREDICTION_DEBUG_MODE:
+        if architecture.prediction.prediction_debug_mode:
             logger.debug(
                 f"Motion check: significant_frames={significant_motion_frames} < threshold={_SIGNIFICANT_MOTION_MIN_FRAMES}"
             )
         return False
 
-    if PREDICTION_DEBUG_MODE:
+    if architecture.prediction.prediction_debug_mode:
         logger.debug(
             f"Motion validation passed: avg={avg_motion:.1f}, var={motion_variance:.1f}, peaks={significant_motion_frames}"
         )
@@ -144,19 +131,19 @@ def main():
     # Motion detection settings
     logger.info("MOTION DETECTION (Rest vs Gesture Classification)")
     logger.info(
-        f"Instantaneous Motion Threshold: {PREDICTION_MOTION_THRESHOLD} (peak motion)"
+        f"Instantaneous Motion Threshold: {architecture.prediction.prediction_motion_threshold} (peak motion)"
     )
     logger.info(
-        f"Average Motion Threshold: {PREDICTION_AVG_MOTION_THRESHOLD} (sustained motion)"
+        f"Average Motion Threshold: {architecture.prediction.prediction_avg_motion_threshold} (sustained motion)"
     )
     logger.info(
-        f"Motion Variance Min: {PREDICTION_MOTION_VARIANCE_MIN} (motion variation)"
+        f"Motion Variance Min: {architecture.prediction.prediction_motion_variance_min} (motion variation)"
     )
-    logger.info(f"Min Confidence for Gestures: {CONFIDENCE_THRESHOLD:.1%}")
+    logger.info(f"Min Confidence for Gestures: {architecture.prediction.confidence_threshold:.1%}")
     logger.info(
-        f"Min Confidence Gap: {PREDICTION_MIN_CONFIDENCE_GAP:.1%} (certainty margin)"
+        f"Min Confidence Gap: {architecture.prediction.prediction_min_confidence_gap:.1%} (certainty margin)"
     )
-    logger.info(f"Temporal Stability: {PREDICTION_CONSENSUS_FRAMES} consecutive frames")
+    logger.info(f"Temporal Stability: {architecture.prediction.prediction_consensus_frames} consecutive frames")
     logger.info(
         "\nValidates:\n"
         "  - Peak motion detected\n"
@@ -170,8 +157,8 @@ def main():
     # Connect to serial port
     logger.info(f"Connecting to {COM_PORT}...")
     try:
-        ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=TIMEOUT)
-        time.sleep(SERIAL_CONNECTION_DELAY)
+        ser = serial.Serial(COM_PORT, architecture.hardware.baud_rate, timeout=architecture.hardware.timeout)
+        time.sleep(architecture.hardware.serial_connection_delay)
         logger.info("Connected!")
     except Exception as e:
         logger.error(f"Could not connect to {COM_PORT}")
@@ -179,13 +166,13 @@ def main():
         return
 
     logger.info("COLLECTING DATA... (Press Ctrl+C to stop)")
-    logger.info(f"Buffering {SEQUENCE_LENGTH} samples before first prediction...")
+    logger.info(f"Buffering {architecture.training.sequence_length} samples before first prediction...")
 
     last_gesture = None
     last_added_gesture = None
     collected_gestures: list[tuple[str, float]] = []
-    motion_samples: deque[float] = deque(maxlen=SEQUENCE_LENGTH)
-    prediction_history: deque = deque(maxlen=PREDICTION_CONSENSUS_FRAMES)
+    motion_samples: deque[float] = deque(maxlen=architecture.training.sequence_length)
+    prediction_history: deque = deque(maxlen=architecture.prediction.prediction_consensus_frames)
     consecutive_rest_frames = 0
     llm_busy = False  # Guard against overlapping LLM calls
     warning_beeper = ContinuousWarningBeeper()
@@ -227,7 +214,7 @@ def main():
 
                     if gesture:
                         # Show all probabilities in debug mode
-                        if PREDICTION_DEBUG_MODE and all_probs:
+                        if architecture.prediction.prediction_debug_mode and all_probs:
                             sorted_probs = sorted(
                                 all_probs.items(), key=lambda x: x[1], reverse=True
                             )
@@ -245,36 +232,36 @@ def main():
                             valid = (
                                 confidence is not None
                                 and confidence_gap is not None
-                                and confidence >= CONFIDENCE_THRESHOLD
-                                and confidence_gap >= PREDICTION_MIN_CONFIDENCE_GAP
+                                and confidence >= architecture.prediction.confidence_threshold
+                                and confidence_gap >= architecture.prediction.prediction_min_confidence_gap
                             )
 
-                            if PREDICTION_DEBUG_MODE and not valid:
+                            if architecture.prediction.prediction_debug_mode and not valid:
                                 if (
                                     confidence is not None
-                                    and confidence < CONFIDENCE_THRESHOLD
+                                    and confidence < architecture.prediction.confidence_threshold
                                 ):
                                     logger.debug(
-                                        f"Filtered {original_gesture}: confidence {confidence:.2%} < {CONFIDENCE_THRESHOLD:.2%}"
+                                        f"Filtered {original_gesture}: confidence {confidence:.2%} < {architecture.prediction.confidence_threshold:.2%}"
                                     )
                                 elif (
                                     confidence_gap is not None
-                                    and confidence_gap < PREDICTION_MIN_CONFIDENCE_GAP
+                                    and confidence_gap < architecture.prediction.prediction_min_confidence_gap
                                 ):
                                     logger.debug(
-                                        f"Filtered {original_gesture}: confidence gap {confidence_gap:.2%} < {PREDICTION_MIN_CONFIDENCE_GAP:.2%}"
+                                        f"Filtered {original_gesture}: confidence gap {confidence_gap:.2%} < {architecture.prediction.prediction_min_confidence_gap:.2%}"
                                     )
 
                             # Check temporal consensus (consistent predictions)
                             if (
                                 valid
                                 and len(prediction_history)
-                                >= PREDICTION_CONSENSUS_FRAMES
+                                >= architecture.prediction.prediction_consensus_frames
                             ):
                                 valid = all(
                                     g == gesture for g, _, _ in prediction_history
                                 )
-                                if PREDICTION_DEBUG_MODE and not valid:
+                                if architecture.prediction.prediction_debug_mode and not valid:
                                     logger.debug(
                                         f"Filtered {original_gesture}: failed temporal consensus"
                                     )
@@ -282,7 +269,7 @@ def main():
                             # ALWAYS check motion for non-REST gestures
                             if valid:
                                 valid = validate_motion_consistency(motion_samples)
-                                if PREDICTION_DEBUG_MODE and not valid:
+                                if architecture.prediction.prediction_debug_mode and not valid:
                                     logger.debug(
                                         f"Filtered {original_gesture}: failed motion validation"
                                     )
@@ -302,8 +289,8 @@ def main():
 
                             # Trigger QWEN exactly once after sustained REST
                             if (
-                                consecutive_rest_frames == MIN_CONSECUTIVE_REST
-                                and len(collected_gestures) >= MIN_GESTURES_FOR_LLM
+                                consecutive_rest_frames == architecture.prediction.min_consecutive_rest
+                                and len(collected_gestures) >= architecture.prediction.min_gestures_for_llm
                                 and not llm_busy
                             ):
                                 logger.info("REST (confidence: 1.00)")

@@ -6,16 +6,7 @@ import os
 
 import matplotlib.pyplot as plt
 
-from config.config import (
-    PLOT_FIGURE_WIDTH,
-    PLOT_FIGURE_HEIGHT,
-    PLOT_NUM_ROWS,
-    PLOT_NUM_COLS,
-    PLOT_FONT_SIZE,
-    PLOT_MARKER_SIZE,
-    PLOT_GRID_ALPHA,
-    NUM_FLEX_SENSORS,
-)
+from config.architecture import architecture
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +41,7 @@ def plot_recording(filename: str, title: str = "", show: bool = True) -> bool:
             return False
 
         # Create subplots for different sensor types
-        fig, axes = plt.subplots(PLOT_NUM_ROWS, PLOT_NUM_COLS, figsize=(PLOT_FIGURE_WIDTH, PLOT_FIGURE_HEIGHT))  # type: ignore
+        fig, axes = plt.subplots(architecture.plot.plot_num_rows, architecture.plot.plot_num_cols, figsize=(architecture.plot.plot_figure_width, architecture.plot.plot_figure_height))  # type: ignore
         try:
             manager = fig.canvas.manager
             if manager and hasattr(manager, "window"):
@@ -62,20 +53,20 @@ def plot_recording(filename: str, title: str = "", show: bool = True) -> bool:
             if title
             else f"Recording: {os.path.basename(filename)}"
         )
-        fig.suptitle(display_title, fontsize=PLOT_FONT_SIZE)  # type: ignore
+        fig.suptitle(display_title, fontsize=architecture.plot.plot_font_size)  # type: ignore
 
         # Plot flex sensors
         ax = axes[0]
-        for i in range(NUM_FLEX_SENSORS):
+        for i in range(architecture.hardware.num_flex_sensors):
             key = f"flex{i}"
             if key in data:
                 ax.plot(
-                    times, data[key], label=key, marker="o", markersize=PLOT_MARKER_SIZE
+                    times, data[key], label=key, marker="o", markersize=architecture.plot.plot_marker_size
                 )
         ax.set_ylabel("Flex Sensor Values")
         ax.set_xlabel("Time (ms)")
         ax.legend()
-        ax.grid(True, alpha=PLOT_GRID_ALPHA)
+        ax.grid(True, alpha=architecture.plot.plot_grid_alpha)
         ax.set_title("Flex Sensors")
 
         # Plot accelerometer
@@ -83,12 +74,12 @@ def plot_recording(filename: str, title: str = "", show: bool = True) -> bool:
         for key in ["accelX", "accelY", "accelZ"]:
             if key in data:
                 ax.plot(
-                    times, data[key], label=key, marker="o", markersize=PLOT_MARKER_SIZE
+                    times, data[key], label=key, marker="o", markersize=architecture.plot.plot_marker_size
                 )
         ax.set_ylabel("Acceleration (16-bit raw)")
         ax.set_xlabel("Time (ms)")
         ax.legend()
-        ax.grid(True, alpha=PLOT_GRID_ALPHA)
+        ax.grid(True, alpha=architecture.plot.plot_grid_alpha)
         ax.set_title("Accelerometer")
 
         # Plot gyroscope
@@ -96,12 +87,12 @@ def plot_recording(filename: str, title: str = "", show: bool = True) -> bool:
         for key in ["gyroX", "gyroY", "gyroZ"]:
             if key in data:
                 ax.plot(
-                    times, data[key], label=key, marker="o", markersize=PLOT_MARKER_SIZE
+                    times, data[key], label=key, marker="o", markersize=architecture.plot.plot_marker_size
                 )
         ax.set_ylabel("Angular Velocity (16-bit raw)")
         ax.set_xlabel("Time (ms)")
         ax.legend()
-        ax.grid(True, alpha=PLOT_GRID_ALPHA)
+        ax.grid(True, alpha=architecture.plot.plot_grid_alpha)
         ax.set_title("Gyroscope")
 
         plt.tight_layout()

@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from gui.ui.stage_widget import StageWidget
 from gui.ui.trace_preview_widget import TracePreviewWidget
+from config.architecture import architecture
 
 
 class DataManagerTabsMixin:
@@ -257,11 +258,9 @@ class DataManagerTabsMixin:
 
         self.train_epochs_spin = QSpinBox()
         self.train_epochs_spin.setRange(1, 2000)
-        from config.config import EPOCHS
-
-        self.train_epochs_spin.setValue(EPOCHS)
+        self.train_epochs_spin.setValue(architecture.training.epochs)
         self.train_epochs_spin.setToolTip(
-            f"Max training epochs (config default: {EPOCHS})"
+            f"Max training epochs (config default: {architecture.training.epochs})"
         )
         override_form.addRow("Max Epochs:", self.train_epochs_spin)
 
@@ -269,40 +268,32 @@ class DataManagerTabsMixin:
         self.train_lr_spin.setRange(0.00001, 0.1)
         self.train_lr_spin.setDecimals(6)
         self.train_lr_spin.setSingleStep(0.0001)
-        from config.config import LEARNING_RATE
-
-        self.train_lr_spin.setValue(LEARNING_RATE)
+        self.train_lr_spin.setValue(architecture.training.learning_rate)
         self.train_lr_spin.setToolTip(
-            f"Initial learning rate (config default: {LEARNING_RATE})"
+            f"Initial learning rate (config default: {architecture.training.learning_rate})"
         )
         override_form.addRow("Learning Rate:", self.train_lr_spin)
 
         self.train_batch_spin = QSpinBox()
         self.train_batch_spin.setRange(1, 512)
-        from config.config import BATCH_SIZE
-
-        self.train_batch_spin.setValue(BATCH_SIZE)
+        self.train_batch_spin.setValue(architecture.training.batch_size)
         self.train_batch_spin.setToolTip(
-            f"Mini-batch size (config default: {BATCH_SIZE})"
+            f"Mini-batch size (config default: {architecture.training.batch_size})"
         )
         override_form.addRow("Batch Size:", self.train_batch_spin)
 
         self.train_patience_spin = QSpinBox()
         self.train_patience_spin.setRange(1, 200)
-        from config.config import EARLY_STOPPING_PATIENCE
-
-        self.train_patience_spin.setValue(EARLY_STOPPING_PATIENCE)
+        self.train_patience_spin.setValue(architecture.training.early_stopping_patience)
         self.train_patience_spin.setToolTip(
-            f"Early stopping patience in epochs (config default: {EARLY_STOPPING_PATIENCE})"
+            f"Early stopping patience in epochs (config default: {architecture.training.early_stopping_patience})"
         )
         override_form.addRow("Early Stop Patience:", self.train_patience_spin)
 
         self.train_ensemble_check = QCheckBox("Train as Ensemble")
-        from config.config import USE_ENSEMBLE
-
-        self.train_ensemble_check.setChecked(USE_ENSEMBLE)
+        self.train_ensemble_check.setChecked(architecture.training.use_ensemble)
         self.train_ensemble_check.setToolTip(
-            f"Train an ensemble of multiple models (config default: {USE_ENSEMBLE})"
+            f"Train an ensemble of multiple models (config default: {architecture.training.use_ensemble})"
         )
         override_form.addRow("Ensemble Mode:", self.train_ensemble_check)
 

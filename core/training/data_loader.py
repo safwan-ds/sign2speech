@@ -6,7 +6,8 @@ import os
 
 import numpy as np
 
-from config.config import PROCESSED_DIR, TEST_DATA_DIR, TEST_SIZE, USE_TEST_SPLIT
+from config.architecture import architecture
+from config.config import PROCESSED_DIR, TEST_DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,12 @@ def load_processed_sequences():
     test_X = None
     test_y = None
 
-    if not USE_TEST_SPLIT:
+    if not architecture.training.use_test_split:
         logger.info("USE_TEST_SPLIT is False - skipping separate test set loading")
         logger.info("All data will be used for training.")
         return X, y, None, None
 
-    if TEST_SIZE > 0 and os.path.exists(TEST_DATA_DIR):
+    if architecture.training.test_size > 0 and os.path.exists(TEST_DATA_DIR):
         test_npz_files = glob.glob(os.path.join(TEST_DATA_DIR, "sequences_*.npz"))
         if test_npz_files:
             logger.info(f"Found {len(test_npz_files)} separate test sequence file(s)")
@@ -75,7 +76,7 @@ def load_processed_sequences():
         else:
             logger.info(f"No test sequences found in {TEST_DATA_DIR}")
             logger.info("Will use train-test split instead.")
-    elif TEST_SIZE == 0:
+    elif architecture.training.test_size == 0:
         logger.info(f"TEST_SIZE is 0 - skipping separate test set loading")
         logger.info("All data will be used for training without validation split.")
     else:

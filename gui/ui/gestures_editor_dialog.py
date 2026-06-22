@@ -17,10 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from config.config import (
-    GESTURES_EDITOR_DIALOG_HEIGHT,
-    GESTURES_EDITOR_DIALOG_WIDTH,
-)
+from config.architecture import architecture
 from utils.recording_utils import load_gestures, save_gestures
 
 
@@ -31,7 +28,7 @@ class GesturesEditorDialog(QDialog):
         super().__init__(parent)
         self.project_root = project_root
         self.setWindowTitle("Manage Gestures")
-        self.resize(GESTURES_EDITOR_DIALOG_WIDTH, GESTURES_EDITOR_DIALOG_HEIGHT)
+        self.resize(architecture.gui.gestures_editor_dialog_width, architecture.gui.gestures_editor_dialog_height)
 
         layout = QVBoxLayout(self)
 

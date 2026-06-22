@@ -12,17 +12,8 @@ import torch
 from torchviz import make_dot
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from config.config import (
-    MODELS_DIR,
-    SEQUENCE_LENGTH,
-    LSTM_UNITS,
-    LSTM_LAYERS,
-    DROPOUT_RATE,
-    MODEL_TYPE,
-    USE_BIDIRECTIONAL,
-    USE_ATTENTION,
-    USE_BATCH_NORM,
-)
+from config.architecture import architecture
+from config.config import MODELS_DIR
 from core.models.lstm_model import build_lstm_model
 
 logger = logging.getLogger(__name__)
@@ -53,14 +44,14 @@ def _build_model(input_size: int, num_classes: int) -> torch.nn.Module:
     return build_lstm_model(
         input_size=input_size,
         num_classes=num_classes,
-        hidden_size=LSTM_UNITS,
-        num_layers=LSTM_LAYERS,
-        dropout_rate=DROPOUT_RATE,
+        hidden_size=architecture.model.lstm_units,
+        num_layers=architecture.model.lstm_layers,
+        dropout_rate=architecture.model.dropout_rate,
         device=torch.device("cpu"),
-        model_type=MODEL_TYPE,
-        bidirectional=USE_BIDIRECTIONAL,
-        use_attention=USE_ATTENTION,
-        use_batch_norm=USE_BATCH_NORM,
+        model_type=architecture.model.model_type,
+        bidirectional=architecture.model.use_bidirectional,
+        use_attention=architecture.model.use_attention,
+        use_batch_norm=architecture.model.use_batch_norm,
     )
 
 
@@ -118,7 +109,7 @@ def main() -> int:
     model.load_state_dict(state_dict)
     model.eval()
 
-    dummy_input = torch.zeros(1, SEQUENCE_LENGTH, input_size)
+    dummy_input = torch.zeros(1, architecture.training.sequence_length, input_size)
     output = model(dummy_input)
 
     params = dict(model.named_parameters())

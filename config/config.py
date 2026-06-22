@@ -1,11 +1,21 @@
 """
 Shared configuration and constants for Sign2Speech project
+
+Architecture constants are loaded from ``architecture.yaml`` via the
+:mod:`config.architecture` module.  Runtime-derived paths and
+environment-variable-based values are computed here.
 """
 
+import logging
 import os
+from datetime import datetime
 from pathlib import Path
 
-# --- Load .env file (if present) -------------------------------------------
+from config.architecture import architecture
+
+# ---------------------------------------------------------------------------
+# Load .env file (if present) — runs before any environment-dependent constant
+# ---------------------------------------------------------------------------
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 if _ENV_PATH.is_file():
     with open(_ENV_PATH, encoding="utf-8") as _fh:
@@ -19,31 +29,28 @@ if _ENV_PATH.is_file():
             if key and key not in os.environ:
                 os.environ[key] = val
 
-COM_PORT = os.environ.get("SIGN2SPEECH_COM_PORT", "COM9")
-BAUD_RATE = 115200
-TIMEOUT = 3
-SERIAL_CONNECTION_DELAY = 2
+# ===========================================================================
+# Architecture constants — re-exported from architecture.yaml
+# ===========================================================================
 
+# -- hardware ---------------------------------------------------------------
+COM_PORT = os.environ.get("SIGN2SPEECH_COM_PORT", architecture.hardware.com_port)
+BAUD_RATE = architecture.hardware.baud_rate
+TIMEOUT = architecture.hardware.timeout
+SERIAL_CONNECTION_DELAY = architecture.hardware.serial_connection_delay
 FLEX_SENSOR_RANGES = {
-    0: (25, 300),
-    1: (25, 300),
-    2: (25, 300),
-    3: (25, 300),
-    4: (25, 300),
+    k: tuple(v) for k, v in architecture.hardware.flex_sensor_ranges.items()
 }
+FLEX_SENSOR_DEFAULT_RANGE = tuple(architecture.hardware.flex_sensor_default_range)
+MIN_ACCEL_VALUE = architecture.hardware.min_accel_value
+MAX_ACCEL_VALUE = architecture.hardware.max_accel_value
+MIN_GYRO_VALUE = architecture.hardware.min_gyro_value
+MAX_GYRO_VALUE = architecture.hardware.max_gyro_value
+NUM_FLEX_SENSORS = architecture.hardware.num_flex_sensors
+NUM_IMU_AXES = architecture.hardware.num_imu_axes
+EXPECTED_SENSOR_COUNT = architecture.hardware.expected_sensor_count
 
-FLEX_SENSOR_DEFAULT_RANGE = (0, 1023)
-
-MIN_ACCEL_VALUE = -32768
-MAX_ACCEL_VALUE = 32767
-
-MIN_GYRO_VALUE = -32768
-MAX_GYRO_VALUE = 32767
-
-NUM_FLEX_SENSORS = 5
-NUM_IMU_AXES = 6
-EXPECTED_SENSOR_COUNT = 11
-
+# -- sensor-index aliases (computed from NUM_FLEX_SENSORS) ------------------
 ACCEL_X_IDX = NUM_FLEX_SENSORS
 ACCEL_Y_IDX = NUM_FLEX_SENSORS + 1
 ACCEL_Z_IDX = NUM_FLEX_SENSORS + 2
@@ -51,199 +58,218 @@ GYRO_X_IDX = NUM_FLEX_SENSORS + 3
 GYRO_Y_IDX = NUM_FLEX_SENSORS + 4
 GYRO_Z_IDX = NUM_FLEX_SENSORS + 5
 
-DETECT_GESTURE_MOTION = True
-MOTION_THRESHOLD = 0.02
-MOTION_DETECTION_MIN_DURATION = 5
-MOTION_DETECTION_SMOOTHING_WINDOW = 2
-SEQUENCE_OVERLAP = 0.1
-MOTION_PADDING_RATIO = 0.2
+# -- motion_detection -------------------------------------------------------
+DETECT_GESTURE_MOTION = architecture.motion_detection.detect_gesture_motion
+MOTION_THRESHOLD = architecture.motion_detection.motion_threshold
+MOTION_DETECTION_MIN_DURATION = architecture.motion_detection.motion_detection_min_duration
+MOTION_DETECTION_SMOOTHING_WINDOW = architecture.motion_detection.motion_detection_smoothing_window
+SEQUENCE_OVERLAP = architecture.motion_detection.sequence_overlap
+MOTION_PADDING_RATIO = architecture.motion_detection.motion_padding_ratio
+ENABLE_MADGWICK = architecture.motion_detection.enable_madgwick
 
-LSTM_UNITS = 64
-LSTM_LAYERS = 2
-DROPOUT_RATE = 0.4
-BATCH_SIZE = 32
-EPOCHS = 150
-LEARNING_RATE = 0.0005
-SEQUENCE_LENGTH = 20
+# -- model ------------------------------------------------------------------
+LSTM_UNITS = architecture.model.lstm_units
+LSTM_LAYERS = architecture.model.lstm_layers
+DROPOUT_RATE = architecture.model.dropout_rate
+MODEL_TYPE = architecture.model.model_type
+USE_BIDIRECTIONAL = architecture.model.use_bidirectional
+USE_ATTENTION = architecture.model.use_attention
+USE_BATCH_NORM = architecture.model.use_batch_norm
+USE_ENHANCED_FEATURES = architecture.model.use_enhanced_features
+INCLUDE_VELOCITY = architecture.model.include_velocity
+INCLUDE_ACCELERATION = architecture.model.include_acceleration
+INCLUDE_ROLLING_STATS = architecture.model.include_rolling_stats
+ROLLING_WINDOW_SIZE = architecture.model.rolling_window_size
 
-MODEL_TYPE = "enhanced"
-USE_BIDIRECTIONAL = True
-USE_ATTENTION = True
-USE_BATCH_NORM = True
-WEIGHT_DECAY = 5e-4
+# -- training ---------------------------------------------------------------
+BATCH_SIZE = architecture.training.batch_size
+EPOCHS = architecture.training.epochs
+LEARNING_RATE = architecture.training.learning_rate
+SEQUENCE_LENGTH = architecture.training.sequence_length
+WEIGHT_DECAY = architecture.training.weight_decay
+USE_WEIGHTED_LOSS = architecture.training.use_weighted_loss
+USE_LABEL_SMOOTHING = architecture.training.use_label_smoothing
+LABEL_SMOOTHING_FACTOR = architecture.training.label_smoothing_factor
+USE_COSINE_ANNEALING = architecture.training.use_cosine_annealing
+COSINE_T_0 = architecture.training.cosine_t_0
+COSINE_T_MULT = architecture.training.cosine_t_mult
+COSINE_ETA_MIN = architecture.training.cosine_eta_min
+LR_PLATEAU_FACTOR = architecture.training.lr_plateau_factor
+LR_PLATEAU_PATIENCE = architecture.training.lr_plateau_patience
+LR_PLATEAU_MIN = architecture.training.lr_plateau_min
+USE_WARMUP = architecture.training.use_warmup
+WARMUP_EPOCHS = architecture.training.warmup_epochs
+WARMUP_START_FACTOR = architecture.training.warmup_start_factor
+EARLY_STOPPING_PATIENCE = architecture.training.early_stopping_patience
+MIN_DELTA = architecture.training.min_delta
+GRADIENT_CLIP_VALUE = architecture.training.gradient_clip_value
+MIN_VALIDATION_SAMPLES_PER_CLASS = architecture.training.min_validation_samples_per_class
+USE_ENSEMBLE = architecture.training.use_ensemble
+ENSEMBLE_SIZE = architecture.training.ensemble_size
+RANDOM_STATE = architecture.training.random_state
+USE_TEST_SPLIT = architecture.training.use_test_split
+TEST_SIZE = architecture.training.test_size
+TEST_DATA_SPLIT_PERCENTAGE = architecture.training.test_data_split_percentage
+MIN_STRATIFY_SAMPLES = architecture.training.min_stratify_samples
+DEFAULT_VALIDATION_SIZE = architecture.training.default_validation_size
 
-USE_AUGMENTATION = True
-AUGMENTATION_FACTOR = 2
-AUGMENTATION_PROB = 0.7
-NUM_AUGMENTATIONS_PER_SAMPLE = 2
-TIME_WARP_SIGMA = 0.2
-TIME_WARP_KNOT = 4
-MAGNITUDE_WARP_SIGMA = 0.2
-MAGNITUDE_WARP_KNOT = 4
-NOISE_LEVEL = 0.01
-SCALE_RANGE = (0.9, 1.1)
-TIME_SHIFT_RANGE = 0.1
-ROTATION_MAX_ANGLE = 10
+# -- augmentation -----------------------------------------------------------
+USE_AUGMENTATION = architecture.augmentation.use_augmentation
+AUGMENTATION_FACTOR = architecture.augmentation.augmentation_factor
+AUGMENTATION_PROB = architecture.augmentation.augmentation_prob
+NUM_AUGMENTATIONS_PER_SAMPLE = architecture.augmentation.num_augmentations_per_sample
+TIME_WARP_SIGMA = architecture.augmentation.time_warp_sigma
+TIME_WARP_KNOT = architecture.augmentation.time_warp_knot
+MAGNITUDE_WARP_SIGMA = architecture.augmentation.magnitude_warp_sigma
+MAGNITUDE_WARP_KNOT = architecture.augmentation.magnitude_warp_knot
+NOISE_LEVEL = architecture.augmentation.noise_level
+SCALE_RANGE = tuple(architecture.augmentation.scale_range)
+TIME_SHIFT_RANGE = architecture.augmentation.time_shift_range
+ROTATION_MAX_ANGLE = architecture.augmentation.rotation_max_angle
 
-USE_ENHANCED_FEATURES = False
-INCLUDE_VELOCITY = True
-INCLUDE_ACCELERATION = True
-INCLUDE_ROLLING_STATS = True
-ROLLING_WINDOW_SIZE = 5
+# -- prediction -------------------------------------------------------------
+PREDICTION_INTERVAL = architecture.prediction.prediction_interval
+PREDICTION_MOTION_THRESHOLD = architecture.prediction.prediction_motion_threshold
+CONFIDENCE_THRESHOLD = architecture.prediction.confidence_threshold
+PREDICTION_CLASS_THRESHOLDS: dict[str, float] = dict(
+    architecture.prediction.prediction_class_thresholds
+)
+PREDICTION_CONSENSUS_FRAMES = architecture.prediction.prediction_consensus_frames
+PREDICTION_AVG_MOTION_THRESHOLD = architecture.prediction.prediction_avg_motion_threshold
+PREDICTION_MOTION_VARIANCE_MIN = architecture.prediction.prediction_motion_variance_min
+PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO = (
+    architecture.prediction.prediction_significant_motion_min_ratio
+)
+PREDICTION_MIN_CONFIDENCE_GAP = architecture.prediction.prediction_min_confidence_gap
+PREDICTION_DEBUG_MODE = architecture.prediction.prediction_debug_mode
+MIN_CONSECUTIVE_REST = architecture.prediction.min_consecutive_rest
+MIN_GESTURES_FOR_LLM = architecture.prediction.min_gestures_for_llm
+PREDICTION_SWITCH_CONSENSUS_FRAMES = (
+    architecture.prediction.prediction_switch_consensus_frames
+)
+PREDICTION_INITIAL_CONSENSUS_FRAMES = (
+    architecture.prediction.prediction_initial_consensus_frames
+)
+PREDICTION_KEEP_LAST_STABLE_FRAMES = (
+    architecture.prediction.prediction_keep_last_stable_frames
+)
+PREDICTION_UNCERTAIN_TOKEN = architecture.prediction.prediction_uncertain_token
+PREDICTION_REST_WEIGHT = architecture.prediction.prediction_rest_weight
+ENABLE_SEQUENCE_DECODER = architecture.prediction.enable_sequence_decoder
+SEQUENCE_DECODER_SWITCH_PENALTY = architecture.prediction.sequence_decoder_switch_penalty
+SEQUENCE_DECODER_REST_SWITCH_PENALTY = (
+    architecture.prediction.sequence_decoder_rest_switch_penalty
+)
 
-ENABLE_MADGWICK = True
+# -- normalization ----------------------------------------------------------
+NORM_MIN = architecture.normalization.norm_min
+NORM_MAX = architecture.normalization.norm_max
 
-USE_WEIGHTED_LOSS = True
-USE_LABEL_SMOOTHING = True
-LABEL_SMOOTHING_FACTOR = 0.1
+# -- general feature toggles -------------------------------------------------
+USE_TTS = architecture.general.use_tts
 
-USE_COSINE_ANNEALING = True
-COSINE_T_0 = 10
-COSINE_T_MULT = 2
-COSINE_ETA_MIN = 1e-6
-LR_PLATEAU_FACTOR = 0.5
-LR_PLATEAU_PATIENCE = 5
-LR_PLATEAU_MIN = 1e-6
+# -- llm --------------------------------------------------------------------
+USE_QWEN_LLM = architecture.llm.use_qwen_llm
+QWEN_MODEL_FILENAME = architecture.llm.qwen_model_filename
+QWEN_N_CTX = architecture.llm.qwen_n_ctx
+QWEN_N_GPU_LAYERS = architecture.llm.qwen_n_gpu_layers
+QWEN_N_BATCH = architecture.llm.qwen_n_batch
+QWEN_FORCE_GPU = architecture.llm.qwen_force_gpu
+QWEN_MAX_TOKENS = architecture.llm.qwen_max_tokens
+QWEN_INFERENCE_TEMPERATURE = architecture.llm.qwen_inference_temperature
 
-USE_WARMUP = True
-WARMUP_EPOCHS = 5
-WARMUP_START_FACTOR = 0.1
+# -- plot -------------------------------------------------------------------
+PLOT_FIGURE_WIDTH = architecture.plot.plot_figure_width
+PLOT_FIGURE_HEIGHT = architecture.plot.plot_figure_height
+PLOT_NUM_ROWS = architecture.plot.plot_num_rows
+PLOT_NUM_COLS = architecture.plot.plot_num_cols
+PLOT_FONT_SIZE = architecture.plot.plot_font_size
+PLOT_MARKER_SIZE = architecture.plot.plot_marker_size
+PLOT_GRID_ALPHA = architecture.plot.plot_grid_alpha
 
-EARLY_STOPPING_PATIENCE = 15
-MIN_DELTA = 1e-4
+# -- gui --------------------------------------------------------------------
+KEYBOARD_DEBOUNCE_DELAY = architecture.gui.keyboard_debounce_delay
+KEYBOARD_POLL_INTERVAL = architecture.gui.keyboard_poll_interval
+GUI_MIN_WIDTH = architecture.gui.gui_min_width
+GUI_MIN_HEIGHT = architecture.gui.gui_min_height
+GUI_PADDING = architecture.gui.gui_padding
+GUI_SMALL_PADDING = architecture.gui.gui_small_padding
+GUI_FONT_SIZE = architecture.gui.gui_font_size
+GUI_TITLE_FONT_SIZE = architecture.gui.gui_title_font_size
+GUI_REVIEW_BATCH_SIZE = architecture.gui.gui_review_batch_size
+GUI_PLOT_ROWS_CALC = architecture.gui.gui_plot_rows_calc
+GUI_PLOT_HEIGHT_MULTIPLIER = architecture.gui.gui_plot_height_multiplier
+GUI_PLOT_HSPACE = architecture.gui.gui_plot_hspace
+GUI_PLOT_WSPACE = architecture.gui.gui_plot_wspace
+GUI_PLOT_TOP = architecture.gui.gui_plot_top
+GUI_PLOT_BOTTOM = architecture.gui.gui_plot_bottom
+GUI_THREAD_SLEEP = architecture.gui.gui_thread_sleep
+DATA_MANAGER_WINDOW_WIDTH = architecture.gui.data_manager_window_width
+DATA_MANAGER_WINDOW_HEIGHT = architecture.gui.data_manager_window_height
+DATA_MANAGER_MIN_WIDTH = architecture.gui.data_manager_min_width
+DATA_MANAGER_MIN_HEIGHT = architecture.gui.data_manager_min_height
+GESTURES_EDITOR_DIALOG_WIDTH = architecture.gui.gestures_editor_dialog_width
+GESTURES_EDITOR_DIALOG_HEIGHT = architecture.gui.gestures_editor_dialog_height
+DEFAULT_UI_LANGUAGE = architecture.gui.default_ui_language
+SUPPORTED_UI_LANGUAGES = tuple(architecture.gui.supported_ui_languages)
 
-GRADIENT_CLIP_VALUE = 1.0
+# -- evaluation -------------------------------------------------------------
+EVALUATION_DPI = architecture.evaluation.evaluation_dpi
+CONFUSION_MATRIX_FIGSIZE = tuple(architecture.evaluation.confusion_matrix_figsize)
+ROC_CURVE_FIGSIZE = tuple(architecture.evaluation.roc_curve_figsize)
+EVALUATION_CLASS_WEIGHT_EPSILON = architecture.evaluation.evaluation_class_weight_epsilon
 
-MIN_VALIDATION_SAMPLES_PER_CLASS = 5
-
-USE_ENSEMBLE = False
-ENSEMBLE_SIZE = 3
-
-PREDICTION_INTERVAL = 0.08
-
-RANDOM_STATE = 42
-USE_TEST_SPLIT = False
-TEST_SIZE = 0.1
-TEST_DATA_SPLIT_PERCENTAGE = 0.1
-MIN_STRATIFY_SAMPLES = 2
-DEFAULT_VALIDATION_SIZE = 0.1
-
+# ===========================================================================
+# Runtime-derived paths (computed at import time)
+# ===========================================================================
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(CONFIG_DIR)
 RAW_DATA_DIR = os.path.join(BASE_DIR, "data", "raw")
 PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
 TEST_DATA_DIR = os.path.join(BASE_DIR, "data", "test")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
+LOGS_OUTPUT_DIR = os.path.join(BASE_DIR, "logs")
 
-PREDICTION_MOTION_THRESHOLD = 1000
-CONFIDENCE_THRESHOLD = 0.74
-PREDICTION_CLASS_THRESHOLDS: dict[str, float] = {"DEFAULT": CONFIDENCE_THRESHOLD}
-PREDICTION_CONSENSUS_FRAMES = 5
-PREDICTION_AVG_MOTION_THRESHOLD = 600
-PREDICTION_MOTION_VARIANCE_MIN = 150
-PREDICTION_SIGNIFICANT_MOTION_MIN_RATIO = 0.35
-PREDICTION_MIN_CONFIDENCE_GAP = 0.15
-PREDICTION_DEBUG_MODE = False
-MIN_CONSECUTIVE_REST = 5
-MIN_GESTURES_FOR_LLM = 2
-PREDICTION_SWITCH_CONSENSUS_FRAMES = 3
-PREDICTION_INITIAL_CONSENSUS_FRAMES = 2
-PREDICTION_KEEP_LAST_STABLE_FRAMES = 2
-PREDICTION_UNCERTAIN_TOKEN = "UNKNOWN"
-PREDICTION_REST_WEIGHT = 0.75
-ENABLE_SEQUENCE_DECODER = False
-SEQUENCE_DECODER_SWITCH_PENALTY = 0.0
-SEQUENCE_DECODER_REST_SWITCH_PENALTY = 0.0
-
-NORM_MIN = 0.0
-NORM_MAX = 1.0
+QWEN_MODEL_PATH = os.path.join(MODELS_DIR, "llm", QWEN_MODEL_FILENAME)
 
 MIN_FLEX_VALUE = min(v[0] for v in FLEX_SENSOR_RANGES.values())
 MAX_FLEX_VALUE = max(v[1] for v in FLEX_SENSOR_RANGES.values())
 
-USE_TTS = True
-
-USE_QWEN_LLM = True
-QWEN_MODEL_FILENAME = "qwen2.5-7b-instruct-q6_k-00001-of-00002.gguf"
-QWEN_MODEL_PATH = os.path.join(MODELS_DIR, "llm", QWEN_MODEL_FILENAME)
-QWEN_N_CTX = 2048
-QWEN_N_GPU_LAYERS = -1
-QWEN_N_BATCH = 512
-QWEN_FORCE_GPU = True
-QWEN_MAX_TOKENS = 64
-QWEN_INFERENCE_TEMPERATURE = 0.25
+# ===========================================================================
+# Environment-variable-derived values (loaded at import time)
+# ===========================================================================
 
 # ── Remote LLM backend (OpenAI-compatible) ─────────────────────────────────
-LLM_BACKEND = os.environ.get("LLM_BACKEND", "local")  # "local" or "remote"
-LLM_REMOTE_URL = os.environ.get("LLM_REMOTE_URL", "https://api.deepseek.com")
+LLM_BACKEND = os.environ.get("LLM_BACKEND", architecture.llm.llm_backend)
+LLM_REMOTE_URL = os.environ.get("LLM_REMOTE_URL", architecture.llm.llm_remote_url)
 LLM_REMOTE_API_KEY = os.environ.get(
-    "LLM_REMOTE_API_KEY", os.environ.get("DEEPSEEK_API_KEY", "")
+    "LLM_REMOTE_API_KEY",
+    os.environ.get("DEEPSEEK_API_KEY", architecture.llm.llm_remote_api_key),
 )
-LLM_REMOTE_MODEL = os.environ.get("LLM_REMOTE_MODEL", "deepseek-v4-flash")
-LLM_REMOTE_TIMEOUT = 15.0
+LLM_REMOTE_MODEL = os.environ.get(
+    "LLM_REMOTE_MODEL", architecture.llm.llm_remote_model
+)
+LLM_REMOTE_TIMEOUT = architecture.llm.llm_remote_timeout
 LLM_REMOTE_FORMAT = os.environ.get(
-    "LLM_REMOTE_FORMAT", "chat"
-)  # "chat" (OpenAI/Nous) or "completions" (legacy)
-LLM_REMOTE_MAX_TOKENS = int(os.environ.get("LLM_REMOTE_MAX_TOKENS", "1024"))
+    "LLM_REMOTE_FORMAT", architecture.llm.llm_remote_format
+)
+LLM_REMOTE_MAX_TOKENS = int(
+    os.environ.get("LLM_REMOTE_MAX_TOKENS", str(architecture.llm.llm_remote_max_tokens))
+)
 
-PLOT_FIGURE_WIDTH = 12
-PLOT_FIGURE_HEIGHT = 10
-PLOT_NUM_ROWS = 3
-PLOT_NUM_COLS = 1
-PLOT_FONT_SIZE = 14
-PLOT_MARKER_SIZE = 2
-PLOT_GRID_ALPHA = 0.3
-
-KEYBOARD_DEBOUNCE_DELAY = 0.3
-KEYBOARD_POLL_INTERVAL = 0.05
-
-GUI_MIN_WIDTH = 900
-GUI_MIN_HEIGHT = 600
-GUI_PADDING = 20
-GUI_SMALL_PADDING = 10
-GUI_FONT_SIZE = 12
-GUI_TITLE_FONT_SIZE = 14
-GUI_REVIEW_BATCH_SIZE = 4
-GUI_PLOT_ROWS_CALC = 14
-GUI_PLOT_HEIGHT_MULTIPLIER = 3
-GUI_PLOT_HSPACE = 0.45
-GUI_PLOT_WSPACE = 0.30
-GUI_PLOT_TOP = 0.95
-GUI_PLOT_BOTTOM = 0.05
-GUI_THREAD_SLEEP = 0.01
-
-# Data Manager window dimensions
-DATA_MANAGER_WINDOW_WIDTH = 1560
-DATA_MANAGER_WINDOW_HEIGHT = 940
-DATA_MANAGER_MIN_WIDTH = 1220
-DATA_MANAGER_MIN_HEIGHT = 760
-
-# Gestures Editor dialog dimensions
-GESTURES_EDITOR_DIALOG_WIDTH = 600
-GESTURES_EDITOR_DIALOG_HEIGHT = 420
-
-DEFAULT_UI_LANGUAGE = "tr"
-SUPPORTED_UI_LANGUAGES = ("tr", "en")
-
-EVALUATION_DPI = 300
-CONFUSION_MATRIX_FIGSIZE = (10, 8)
-ROC_CURVE_FIGSIZE = (10, 8)
-EVALUATION_CLASS_WEIGHT_EPSILON = 1e-6
-
-
-import logging
-from datetime import datetime
-
-LOGS_OUTPUT_DIR = os.path.join(BASE_DIR, "logs")
-
+# ===========================================================================
+# Logging constants (depend on the ``logging`` module)
+# ===========================================================================
 CONSOLE_LOG_LEVEL = logging.INFO
 FILE_LOG_LEVEL = logging.DEBUG
-
 CONSOLE_LOG_FORMAT = "%(levelname)s - %(message)s"
 FILE_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
+# ===========================================================================
+# Logging setup helper
+# ===========================================================================
 def setup_logging(script_name: str | None = None) -> None:
     """
     Configure logging with dual handlers:

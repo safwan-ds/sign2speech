@@ -7,7 +7,8 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from config.config import MODELS_DIR, ENSEMBLE_SIZE
+from config.architecture import architecture
+from config.config import MODELS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -145,14 +146,14 @@ def save_lstm_model(
         f.write(f"{'=' * 60}\n")
         f.write(f"Folder: {timestamp_str}\n")
         if ensemble_idx is not None:
-            f.write(f"Ensemble: Model {ensemble_idx + 1} of {ENSEMBLE_SIZE}\n")
+            f.write(f"Ensemble: Model {ensemble_idx + 1} of {architecture.training.ensemble_size}\n")
         f.write(f"Model Type: PyTorch LSTM\n")
         f.write(f"Device: {device}\n")
         for key, value in metadata.items():
             f.write(f"{key}: {value}\n")
 
     logger.info(
-        f"MODEL SAVED {f'(Ensemble {ensemble_idx + 1}/{ENSEMBLE_SIZE})' if ensemble_idx is not None else ''}"
+        f"MODEL SAVED {f'(Ensemble {ensemble_idx + 1}/{architecture.training.ensemble_size})' if ensemble_idx is not None else ''}"
     )
     logger.info(f"Folder:        {model_dir}")
     logger.info(f"Model:         {model_path}")

@@ -7,26 +7,8 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from config.config import (
-    MODELS_DIR,
-    RANDOM_STATE,
-    ENSEMBLE_SIZE,
-    LSTM_UNITS,
-    LSTM_LAYERS,
-    DROPOUT_RATE,
-    EPOCHS,
-    BATCH_SIZE,
-    MODEL_TYPE,
-    USE_BIDIRECTIONAL,
-    USE_ATTENTION,
-    USE_BATCH_NORM,
-    USE_AUGMENTATION,
-    USE_WEIGHTED_LOSS,
-    USE_LABEL_SMOOTHING,
-    USE_COSINE_ANNEALING,
-    LEARNING_RATE,
-    WEIGHT_DECAY,
-)
+from config.architecture import architecture
+from config.config import MODELS_DIR
 from .model_evaluation import evaluate_lstm_model
 from .model_training import train_lstm_model
 from .model_utils import save_lstm_model
@@ -51,7 +33,7 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
     Returns:
         Tuple of (ensemble_models, label_encoder, mean, std)
     """
-    logger.info(f"TRAINING ENSEMBLE OF {ENSEMBLE_SIZE} MODELS")
+    logger.info(f"TRAINING ENSEMBLE OF {architecture.training.ensemble_size} MODELS")
 
     all_accuracies = []
     ensemble_models = []
@@ -64,18 +46,18 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
     model_dir = os.path.join(MODELS_DIR, f"ensemble_{timestamp}")
     os.makedirs(model_dir, exist_ok=True)
 
-    total_ensemble_epochs = ENSEMBLE_SIZE * EPOCHS
+    total_ensemble_epochs = architecture.training.ensemble_size * architecture.training.epochs
 
-    for ensemble_idx in range(ENSEMBLE_SIZE):
+    for ensemble_idx in range(architecture.training.ensemble_size):
         if cancel_event is not None and cancel_event.is_set():
             logger.info("Ensemble training cancelled between models.")
             break
 
-        logger.info(f"Training Model {ensemble_idx + 1}/{ENSEMBLE_SIZE}")
+        logger.info(f"Training Model {ensemble_idx + 1}/{architecture.training.ensemble_size}")
 
         # Use a different random seed for each ensemble member
         # so each model learns different patterns from the data
-        ensemble_seed = RANDOM_STATE + ensemble_idx
+        ensemble_seed = architecture.training.random_state + ensemble_idx
         np.random.seed(ensemble_seed)
         torch.manual_seed(ensemble_seed)
         if torch.cuda.is_available():
@@ -84,7 +66,7 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
         def wrapped_callback(epoch, total, t_loss, t_acc, v_loss, v_acc, lr):
             if epoch_callback:
                 # Offset epoch to show global progress across the whole ensemble
-                global_epoch = ensemble_idx * EPOCHS + epoch
+                global_epoch = ensemble_idx * architecture.training.epochs + epoch
                 epoch_callback(
                     global_epoch,
                     total_ensemble_epochs,
@@ -142,7 +124,7 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
             "classes": ", ".join(label_encoder.classes_),
             "val_accuracy": f"{val_accuracy:.4f}",
             "ensemble_idx": ensemble_idx + 1,
-            "ensemble_size": ENSEMBLE_SIZE,
+            "ensemble_size": architecture.training.ensemble_size,
             "random_seed": ensemble_seed,
         }
 
@@ -154,21 +136,21 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
                 "total_sequences": len(X),
                 "sequence_length": X.shape[1],
                 "num_features": X.shape[2],
-                "lstm_units": LSTM_UNITS,
-                "lstm_layers": LSTM_LAYERS,
-                "dropout_rate": DROPOUT_RATE,
-                "epochs": EPOCHS,
-                "batch_size": BATCH_SIZE,
-                "model_type": MODEL_TYPE,
-                "bidirectional": USE_BIDIRECTIONAL,
-                "attention": USE_ATTENTION,
-                "batch_norm": USE_BATCH_NORM,
-                "data_augmentation": USE_AUGMENTATION,
-                "weighted_loss": USE_WEIGHTED_LOSS,
-                "label_smoothing": USE_LABEL_SMOOTHING,
-                "cosine_annealing": USE_COSINE_ANNEALING,
-                "learning_rate": LEARNING_RATE,
-                "weight_decay": WEIGHT_DECAY,
+                "lstm_units": architecture.model.lstm_units,
+                "lstm_layers": architecture.model.lstm_layers,
+                "dropout_rate": architecture.model.dropout_rate,
+                "epochs": architecture.training.epochs,
+                "batch_size": architecture.training.batch_size,
+                "model_type": architecture.model.model_type,
+                "bidirectional": architecture.model.use_bidirectional,
+                "attention": architecture.model.use_attention,
+                "batch_norm": architecture.model.use_batch_norm,
+                "data_augmentation": architecture.augmentation.use_augmentation,
+                "weighted_loss": architecture.training.use_weighted_loss,
+                "label_smoothing": architecture.training.use_label_smoothing,
+                "cosine_annealing": architecture.training.use_cosine_annealing,
+                "learning_rate": architecture.training.learning_rate,
+                "weight_decay": architecture.training.weight_decay,
             }
         )
 

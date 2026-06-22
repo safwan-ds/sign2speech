@@ -14,19 +14,11 @@ import os
 import numpy as np
 import pandas as pd
 
+from config.architecture import architecture
 from config.config import (
-    DETECT_GESTURE_MOTION,
-    INCLUDE_ACCELERATION,
-    INCLUDE_ROLLING_STATS,
-    INCLUDE_VELOCITY,
-    RAW_DATA_DIR,
     PROCESSED_DIR,
-    RANDOM_STATE,
-    SEQUENCE_LENGTH,
+    RAW_DATA_DIR,
     TEST_DATA_DIR,
-    TEST_DATA_SPLIT_PERCENTAGE,
-    USE_ENHANCED_FEATURES,
-    USE_TEST_SPLIT,
     setup_logging,
 )
 from utils.data_utils import (
@@ -160,7 +152,7 @@ def clear_previous_sequence_files() -> None:
 def prepare_lstm_dataset(
     dataframes: list[pd.DataFrame],
     gesture_label: str,
-    sequence_length: int = SEQUENCE_LENGTH,
+    sequence_length: int = architecture.training.sequence_length,
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """Prepare dataset for LSTM training with optional enhanced features.
 
@@ -172,13 +164,13 @@ def prepare_lstm_dataset(
     all_labels: list[str] = []
 
     for df in dataframes:
-        if USE_ENHANCED_FEATURES:
+        if architecture.model.use_enhanced_features:
             sequences = segment_sequences_with_enhanced_features(
                 df,
                 sequence_length,
                 use_enhanced_features=True,
-                include_derivatives=INCLUDE_VELOCITY or INCLUDE_ACCELERATION,
-                include_stats=INCLUDE_ROLLING_STATS,
+                include_derivatives=architecture.model.include_velocity or architecture.model.include_acceleration,
+                include_stats=architecture.model.include_rolling_stats,
             )
         else:
             sequences = segment_sequences(df, sequence_length)
@@ -242,27 +234,27 @@ def main(*, configure_logging: bool = True) -> None:
         )
 
     logger.info("Total samples: %s", total_samples)
-    if USE_TEST_SPLIT:
+    if architecture.training.use_test_split:
         logger.info(
             "Data split: ~%d%% training, ~%d%% test (at recording-file level)",
-            int((1 - TEST_DATA_SPLIT_PERCENTAGE) * 100),
-            int(TEST_DATA_SPLIT_PERCENTAGE * 100),
+            int((1 - architecture.training.test_data_split_percentage) * 100),
+            int(architecture.training.test_data_split_percentage * 100),
         )
     else:
         logger.info("Test split: DISABLED — all data will be used for training")
 
-    if DETECT_GESTURE_MOTION:
+    if architecture.motion_detection.detect_gesture_motion:
         logger.info("Motion detection: ENABLED")
     else:
         logger.info("Motion detection: DISABLED")
 
-    if USE_ENHANCED_FEATURES:
+    if architecture.model.use_enhanced_features:
         features_list = ["Base sensor values"]
-        if INCLUDE_VELOCITY:
+        if architecture.model.include_velocity:
             features_list.append("Velocity (1st derivative)")
-        if INCLUDE_ACCELERATION:
+        if architecture.model.include_acceleration:
             features_list.append("Acceleration (2nd derivative)")
-        if INCLUDE_ROLLING_STATS:
+        if architecture.model.include_rolling_stats:
             features_list.append("Rolling statistics")
         logger.info("Enhanced features: ENABLED — %s", ", ".join(features_list))
     else:
@@ -275,14 +267,14 @@ def main(*, configure_logging: bool = True) -> None:
         logger.info("Processing gesture: '%s'", gesture_label)
 
         n_files = len(dataframes)
-        rng = np.random.RandomState(RANDOM_STATE)
+        rng = np.random.RandomState(architecture.training.random_state)
         shuffled_indices = rng.permutation(n_files)
 
-        if not USE_TEST_SPLIT:
+        if not architecture.training.use_test_split:
             train_dfs = dataframes
             test_dfs: list[pd.DataFrame] = []
         elif n_files >= 2:
-            split_idx = max(1, int(n_files * (1 - TEST_DATA_SPLIT_PERCENTAGE)))
+            split_idx = max(1, int(n_files * (1 - architecture.training.test_data_split_percentage)))
             if split_idx >= n_files:
                 split_idx = n_files - 1
             train_dfs = [dataframes[i] for i in shuffled_indices[:split_idx]]

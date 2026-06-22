@@ -4,23 +4,8 @@ from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
-from config.config import (
-    USE_QWEN_LLM,
-    QWEN_MODEL_PATH,
-    QWEN_N_CTX,
-    QWEN_N_GPU_LAYERS,
-    QWEN_N_BATCH,
-    QWEN_FORCE_GPU,
-    QWEN_MAX_TOKENS,
-    QWEN_INFERENCE_TEMPERATURE,
-    LLM_BACKEND,
-    LLM_REMOTE_URL,
-    LLM_REMOTE_API_KEY,
-    LLM_REMOTE_MODEL,
-    LLM_REMOTE_TIMEOUT,
-    LLM_REMOTE_FORMAT,
-    LLM_REMOTE_MAX_TOKENS,
-)
+from config.architecture import architecture
+from config.config import QWEN_MODEL_PATH
 
 
 def create_llm_backend() -> tuple[object | None, dict[str, str]]:
@@ -34,13 +19,13 @@ def create_llm_backend() -> tuple[object | None, dict[str, str]]:
     display in the GUI backend badge.
     """
     global _remote_backend_active
-    if not USE_QWEN_LLM:
+    if not architecture.llm.use_qwen_llm:
         _remote_backend_active = False
         return None, {"type": "disabled"}
 
-    backend = LLM_BACKEND.strip().lower()
+    backend = architecture.llm.llm_backend.strip().lower()
     if backend not in {"local", "remote"}:
-        logger.warning("Unknown LLM_BACKEND=%r; falling back to local", LLM_BACKEND)
+        logger.warning("Unknown architecture.llm.llm_backend=%r; falling back to local", architecture.llm.llm_backend)
         backend = "local"
 
     if backend == "remote":
@@ -58,9 +43,9 @@ def _make_local_llm() -> tuple[object | None, dict[str, str]]:
 
 
 def _make_remote_llm() -> tuple[object | None, dict[str, str]]:
-    url = LLM_REMOTE_URL
-    api_key = LLM_REMOTE_API_KEY
-    model = LLM_REMOTE_MODEL
+    url = architecture.llm.llm_remote_url
+    api_key = architecture.llm.llm_remote_api_key
+    model = architecture.llm.llm_remote_model
 
     try:
         from openai import OpenAI
@@ -85,8 +70,8 @@ def _make_remote_llm() -> tuple[object | None, dict[str, str]]:
                 stream=False,
                 reasoning_effort="high",
                 extra_body={"thinking": {"type": "enabled"}},
-                temperature=kwargs.get("temperature", QWEN_INFERENCE_TEMPERATURE),
-                max_tokens=kwargs.get("max_tokens", LLM_REMOTE_MAX_TOKENS)
+                temperature=kwargs.get("temperature", architecture.llm.qwen_inference_temperature),
+                max_tokens=kwargs.get("max_tokens", architecture.llm.llm_remote_max_tokens)
             )
             content = response.choices[0].message.content
             return {"choices": [{"text": content}]}
@@ -98,15 +83,15 @@ def _make_remote_llm() -> tuple[object | None, dict[str, str]]:
 
 
 def load_qwen_model():
-    if not USE_QWEN_LLM:
+    if not architecture.llm.use_qwen_llm:
         return None
     if not os.path.exists(QWEN_MODEL_PATH):
         logger.warning(f"Qwen model not found at {QWEN_MODEL_PATH}")
         return None
-    if QWEN_FORCE_GPU and QWEN_N_GPU_LAYERS == 0:
+    if architecture.llm.qwen_force_gpu and architecture.llm.qwen_n_gpu_layers == 0:
         raise ValueError(
-            "QWEN_FORCE_GPU is enabled but QWEN_N_GPU_LAYERS is 0. "
-            "Set QWEN_N_GPU_LAYERS to -1 (all) or a positive value."
+            "architecture.llm.qwen_force_gpu is enabled but architecture.llm.qwen_n_gpu_layers is 0. "
+            "Set architecture.llm.qwen_n_gpu_layers to -1 (all) or a positive value."
         )
     try:
         from llama_cpp import Llama
@@ -118,9 +103,9 @@ def load_qwen_model():
         return None
     return Llama(
         model_path=QWEN_MODEL_PATH,
-        n_ctx=QWEN_N_CTX,
-        n_gpu_layers=QWEN_N_GPU_LAYERS,
-        n_batch=QWEN_N_BATCH,
+        n_ctx=architecture.llm.qwen_n_ctx,
+        n_gpu_layers=architecture.llm.qwen_n_gpu_layers,
+        n_batch=architecture.llm.qwen_n_batch,
         flash_attn=True,
         verbose=False,
     )
@@ -230,8 +215,8 @@ def generate_reply(
         result = llm(
             prompt,
             system_prompt=system_prompt,
-            max_tokens=LLM_REMOTE_MAX_TOKENS,
-            temperature=QWEN_INFERENCE_TEMPERATURE,
+            max_tokens=architecture.llm.llm_remote_max_tokens,
+            temperature=architecture.llm.qwen_inference_temperature,
         )
         if isinstance(result, dict) and "choices" in result:
             text = result["choices"][0]["text"].strip()
@@ -261,7 +246,7 @@ def generate_reply(
     try:
         result = llm(
             prompt,
-            max_tokens=QWEN_MAX_TOKENS,
+            max_tokens=architecture.llm.qwen_max_tokens,
             temperature=0.1,
             top_p=0.5,
             stop=["<|im_end|>"],
