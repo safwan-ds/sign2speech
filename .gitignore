@@ -27,5 +27,4 @@ launcher.cpp
 *.ttf
 *.rc
 
-gestures.json
 /graphify-out/

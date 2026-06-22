@@ -1,0 +1,178 @@
+[
+  {
+    "name": "REST",
+    "translation": ""
+  },
+  {
+    "name": "hello",
+    "translation": "merhaba"
+  },
+  {
+    "name": "me",
+    "translation": "ben"
+  },
+  {
+    "name": "mine",
+    "translation": "benim"
+  },
+  {
+    "name": "you",
+    "translation": "sen"
+  },
+  {
+    "name": "project",
+    "translation": "proje"
+  },
+  {
+    "name": "sign_language",
+    "translation": "işaret dili"
+  },
+  {
+    "name": "teacher",
+    "translation": "hoca"
+  },
+  {
+    "name": "student",
+    "translation": "öğrenci"
+  },
+  {
+    "name": "thank_you",
+    "translation": "teşekkür ederim"
+  },
+  {
+    "name": "welcome",
+    "translation": "hoş geldiniz"
+  },
+  {
+    "name": "glove",
+    "translation": "eldiven"
+  },
+  {
+    "name": "good",
+    "translation": "iyi"
+  },
+  {
+    "name": "bad",
+    "translation": "kötü"
+  },
+  {
+    "name": "wolf",
+    "translation": "kurt"
+  },
+  {
+    "name": "ok",
+    "translation": "tamam"
+  },
+  {
+    "name": "zero",
+    "translation": "sıfır"
+  },
+  {
+    "name": "one",
+    "translation": "bir"
+  },
+  {
+    "name": "two",
+    "translation": "iki"
+  },
+  {
+    "name": "three",
+    "translation": "üç"
+  },
+  {
+    "name": "four",
+    "translation": "dört"
+  },
+  {
+    "name": "five",
+    "translation": "beş"
+  },
+  {
+    "name": "six",
+    "translation": "altı"
+  },
+  {
+    "name": "seven",
+    "translation": "yedi"
+  },
+  {
+    "name": "eight",
+    "translation": "sekiz"
+  },
+  {
+    "name": "nine",
+    "translation": "dokuz"
+  },
+  {
+    "name": "ten",
+    "translation": "on"
+  },
+  {
+    "name": "what",
+    "translation": "ne"
+  },
+  {
+    "name": "where",
+    "translation": "nerede"
+  },
+  {
+    "name": "why",
+    "translation": "neden"
+  },
+  {
+    "name": "how",
+    "translation": "nasıl"
+  },
+  {
+    "name": "do",
+    "translation": "yapmak"
+  },
+  {
+    "name": "want",
+    "translation": "istemek"
+  },
+  {
+    "name": "go",
+    "translation": "gitmek"
+  },
+  {
+    "name": "come",
+    "translation": "gelmek"
+  },
+  {
+    "name": "help",
+    "translation": "yardım etmek"
+  },
+  {
+    "name": "finish",
+    "translation": "bitirmek"
+  },
+  {
+    "name": "eat",
+    "translation": "yemek"
+  },
+  {
+    "name": "drink",
+    "translation": "içmek"
+  },
+  {
+    "name": "name",
+    "translation": "isim"
+  },
+  {
+    "name": "university",
+    "translation": "üniversite"
+  },
+  {
+    "name": "yes",
+    "translation": "evet"
+  },
+  {
+    "name": "no",
+    "translation": "hayır"
+  },
+  {
+    "name": "deaf",
+    "translation": "sağır"
+  }
+]
