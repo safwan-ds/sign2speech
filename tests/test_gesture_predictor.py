@@ -2,20 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
+import pytest
 import torch
 
 from core.inference.gesture_predictor import _canonical_sensor_name
 from core.inference.gesture_predictor import _normalize_class_thresholds
-
-# Module-level constants from gesture_predictor for testing
-_SENSOR_NAME_ALIASES = {
-    "accelx": "accelX", "accel_x": "accelX", "accelerometer_x": "accelX",
-    "accely": "accelY", "accel_y": "accelY", "accelerometer_y": "accelY",
-    "accelz": "accelZ", "accel_z": "accelZ", "accelerometer_z": "accelZ",
-    "gyrox": "gyroX", "gyro_x": "gyroX", "gyroscope_x": "gyroX",
-    "gyroy": "gyroY", "gyro_y": "gyroY", "gyroscope_y": "gyroY",
-    "gyroz": "gyroZ", "gyro_z": "gyroZ", "gyroscope_z": "gyroZ",
-}
+from core.inference.gesture_predictor import LSTMGesturePredictor
 
 
 class TestCanonicalSensorName:
@@ -46,8 +40,7 @@ class TestCanonicalSensorName:
         assert _canonical_sensor_name("accel-x") == "accelX"
 
     def test_unknown_name_passes_through(self) -> None:
-        result = _canonical_sensor_name("temperature")
-        assert result == "temperature"
+        assert _canonical_sensor_name("temperature") == "temperature"
 
     def test_strips_whitespace(self) -> None:
         assert _canonical_sensor_name("  flex0  ") == "flex0"
@@ -57,14 +50,12 @@ class TestNormalizeClassThresholds:
     """Tests for _normalize_class_thresholds()."""
 
     def test_normalizes_string_keys(self) -> None:
-        thresholds = {"rest": 0.8, "A": 0.9}
-        result = _normalize_class_thresholds(thresholds)
+        result = _normalize_class_thresholds({"rest": 0.8, "A": 0.9})
         assert result["REST"] == 0.8
         assert result["A"] == 0.9
 
     def test_handles_invalid_values(self) -> None:
-        thresholds = {"A": "not_a_number", "B": 0.9}
-        result = _normalize_class_thresholds(thresholds)
+        result = _normalize_class_thresholds({"A": "not_a_number", "B": 0.9})
         assert "A" not in result
         assert result["B"] == 0.9
 
@@ -77,63 +68,28 @@ class TestNormalizeClassThresholds:
         assert _normalize_class_thresholds({}) == {}
 
 
+@pytest.fixture
+def predictor(synthetic_model_checkpoint: str) -> LSTMGesturePredictor:
+    """LSTMGesturePredictor using the synthetic checkpoint with encoder/norm alongside."""
+    model_path = os.path.join(synthetic_model_checkpoint, "model.pth")
+    return LSTMGesturePredictor(model_path=model_path, device=torch.device("cpu"))
+
+
 class TestLSTMGesturePredictor:
-    """Tests for LSTMGesturePredictor class with monkeypatched paths."""
+    """Tests for LSTMGesturePredictor class."""
 
-    def test_init_with_synthetic_checkpoint(
-        self, monkeypatch, synthetic_model_checkpoint: str, synthetic_encoder: str
-    ) -> None:
-        import os
-        # Monkeypatch paths before import
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_init_with_synthetic_checkpoint(self, predictor: LSTMGesturePredictor) -> None:
         assert predictor is not None
         assert hasattr(predictor, "model")
         assert predictor.use_onnx is False
 
-    def test_sanitize_sensor_dict(self, monkeypatch, synthetic_model_checkpoint: str) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_sanitize_sensor_dict(self, predictor: LSTMGesturePredictor) -> None:
         dirty: dict[str, float] = {"accel_x": 1.0, "gyro_Y": 2.0, "flex_0": 100.0}
         clean = predictor._sanitize_sensor_dict(dirty)
-        assert "accelX" in clean
-        assert "gyroY" in clean
         assert clean["accelX"] == 1.0
         assert clean["gyroY"] == 2.0
 
-    def test_add_sensor_dict_buffers(self, monkeypatch, synthetic_model_checkpoint: str) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_add_sensor_dict_buffers(self, predictor: LSTMGesturePredictor) -> None:
         sample: dict[str, float] = {
             f"flex{i}": float(150 + i) for i in range(5)
         }
@@ -141,79 +97,22 @@ class TestLSTMGesturePredictor:
             sample[f"accel{axis}"] = val
         for axis, val in zip(["X", "Y", "Z"], [10.0, 20.0, 30.0], strict=True):
             sample[f"gyro{axis}"] = val
-
         predictor.add_sensor_dict(sample)
         assert len(predictor.buffer) == 1
 
-    def test_can_predict_requires_full_buffer(
-        self, monkeypatch, synthetic_model_checkpoint: str
-    ) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_can_predict_requires_full_buffer(self, predictor: LSTMGesturePredictor) -> None:
         assert predictor.can_predict() is False
 
-    def test_confidence_threshold_for_known_class(
-        self, monkeypatch, synthetic_model_checkpoint: str
-    ) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_confidence_threshold_for_known_class(self, predictor: LSTMGesturePredictor) -> None:
         threshold = predictor._confidence_threshold_for("REST")
         assert isinstance(threshold, float)
         assert 0.0 <= threshold <= 1.0
 
-    def test_confidence_threshold_unknown_class(
-        self, monkeypatch, synthetic_model_checkpoint: str
-    ) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_confidence_threshold_unknown_class(self, predictor: LSTMGesturePredictor) -> None:
         threshold = predictor._confidence_threshold_for("NONEXISTENT_GESTURE")
         assert isinstance(threshold, float)
 
-    def test_probability_result_shape(
-        self, monkeypatch, synthetic_model_checkpoint: str
-    ) -> None:
-        import os
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODEL_PATH",
-            os.path.join(synthetic_model_checkpoint, "model.pth"),
-        )
-        monkeypatch.setattr(
-            "core.inference.gesture_predictor.MODELS_DIR",
-            os.path.dirname(synthetic_model_checkpoint),
-        )
-        from core.inference.gesture_predictor import LSTMGesturePredictor
-
-        predictor = LSTMGesturePredictor(device=torch.device("cpu"))
+    def test_probability_result_shape(self, predictor: LSTMGesturePredictor) -> None:
         n_classes = len(predictor.classes)
         probs = torch.rand(1, n_classes, device=torch.device("cpu"))
         probs = probs / probs.sum(dim=1, keepdim=True)
