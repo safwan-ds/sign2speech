@@ -14,10 +14,25 @@ from pathlib import Path
 from config.architecture import architecture
 
 # ---------------------------------------------------------------------------
-# Load .env file (if present) — runs before any environment-dependent constant
+# Load .env file (if present) — idempotent, deferred until init_config()
 # ---------------------------------------------------------------------------
+_config_initialized: bool = False
 _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
-if _ENV_PATH.is_file():
+
+
+def init_config() -> None:
+    """Load ``.env`` file into ``os.environ`` (idempotent, called once).
+
+    Safe to call multiple times — subsequent calls are no-ops.  Called
+    automatically at module import to preserve backward compatibility.
+    """
+    global _config_initialized
+    if _config_initialized:
+        return
+    _config_initialized = True
+
+    if not _ENV_PATH.is_file():
+        return
     with open(_ENV_PATH, encoding="utf-8") as _fh:
         for _line in _fh:
             _line = _line.strip()
@@ -28,6 +43,10 @@ if _ENV_PATH.is_file():
             val = val.strip().strip('"').strip("'")
             if key and key not in os.environ:
                 os.environ[key] = val
+
+
+# Backward-compatible: run at import time so existing consumers don't break.
+init_config()
 
 # ===========================================================================
 # Architecture constants — re-exported from architecture.yaml
@@ -108,12 +127,6 @@ USE_ENSEMBLE = architecture.training.use_ensemble
 ENSEMBLE_SIZE = architecture.training.ensemble_size
 RANDOM_STATE = architecture.training.random_state
 USE_TEST_SPLIT = architecture.training.use_test_split
-TEST_SIZE = architecture.training.test_size
-TEST_DATA_SPLIT_PERCENTAGE = architecture.training.test_data_split_percentage
-MIN_STRATIFY_SAMPLES = architecture.training.min_stratify_samples
-DEFAULT_VALIDATION_SIZE = architecture.training.default_validation_size
-
-# -- augmentation -----------------------------------------------------------
 USE_AUGMENTATION = architecture.augmentation.use_augmentation
 AUGMENTATION_FACTOR = architecture.augmentation.augmentation_factor
 AUGMENTATION_PROB = architecture.augmentation.augmentation_prob
@@ -301,7 +314,12 @@ def setup_logging(script_name: str | None = None) -> None:
     console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
 
-    file_handler = logging.FileHandler(log_filepath, encoding="utf-8")
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_filepath,
+        maxBytes=2 * 1024 * 1024,  # 2 MB
+        backupCount=5,
+        encoding="utf-8",
+    )
     file_handler.setLevel(FILE_LOG_LEVEL)
     file_formatter = logging.Formatter(FILE_LOG_FORMAT, datefmt=DATE_FORMAT)
     file_handler.setFormatter(file_formatter)
