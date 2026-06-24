@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import torch
 import pytest
+import torch
 
-from core.models.lstm_model import AttentionLayer, LSTMModel, TransformerLSTMModel, build_lstm_model
-
+from core.models.lstm_model import AttentionLayer
+from core.models.lstm_model import LSTMModel
+from core.models.lstm_model import TransformerLSTMModel
+from core.models.lstm_model import build_lstm_model
 
 BATCH = 4
 SEQ_LEN = 30

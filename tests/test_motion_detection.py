@@ -7,13 +7,11 @@ from collections import deque
 import numpy as np
 import pytest
 
-from gui.services.motion_detection import (
-    _confidence_gap_for_token,
-    _extract_class_list,
-    _load_per_class_thresholds,
-    calculate_motion_magnitude,
-    validate_motion_consistency,
-)
+from gui.services.motion_detection import _confidence_gap_for_token
+from gui.services.motion_detection import _extract_class_list
+from gui.services.motion_detection import _load_per_class_thresholds
+from gui.services.motion_detection import calculate_motion_magnitude
+from gui.services.motion_detection import validate_motion_consistency
 
 
 class TestCalculateMotionMagnitude:

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 import torch
 
 from core.models.lstm_model import build_lstm_model
-
 
 DEVICE = torch.device("cpu")
 INPUT_SIZE = 11

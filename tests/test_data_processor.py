@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from core.pipeline.data_processor import load_log_file
 from core.pipeline.data_processor import load_all_logs
+from core.pipeline.data_processor import load_log_file
 
 
 class TestLoadLogFile:

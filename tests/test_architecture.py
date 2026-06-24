@@ -7,13 +7,11 @@ import tempfile
 
 import pytest
 
-from config.architecture import (
-    ArchitectureConfig,
-    HardwareConfig,
-    ModelConfig,
-    TrainingConfig,
-    load_architecture,
-)
+from config.architecture import ArchitectureConfig
+from config.architecture import HardwareConfig
+from config.architecture import ModelConfig
+from config.architecture import TrainingConfig
+from config.architecture import load_architecture
 
 
 class TestLoadArchitecture:

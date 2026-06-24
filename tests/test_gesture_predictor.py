@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import numpy as np
-import pytest
 import torch
 
-from core.inference.gesture_predictor import (
-    _canonical_sensor_name,
-    _normalize_class_thresholds,
-)
+from core.inference.gesture_predictor import _canonical_sensor_name
+from core.inference.gesture_predictor import _normalize_class_thresholds
 
 # Module-level constants from gesture_predictor for testing
 _SENSOR_NAME_ALIASES = {
@@ -141,9 +137,9 @@ class TestLSTMGesturePredictor:
         sample: dict[str, float] = {
             f"flex{i}": float(150 + i) for i in range(5)
         }
-        for axis, val in zip(["X", "Y", "Z"], [100.0, 200.0, 300.0]):
+        for axis, val in zip(["X", "Y", "Z"], [100.0, 200.0, 300.0], strict=True):
             sample[f"accel{axis}"] = val
-        for axis, val in zip(["X", "Y", "Z"], [10.0, 20.0, 30.0]):
+        for axis, val in zip(["X", "Y", "Z"], [10.0, 20.0, 30.0], strict=True):
             sample[f"gyro{axis}"] = val
 
         predictor.add_sensor_dict(sample)

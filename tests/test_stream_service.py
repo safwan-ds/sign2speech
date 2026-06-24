@@ -103,8 +103,9 @@ def test_extract_class_list() -> None:
 
 def test_per_class_threshold_loading_empty_dir(tmp_path) -> None:
     """_load_per_class_thresholds returns empty dict for empty dir."""
-    from gui.services.motion_detection import _load_per_class_thresholds
     from pathlib import Path
+
+    from gui.services.motion_detection import _load_per_class_thresholds
 
     result = _load_per_class_thresholds(Path(tmp_path))
     assert result == {}

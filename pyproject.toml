@@ -63,6 +63,13 @@ ignore = [
     "B008",  # do-not-perform-function-calls-in-argument-defaults
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]  # sys.path.insert before imports
+"main.py" = ["E402"]
+"data_manager.py" = ["E402"]
+"utils/llm_utils.py" = ["E402"]  # logger before architecture import
+"tests/test_llm_utils.py" = ["E402"]  # mock import after comment section
+
 [tool.ruff.lint.isort]
 known-first-party = ["core", "gui", "utils", "scripts", "config", "tests"]
 force-single-line = true

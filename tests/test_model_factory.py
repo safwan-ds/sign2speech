@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import torch
 import pytest
+import torch
 
-from core.models.model_factory import build_model_from_checkpoint, load_model_checkpoint
 from core.models.lstm_model import build_lstm_model
-
+from core.models.model_factory import build_model_from_checkpoint
+from core.models.model_factory import load_model_checkpoint
 
 INPUT_SIZE = 11
 HIDDEN = 64
@@ -66,7 +66,7 @@ class TestLoadModelCheckpoint:
         assert n_classes is not None
 
     def test_missing_file_raises(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(FileNotFoundError):
             load_model_checkpoint("nonexistent.pth", DEVICE)
 
     def test_infers_num_classes_from_fc_out(self, tmp_path) -> None:
