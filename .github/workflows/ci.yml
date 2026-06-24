@@ -6,7 +6,7 @@ on:
 
 jobs:
   test-and-compile:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -25,5 +25,5 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-      - name: Compile all source files
-        run: python -m compileall -q config/ core gui scripts tests utils
+      - name: Compile all source files (syntax check)
+        run: python -m compileall -q .
