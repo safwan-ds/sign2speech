@@ -12,7 +12,9 @@ from __future__ import annotations
 import logging
 
 import pandas as pd
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from gui.ui.theme_manager import get_plot_palette
 
@@ -26,8 +28,6 @@ DEFAULT_PLOT_PALETTE: dict[str, str] = get_plot_palette("dark")
 
 _QTGRAPHS_IMPORT_ERROR: Exception | None = None
 try:
-    from PySide6.QtGraphs import QGraphsTheme, QLineSeries, QValueAxis
-    from PySide6.QtQuickWidgets import QQuickWidget
 
     QTGRAPHS_AVAILABLE = True
 except Exception as exc:  # pragma: no cover - environment dependent
@@ -36,8 +36,6 @@ except Exception as exc:  # pragma: no cover - environment dependent
 
 _MATPLOTLIB_IMPORT_ERROR: Exception | None = None
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-    from matplotlib.figure import Figure
 
     MATPLOTLIB_AVAILABLE = True
 except Exception as exc:  # pragma: no cover - environment dependent
@@ -46,8 +44,8 @@ except Exception as exc:  # pragma: no cover - environment dependent
 
 # Backend imports — after constants so sibling modules can import from us
 # without triggering circular-import failures.
-from gui.ui._trace_qtgraphs import _QtGraphsTracePreview  # noqa: E402
 from gui.ui._trace_matplotlib import _MatplotlibTracePreview  # noqa: E402
+from gui.ui._trace_qtgraphs import _QtGraphsTracePreview  # noqa: E402
 
 
 class TracePreviewWidget(QWidget):

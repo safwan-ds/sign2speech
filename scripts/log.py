@@ -10,26 +10,19 @@ import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.architecture import architecture
-from config.config import (
-    COM_PORT,
-    RAW_DATA_DIR,
-    setup_logging,
-)
-
-from utils.serial_utils import (
-    ContinuousWarningBeeper,
-    FlexZeroWarningMonitor,
-    parse_sensor_data,
-    select_serial_port,
-)
+from config.config import COM_PORT
+from config.config import RAW_DATA_DIR
+from config.config import setup_logging
 from utils.plotting import plot_recording
-from utils.recording_utils import (
-    SENSOR_COLUMNS,
-    build_recording_file_path,
-    count_csv_samples,
-    load_gesture_names,
-    sanitize_gesture_label,
-)
+from utils.recording_utils import SENSOR_COLUMNS
+from utils.recording_utils import build_recording_file_path
+from utils.recording_utils import count_csv_samples
+from utils.recording_utils import load_gesture_names
+from utils.recording_utils import sanitize_gesture_label
+from utils.serial_utils import ContinuousWarningBeeper
+from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import parse_sensor_data
+from utils.serial_utils import select_serial_port
 
 logger = logging.getLogger(__name__)
 

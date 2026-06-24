@@ -37,16 +37,12 @@ from queue import Queue
 import numpy as np
 
 from config.architecture import architecture
-from config.config import (
-    PROCESSED_DIR,
-    TEST_DATA_DIR,
-)
-from core.pipeline.data_processor import (
-    clear_previous_sequence_files,
-    load_all_logs,
-    prepare_lstm_dataset,
-    save_processed_data_lstm,
-)
+from config.config import PROCESSED_DIR
+from config.config import TEST_DATA_DIR
+from core.pipeline.data_processor import clear_previous_sequence_files
+from core.pipeline.data_processor import load_all_logs
+from core.pipeline.data_processor import prepare_lstm_dataset
+from core.pipeline.data_processor import save_processed_data_lstm
 
 
 class DataProcessingService:

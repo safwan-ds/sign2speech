@@ -7,15 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 import utils.serial_utils as serial_utils
-from utils.serial_utils import (
-    FlexZeroWarningMonitor,
-    build_flex_zero_warning,
-    connect_serial,
-    detect_glove_ports,
-    flex_zero_sensors,
-    parse_sensor_data,
-    select_serial_port,
-)
+from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import build_flex_zero_warning
+from utils.serial_utils import connect_serial
+from utils.serial_utils import detect_glove_ports
+from utils.serial_utils import flex_zero_sensors
+from utils.serial_utils import parse_sensor_data
+from utils.serial_utils import select_serial_port
 
 
 class TestParseSensorData:

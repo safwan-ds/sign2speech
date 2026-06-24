@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from config.architecture import architecture
-from gui.services.serial_service import SerialService, SerialSettings
+from gui.services.serial_service import SerialService
+from gui.services.serial_service import SerialSettings
 
 
 @dataclass

@@ -11,15 +11,14 @@ from __future__ import annotations
 from typing import cast
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (
-    QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QStatusBar,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtGui import QAction
+from PySide6.QtGui import QKeySequence
+from PySide6.QtWidgets import QComboBox
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QStatusBar
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from gui.ui.app_window_panels import AppWindowPanelsMixin
 from gui.ui.app_window_settings_tab import AppWindowSettingsTabMixin

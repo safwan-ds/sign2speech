@@ -8,16 +8,13 @@ re-exported from ``utils.evaluation_plot`` (matplotlib) and
 
 import logging
 import os
-from pathlib import Path
 
 import numpy as np
 import torch
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,  # type: ignore
-    confusion_matrix,
-    precision_recall_fscore_support,  # type: ignore
-)
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report  # type: ignore
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_recall_fscore_support  # type: ignore
 
 from config.architecture import architecture
 
@@ -406,9 +403,7 @@ def save_evaluation_summary(
 # ---------------------------------------------------------------------------
 # Re-exports so that ``from utils.evaluation import plot_*`` still works.
 # ---------------------------------------------------------------------------
-from utils.evaluation_plot import (  # noqa: E402, F401
-    plot_confusion_matrix,
-    plot_per_class_metrics,
-    plot_roc_curves,
-    plot_training_history,
-)
+from utils.evaluation_plot import plot_confusion_matrix  # noqa: E402, F401
+from utils.evaluation_plot import plot_per_class_metrics  # noqa: E402, F401
+from utils.evaluation_plot import plot_roc_curves  # noqa: E402, F401
+from utils.evaluation_plot import plot_training_history  # noqa: E402, F401

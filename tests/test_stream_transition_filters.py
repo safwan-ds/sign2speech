@@ -7,13 +7,11 @@ from collections import deque
 
 import pytest
 
-from gui.services.stream_service import (
-    SequenceDecoder,
-    TransitionHysteresis,
-    _load_per_class_thresholds,
-    calculate_motion_magnitude,
-    validate_motion_consistency,
-)
+from gui.services.stream_service import SequenceDecoder
+from gui.services.stream_service import TransitionHysteresis
+from gui.services.stream_service import _load_per_class_thresholds
+from gui.services.stream_service import calculate_motion_magnitude
+from gui.services.stream_service import validate_motion_consistency
 
 
 def test_transition_hysteresis_requires_consensus_for_switch() -> None:

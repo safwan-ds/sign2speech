@@ -4,7 +4,8 @@ import logging
 from queue import Queue
 
 from config.config import COM_PORT
-from gui.services.recording_service import RecordingConfig, RecordingService
+from gui.services.recording_service import RecordingConfig
+from gui.services.recording_service import RecordingService
 
 
 class _FakeSerialService:

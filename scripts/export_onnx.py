@@ -10,8 +10,9 @@ import numpy as np
 import torch
 
 from config.architecture import architecture
-from core.models.model_factory import build_model_from_checkpoint, load_model_checkpoint
 from core.inference.gesture_predictor import MODEL_PATH
+from core.models.model_factory import build_model_from_checkpoint
+from core.models.model_factory import load_model_checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -97,11 +98,9 @@ def quantize_static_int8(
     batch_size: int = 16,
 ) -> Path:
     try:
-        from onnxruntime.quantization import (  # type: ignore
-            QuantFormat,
-            QuantType,
-            quantize_static,
-        )
+        from onnxruntime.quantization import QuantFormat  # type: ignore
+        from onnxruntime.quantization import QuantType  # type: ignore
+        from onnxruntime.quantization import quantize_static  # type: ignore
     except ImportError as exc:
         raise ImportError(
             "onnxruntime is required for static INT8 quantization"

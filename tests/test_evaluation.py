@@ -10,11 +10,10 @@ import pytest
 # and skip the entire file when that happens.
 try:
     import torch
-    from utils.evaluation import (
-        compute_class_weights,
-        derive_per_class_thresholds,
-        evaluate_transition_regions,
-    )
+
+    from utils.evaluation import compute_class_weights
+    from utils.evaluation import derive_per_class_thresholds
+    from utils.evaluation import evaluate_transition_regions
     _evaluation_available = True
 except Exception:
     _evaluation_available = False

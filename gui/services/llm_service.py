@@ -9,7 +9,8 @@ from collections import deque
 from dataclasses import dataclass
 from queue import Queue
 
-from utils.llm_utils import create_llm_backend, generate_reply
+from utils.llm_utils import create_llm_backend
+from utils.llm_utils import generate_reply
 
 
 @dataclass(slots=True)

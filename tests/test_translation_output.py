@@ -1,14 +1,12 @@
 """Tests for bilingual gesture translation output."""
 
-from pathlib import Path
 import json
+from pathlib import Path
 
-from core.inference.gesture_translations import (
-    GestureTransitionStateMachine,
-    load_gesture_translations,
-    translate_gesture,
-    translate_gestures,
-)
+from core.inference.gesture_translations import GestureTransitionStateMachine
+from core.inference.gesture_translations import load_gesture_translations
+from core.inference.gesture_translations import translate_gesture
+from core.inference.gesture_translations import translate_gestures
 
 
 def test_load_gesture_translations_reads_pairs(tmp_path: Path) -> None:

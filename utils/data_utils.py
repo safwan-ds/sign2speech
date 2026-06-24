@@ -18,31 +18,25 @@ import numpy as np
 import pandas as pd
 
 from config.architecture import architecture
+from utils.dtw import _dtw_path  # noqa: F401
+from utils.dtw import _euclidean_distance  # noqa: F401
+from utils.dtw import _exact_dtw_path  # noqa: F401
+from utils.dtw import align_sequence_to_template  # noqa: F401
+from utils.dtw import align_sequence_to_templates  # noqa: F401
+from utils.dtw import load_dtw_templates  # noqa: F401
+from utils.dtw import resample_sequence  # noqa: F401
+from utils.madgwick_filter import MadgwickFilter  # noqa: F401
+from utils.madgwick_filter import _normalize_quaternion  # noqa: F401
+from utils.madgwick_filter import _quaternion_multiply  # noqa: F401
+from utils.madgwick_filter import compute_madgwick_quaternions  # noqa: F401
+from utils.normalization import extract_normalized_features  # noqa: F401
+from utils.normalization import get_feature_names  # noqa: F401
+from utils.normalization import normalize_dataframe  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Re-exports from submodules
 # ---------------------------------------------------------------------------
-from utils.normalization import (  # noqa: F401
-    normalize_value,
-    normalize_dataframe,
-    extract_normalized_features,
-    get_feature_names,
-)
-from utils.dtw import (  # noqa: F401
-    _euclidean_distance,
-    _exact_dtw_path,
-    _dtw_path,
-    resample_sequence,
-    align_sequence_to_template,
-    align_sequence_to_templates,
-    load_dtw_templates,
-)
-from utils.madgwick_filter import (  # noqa: F401
-    _normalize_quaternion,
-    _quaternion_multiply,
-    MadgwickFilter,
-    compute_madgwick_quaternions,
-)
+from utils.normalization import normalize_value  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +132,7 @@ def segment_sequences(
         list: List of numpy arrays, each of shape (sequence_length, num_features)
     """
     # First normalize if not already done
-    if f"flex0_norm" not in df.columns:
+    if "flex0_norm" not in df.columns:
         df = normalize_dataframe(df)
 
     sequence = extract_normalized_features(df)
@@ -307,7 +301,8 @@ def extract_frequency_features(sequence: np.ndarray, sampling_rate: int = 100):
     Returns:
         freq_features: Dictionary containing frequency features
     """
-    from scipy.fft import fft, fftfreq  # type: ignore
+    from scipy.fft import fft  # type: ignore
+    from scipy.fft import fftfreq  # type: ignore
 
     n_samples, n_features = sequence.shape
     freq_features: dict[str, float] = {}
@@ -370,7 +365,7 @@ def segment_sequences_with_enhanced_features(
         list: List of numpy arrays with enhanced features
     """
     # First normalize if not already done
-    if f"flex0_norm" not in df.columns:
+    if "flex0_norm" not in df.columns:
         df = normalize_dataframe(df)
 
     sequence = extract_normalized_features(df)

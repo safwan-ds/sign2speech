@@ -7,31 +7,28 @@ _record, _process, _train, _review tabs and the log panel.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDoubleSpinBox,
-    QFormLayout,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
-    QLabel,
-    QPlainTextEdit,
-    QProgressBar,
-    QPushButton,
-    QSizePolicy,
-    QSpinBox,
-    QSplitter,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QCheckBox
+from PySide6.QtWidgets import QComboBox
+from PySide6.QtWidgets import QDoubleSpinBox
+from PySide6.QtWidgets import QFormLayout
+from PySide6.QtWidgets import QGridLayout
+from PySide6.QtWidgets import QGroupBox
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QHeaderView
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QPlainTextEdit
+from PySide6.QtWidgets import QProgressBar
+from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QSizePolicy
+from PySide6.QtWidgets import QSpinBox
+from PySide6.QtWidgets import QSplitter
+from PySide6.QtWidgets import QTableWidget
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
+from config.architecture import architecture
 from gui.ui.stage_widget import StageWidget
 from gui.ui.trace_preview_widget import TracePreviewWidget
-from config.architecture import architecture
 
 
 class DataManagerTabsMixin:

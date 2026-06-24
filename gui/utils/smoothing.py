@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from collections import Counter, deque
-from dataclasses import dataclass, field
-from typing import Deque
+from collections import Counter
+from collections import deque
+from dataclasses import dataclass
+from dataclasses import field
 
 
-def majority_vote(window: Deque[str]) -> str | None:
+def majority_vote(window: deque[str]) -> str | None:
     """Return the most frequent token in a window, or None when empty."""
     if not window:
         return None
@@ -24,7 +25,7 @@ class PredictionSmoother:
     window_size: int
     # Relative vote weight for REST tokens; lower values reduce REST influence.
     rest_weight: float = 0.75
-    _window: Deque[tuple[str, float, bool]] = field(init=False)
+    _window: deque[tuple[str, float, bool]] = field(init=False)
 
     def __post_init__(self) -> None:
         self._window = deque(maxlen=max(1, int(self.window_size)))

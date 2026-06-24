@@ -2,18 +2,19 @@
 
 import logging
 import threading
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from core.models.lstm_model import build_lstm_model
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset
 
 from config.architecture import architecture
+from core.models.lstm_model import build_lstm_model
 from utils.augmentation import create_augmented_dataset
 from utils.evaluation import compute_class_weights
 
@@ -178,7 +179,7 @@ def train_lstm_model(
     # Check class distribution (original data, before augmentation)
     unique, counts = np.unique(y_encoded, return_counts=True)
     class_distribution = dict(zip(unique, counts))
-    logger.info(f"Class distribution (original):")
+    logger.info("Class distribution (original):")
     for idx, count in class_distribution.items():
         logger.info(f"  {label_encoder.classes_[idx]}: {count} samples")
 
@@ -246,7 +247,7 @@ def train_lstm_model(
     # Loss and optimizer
     if architecture.training.use_weighted_loss:
         class_weights = compute_class_weights(y_train, num_classes).to(device)
-        logger.info(f"Using weighted loss with class weights:")
+        logger.info("Using weighted loss with class weights:")
         for i, (cls, weight) in enumerate(zip(label_encoder.classes_, class_weights)):
             logger.info(f"  {cls}: {weight:.3f}")
         criterion = nn.CrossEntropyLoss(

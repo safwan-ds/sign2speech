@@ -3,16 +3,14 @@
 import numpy as np
 import pytest
 
-from utils.data_utils import (
-    normalize_value,
-    compute_velocity,
-    compute_acceleration,
-    detect_motion_boundaries,
-    get_feature_names,
-    compute_rolling_statistics,
-    align_sequence_to_template,
-    compute_madgwick_quaternions,
-)
+from utils.data_utils import align_sequence_to_template
+from utils.data_utils import compute_acceleration
+from utils.data_utils import compute_madgwick_quaternions
+from utils.data_utils import compute_rolling_statistics
+from utils.data_utils import compute_velocity
+from utils.data_utils import detect_motion_boundaries
+from utils.data_utils import get_feature_names
+from utils.data_utils import normalize_value
 
 
 class TestNormalizeValue:
@@ -223,7 +221,9 @@ class TestNormalizeDataframe:
 class TestExtractNormalizedFeatures:
     def test_returns_array_with_correct_shape(self):
         import pandas as pd
-        from utils.data_utils import normalize_dataframe, extract_normalized_features
+
+        from utils.data_utils import extract_normalized_features
+        from utils.data_utils import normalize_dataframe
 
         df = pd.DataFrame(
             {
@@ -247,6 +247,7 @@ class TestExtractNormalizedFeatures:
 
     def test_raises_on_missing_columns(self):
         import pandas as pd
+
         from utils.data_utils import extract_normalized_features
 
         df = pd.DataFrame({"flex0_norm": [0.5, 0.6]})

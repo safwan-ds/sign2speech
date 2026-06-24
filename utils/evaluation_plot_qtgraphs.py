@@ -24,23 +24,21 @@ EVALUATION_PLOT_BACKEND = (
 
 _QTGRAPHS_IMPORT_ERROR: Exception | None = None
 try:
-    from PySide6.QtCore import QMarginsF, QPointF, QSizeF, QUrl
-    from PySide6.QtGui import (
-        QColor,
-        QImage,
-        QPainter,
-        QPageLayout,
-        QPageSize,
-        QPdfWriter,
-    )
-    from PySide6.QtGraphs import (
-        QBarCategoryAxis,
-        QBarSeries,
-        QBarSet,
-        QGraphsTheme,
-        QLineSeries,
-        QValueAxis,
-    )
+    from PySide6.QtCore import QMarginsF
+    from PySide6.QtCore import QPointF
+    from PySide6.QtCore import QSizeF
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGraphs import QBarCategoryAxis
+    from PySide6.QtGraphs import QBarSeries
+    from PySide6.QtGraphs import QBarSet
+    from PySide6.QtGraphs import QGraphsTheme
+    from PySide6.QtGraphs import QLineSeries
+    from PySide6.QtGraphs import QValueAxis
+    from PySide6.QtGui import QColor
+    from PySide6.QtGui import QPageLayout
+    from PySide6.QtGui import QPageSize
+    from PySide6.QtGui import QPainter
+    from PySide6.QtGui import QPdfWriter
     from PySide6.QtQuickWidgets import QQuickWidget
     from PySide6.QtWidgets import QApplication
 

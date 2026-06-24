@@ -8,15 +8,16 @@ import threading
 import time
 from pathlib import Path
 
-from PySide6.QtWidgets import (
-    QApplication,
-    QFileDialog,
-)
+from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QFileDialog
 
-from config.config import LOGS_OUTPUT_DIR, MODELS_DIR
+from config.config import LOGS_OUTPUT_DIR
+from config.config import MODELS_DIR
 from gui.services.model_service import ModelMetadata
-from gui.services.serial_service import SerialService, SerialSettings
-from gui.services.stream_service import StreamConfig, StreamWorker
+from gui.services.serial_service import SerialService
+from gui.services.serial_service import SerialSettings
+from gui.services.stream_service import StreamConfig
+from gui.services.stream_service import StreamWorker
 from gui.utils.exporter import export_sentence
 from gui.utils.formatting import now_stamp
 from utils.serial_utils import select_serial_port
@@ -115,12 +116,12 @@ class AppWindowActionsMixin:
         selected = self.model_dir_combo.currentData()
         if isinstance(selected, str) and selected:
             self.model_path_edit.setText(selected)
-            
+
             # Auto-detect if this is an ensemble and update checkbox
             model_dir = Path(selected)
             is_ensemble = (model_dir / "model_0.pth").exists()
             has_single = (model_dir / "model.pth").exists()
-            
+
             if is_ensemble and not has_single:
                 if hasattr(self, "ensemble_checkbox"):
                     self.ensemble_checkbox.setChecked(True)
@@ -390,12 +391,12 @@ class AppWindowActionsMixin:
             self._set_status(self._t("no_sentence_for_llm"), "WARNING")
             return
         self.event_queue.put({"type": "llm_request", "text": sentence})
-        
+
         self.current_sentence_tokens.clear()
         self.word_count_label.setText(self._format_word_count(0))
         self.sentence_box.setPlainText(self._t("placeholder_sentence"))
         self.refined_box.setPlainText(self._t("placeholder_refined"))
-        
+
         self._set_status(self._t("llm_request_sent"), "INFO")
         self._refresh_action_states()
 

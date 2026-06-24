@@ -12,18 +12,22 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QPointF, Qt, QUrl
+from PySide6.QtCore import QPointF
+from PySide6.QtCore import Qt
+from PySide6.QtCore import QUrl
+from PySide6.QtGraphs import QGraphsTheme
+from PySide6.QtGraphs import QLineSeries
+from PySide6.QtGraphs import QValueAxis
 from PySide6.QtGui import QColor
-from PySide6.QtGraphs import QGraphsTheme, QLineSeries, QValueAxis
 from PySide6.QtQuickWidgets import QQuickWidget
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
-from gui.ui.trace_preview_widget import (
-    ACCEL_AXES,
-    DEFAULT_PLOT_PALETTE,
-    FLEX_AXES,
-    GYRO_AXES,
-)
+from gui.ui.trace_preview_widget import ACCEL_AXES
+from gui.ui.trace_preview_widget import DEFAULT_PLOT_PALETTE
+from gui.ui.trace_preview_widget import FLEX_AXES
+from gui.ui.trace_preview_widget import GYRO_AXES
 
 logger = logging.getLogger(__name__)
 

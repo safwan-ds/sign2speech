@@ -4,19 +4,17 @@ Implements various augmentation techniques to improve model generalization
 """
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 from scipy.interpolate import interp1d  # type: ignore
 from scipy.ndimage import gaussian_filter1d  # type: ignore
 
 from config.architecture import architecture
-from config.config import (
-    ACCEL_X_IDX,
-    ACCEL_Y_IDX,
-    GYRO_X_IDX,
-    GYRO_Y_IDX,
-)
+from config.config import ACCEL_X_IDX
+from config.config import ACCEL_Y_IDX
+from config.config import GYRO_X_IDX
+from config.config import GYRO_Y_IDX
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,8 @@ import serial
 import serial.tools.list_ports
 
 from config.architecture import architecture
-from utils.serial_utils import detect_glove_ports, parse_sensor_data
+from utils.serial_utils import detect_glove_ports
+from utils.serial_utils import parse_sensor_data
 
 
 @dataclass(slots=True)

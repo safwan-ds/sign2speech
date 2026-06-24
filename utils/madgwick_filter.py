@@ -5,7 +5,8 @@ accelerometer and gyroscope readings, as well as helper functions for
 quaternion arithmetic and batch processing of sensor sequences.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 
 import numpy as np
 

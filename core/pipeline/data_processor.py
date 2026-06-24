@@ -15,19 +15,16 @@ import numpy as np
 import pandas as pd
 
 from config.architecture import architecture
-from config.config import (
-    PROCESSED_DIR,
-    RAW_DATA_DIR,
-    TEST_DATA_DIR,
-    setup_logging,
-)
-from utils.data_utils import (
-    normalize_dataframe,
-    segment_sequences,
-    segment_sequences_with_enhanced_features,
-)
+from config.config import PROCESSED_DIR
+from config.config import RAW_DATA_DIR
+from config.config import TEST_DATA_DIR
+from config.config import setup_logging
+from utils.data_utils import normalize_dataframe
+from utils.data_utils import segment_sequences
+from utils.data_utils import segment_sequences_with_enhanced_features
 from utils.recording_utils import SENSOR_COLUMNS
-from utils.serial_utils import FLEX_SENSOR_NAMES, build_flex_zero_warning
+from utils.serial_utils import FLEX_SENSOR_NAMES
+from utils.serial_utils import build_flex_zero_warning
 
 logger = logging.getLogger(__name__)
 

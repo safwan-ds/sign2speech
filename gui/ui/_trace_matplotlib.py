@@ -10,14 +10,13 @@ import logging
 import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
-from gui.ui.trace_preview_widget import (
-    ACCEL_AXES,
-    DEFAULT_PLOT_PALETTE,
-    FLEX_AXES,
-    GYRO_AXES,
-)
+from gui.ui.trace_preview_widget import ACCEL_AXES
+from gui.ui.trace_preview_widget import DEFAULT_PLOT_PALETTE
+from gui.ui.trace_preview_widget import FLEX_AXES
+from gui.ui.trace_preview_widget import GYRO_AXES
 
 logger = logging.getLogger(__name__)
 

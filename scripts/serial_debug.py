@@ -5,19 +5,20 @@ from collections import deque
 import pandas as pd
 import serial
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from config.architecture import architecture
 from gui.ui.trace_preview_widget import TracePreviewWidget
-from utils.serial_utils import (
-    detect_glove_ports,
-    select_serial_port,
-    connect_serial,
-    FlexZeroWarningMonitor,
-    ContinuousWarningBeeper,
-    build_flex_zero_warning,
-    parse_sensor_data,
-)
+from utils.serial_utils import ContinuousWarningBeeper
+from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import build_flex_zero_warning
+from utils.serial_utils import connect_serial
+from utils.serial_utils import detect_glove_ports
+from utils.serial_utils import parse_sensor_data
+from utils.serial_utils import select_serial_port
 
 logger = logging.getLogger(__name__)
 

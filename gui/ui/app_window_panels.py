@@ -5,17 +5,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QProgressBar,
-    QPushButton,
-    QTableWidget,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QProgressBar
+from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QTableWidget
+from PySide6.QtWidgets import QTabWidget
+from PySide6.QtWidgets import QTextEdit
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 
 class AppWindowPanelsMixin:

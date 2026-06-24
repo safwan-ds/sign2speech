@@ -7,28 +7,28 @@ import math
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from queue import Queue
 from typing import TYPE_CHECKING
 
 from config.architecture import architecture
-from core.inference.gesture_translations import (
-    GestureTransitionStateMachine,
-    load_gesture_translations,
-    translate_gesture,
-    translate_gestures,
-)
-from gui.services.serial_service import SerialService, SerialSettings
+from core.inference.gesture_translations import GestureTransitionStateMachine
+from core.inference.gesture_translations import load_gesture_translations
+from core.inference.gesture_translations import translate_gesture
+from core.inference.gesture_translations import translate_gestures
+from gui.services.motion_detection import _confidence_gap_for_token
+from gui.services.motion_detection import _extract_class_list
+from gui.services.motion_detection import _load_per_class_thresholds
+from gui.services.motion_detection import calculate_motion_magnitude
+from gui.services.motion_detection import validate_motion_consistency
+from gui.services.serial_service import SerialService
+from gui.services.serial_service import SerialSettings
 from gui.utils.formatting import now_hms
-from gui.utils.smoothing import PredictionSmoother, SentenceAssembler
-from gui.services.motion_detection import (
-    _confidence_gap_for_token,
-    _extract_class_list,
-    _load_per_class_thresholds,
-    calculate_motion_magnitude,
-    validate_motion_consistency,
-)
-from utils.serial_utils import ContinuousWarningBeeper, FlexZeroWarningMonitor
+from gui.utils.smoothing import PredictionSmoother
+from gui.utils.smoothing import SentenceAssembler
+from utils.serial_utils import ContinuousWarningBeeper
+from utils.serial_utils import FlexZeroWarningMonitor
 
 if TYPE_CHECKING:
     from gui.services.model_service import ModelService
@@ -216,7 +216,7 @@ class StreamWorker(threading.Thread):
 
     def __init__(
         self,
-        model_service: "ModelService",
+        model_service: ModelService,
         serial_service: SerialService,
         event_queue: Queue[dict],
         logger: logging.Logger,

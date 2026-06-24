@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gui.ui.localization import _load_language_file, LOCALIZATION
+from gui.ui.localization import LOCALIZATION
+from gui.ui.localization import _load_language_file
 
 
 class TestLoadLanguageFile:

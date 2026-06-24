@@ -119,7 +119,7 @@ def save_lstm_model(
 
     # Mirror into models/latest/ for quick inference access
     latest_dir = os.path.join(MODELS_DIR, "latest")
-    
+
     # Clear latest directory if this is a single model or the first ensemble member
     # to avoid mixing stale files from previous different run types (e.g. ensemble vs single)
     if ensemble_idx is None or ensemble_idx == 0:
@@ -129,7 +129,7 @@ def save_lstm_model(
                 shutil.rmtree(latest_dir)
             except Exception as e:
                 logger.warning(f"Could not clear latest directory: {e}")
-    
+
     os.makedirs(latest_dir, exist_ok=True)
 
     latest_model_name = (
@@ -142,12 +142,12 @@ def save_lstm_model(
     # Save metadata
     timestamp_str = os.path.basename(model_dir)
     with open(metadata_path, "w") as f:
-        f.write(f"PyTorch LSTM Model Metadata\n")
+        f.write("PyTorch LSTM Model Metadata\n")
         f.write(f"{'=' * 60}\n")
         f.write(f"Folder: {timestamp_str}\n")
         if ensemble_idx is not None:
             f.write(f"Ensemble: Model {ensemble_idx + 1} of {architecture.training.ensemble_size}\n")
-        f.write(f"Model Type: PyTorch LSTM\n")
+        f.write("Model Type: PyTorch LSTM\n")
         f.write(f"Device: {device}\n")
         for key, value in metadata.items():
             f.write(f"{key}: {value}\n")

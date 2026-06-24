@@ -9,12 +9,10 @@ import numpy as np
 import torch
 
 from config.config import MODELS_DIR
-from utils.evaluation import (
-    comprehensive_evaluation,
-    analyze_misclassifications,
-    plot_training_history,
-    save_evaluation_summary,
-)
+from utils.evaluation import analyze_misclassifications
+from utils.evaluation import comprehensive_evaluation
+from utils.evaluation import plot_training_history
+from utils.evaluation import save_evaluation_summary
 
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -76,7 +74,7 @@ def evaluate_lstm_model(
 
     # Diagnostic warning for perfect accuracy
     if val_metrics["accuracy"] == 1.0:
-        logger.warning(f"Perfect validation accuracy (1.0000) detected!")
+        logger.warning("Perfect validation accuracy (1.0000) detected!")
 
     # Evaluate on separate test set if provided
     test_metrics = None
@@ -101,7 +99,7 @@ def evaluate_lstm_model(
 
         # Diagnostic warning for perfect accuracy on holdout test
         if test_metrics["accuracy"] == 1.0:
-            logger.warning(f"Perfect holdout test accuracy (1.0000)")
+            logger.warning("Perfect holdout test accuracy (1.0000)")
 
     # Plot training history if provided
     if history:

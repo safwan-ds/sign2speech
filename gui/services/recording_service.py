@@ -10,22 +10,17 @@ from datetime import datetime
 from queue import Queue
 
 from config.architecture import architecture
-from config.config import (
-    COM_PORT,
-    RAW_DATA_DIR,
-)
-from gui.services.serial_service import SerialService, SerialSettings
-from utils.recording_utils import (
-    build_recording_file_path,
-    build_recording_metadata_path,
-    save_recording_metadata,
-    save_rows_to_csv,
-)
-from utils.serial_utils import (
-    ContinuousWarningBeeper,
-    FlexZeroWarningMonitor,
-    select_serial_port,
-)
+from config.config import COM_PORT
+from config.config import RAW_DATA_DIR
+from gui.services.serial_service import SerialService
+from gui.services.serial_service import SerialSettings
+from utils.recording_utils import build_recording_file_path
+from utils.recording_utils import build_recording_metadata_path
+from utils.recording_utils import save_recording_metadata
+from utils.recording_utils import save_rows_to_csv
+from utils.serial_utils import ContinuousWarningBeeper
+from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import select_serial_port
 
 LIVE_PREVIEW_ROW_LIMIT = 600
 RECORD_PROGRESS_INTERVAL_SECONDS = 0.05

@@ -9,50 +9,51 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QAction, QBrush, QKeySequence, QColor, QIcon
-from PySide6.QtWidgets import (
-    QApplication,
-    QDialog,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QSplitter,
-    QStatusBar,
-    QTableWidgetItem,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QAction
+from PySide6.QtGui import QBrush
+from PySide6.QtGui import QColor
+from PySide6.QtGui import QIcon
+from PySide6.QtGui import QKeySequence
+from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QMainWindow
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QSplitter
+from PySide6.QtWidgets import QStatusBar
+from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtWidgets import QTabWidget
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from config.architecture import architecture
-from config.config import (
-    LOGS_OUTPUT_DIR,
-    RAW_DATA_DIR,
-)
+from config.config import LOGS_OUTPUT_DIR
+from config.config import RAW_DATA_DIR
 from gui.services.data_processing_service import DataProcessingService
 from gui.services.logging_service import configure_gui_logger
-from gui.services.recording_service import RecordingConfig, RecordingService
-from gui.services.sample_review_service import SampleRecord, SampleReviewService
+from gui.services.recording_service import RecordingConfig
+from gui.services.recording_service import RecordingService
+from gui.services.sample_review_service import SampleRecord
+from gui.services.sample_review_service import SampleReviewService
 from gui.services.serial_service import SerialService
-from gui.services.training_service import TrainingOverrides, TrainingService
+from gui.services.training_service import TrainingOverrides
+from gui.services.training_service import TrainingService
 from gui.ui.custom_widgets_adapter import apply_custom_widgets_theme
 from gui.ui.data_manager_event_handlers import DataManagerEventHandlersMixin
 from gui.ui.data_manager_tabs import DataManagerTabsMixin
 from gui.ui.gestures_editor_dialog import GesturesEditorDialog
-from gui.ui.theme_manager import (
-    build_data_manager_stylesheet,
-    get_confusion_cell_color,
-    get_confusion_text_color,
-    get_plot_palette,
-    get_status_banner_style,
-)
-from gui.utils.icon_utils import apply_app_icon, resolve_app_icon_path
-from utils.recording_utils import (
-    count_csv_samples,
-    load_gesture_names,
-    sanitize_gesture_label,
-)
+from gui.ui.theme_manager import build_data_manager_stylesheet
+from gui.ui.theme_manager import get_confusion_cell_color
+from gui.ui.theme_manager import get_confusion_text_color
+from gui.ui.theme_manager import get_plot_palette
+from gui.ui.theme_manager import get_status_banner_style
+from gui.utils.icon_utils import apply_app_icon
+from gui.utils.icon_utils import resolve_app_icon_path
+from utils.recording_utils import count_csv_samples
+from utils.recording_utils import load_gesture_names
+from utils.recording_utils import sanitize_gesture_label
 from utils.serial_utils import select_serial_port
 
 
@@ -460,7 +461,7 @@ class DataManagerWindow(DataManagerTabsMixin, DataManagerEventHandlersMixin, QMa
                 self.train_status_label.setText("Status: metrics file not found")
                 return
 
-            with open(metrics_file, "r") as f:
+            with open(metrics_file) as f:
                 metrics_data = json.load(f)
 
             # Populate evaluation metrics table with validation metrics

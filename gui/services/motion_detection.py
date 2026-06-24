@@ -11,7 +11,6 @@ import numpy as np
 
 from config.architecture import architecture
 
-
 _SIGNIFICANT_MOTION_MIN_FRAMES = int(
     architecture.training.sequence_length * architecture.prediction.prediction_significant_motion_min_ratio
 )

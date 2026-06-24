@@ -4,7 +4,8 @@ import logging
 from queue import Queue
 
 from gui.services.serial_service import SerialSettings
-from gui.services.stream_service import StreamConfig, StreamWorker
+from gui.services.stream_service import StreamConfig
+from gui.services.stream_service import StreamWorker
 
 
 class _FakePredictor:

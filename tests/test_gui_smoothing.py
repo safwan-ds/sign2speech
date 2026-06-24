@@ -2,7 +2,9 @@
 
 from collections import deque
 
-from gui.utils.smoothing import PredictionSmoother, SentenceAssembler, majority_vote
+from gui.utils.smoothing import PredictionSmoother
+from gui.utils.smoothing import SentenceAssembler
+from gui.utils.smoothing import majority_vote
 
 
 def test_majority_vote_returns_most_common_token() -> None:

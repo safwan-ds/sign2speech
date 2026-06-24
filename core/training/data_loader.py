@@ -7,7 +7,8 @@ import os
 import numpy as np
 
 from config.architecture import architecture
-from config.config import PROCESSED_DIR, TEST_DATA_DIR
+from config.config import PROCESSED_DIR
+from config.config import TEST_DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ def load_processed_sequences():
             logger.info(f"No test sequences found in {TEST_DATA_DIR}")
             logger.info("Will use train-test split instead.")
     elif architecture.training.test_size == 0:
-        logger.info(f"TEST_SIZE is 0 - skipping separate test set loading")
+        logger.info("TEST_SIZE is 0 - skipping separate test set loading")
         logger.info("All data will be used for training without validation split.")
     else:
         logger.info(f"Test data directory not found: {TEST_DATA_DIR}")

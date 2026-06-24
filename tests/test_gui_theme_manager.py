@@ -2,20 +2,17 @@
 
 from PySide6.QtGui import QColor
 
-from gui.ui.theme_manager import (
-    DEFAULT_THEME,
-    build_dashboard_stylesheet,
-    build_data_manager_stylesheet,
-    get_confusion_cell_color,
-    get_confusion_text_color,
-    get_connection_badge_style,
-    get_model_badge_style,
-    get_palette,
-    get_plot_palette,
-    get_status_banner_style,
-    normalize_theme,
-)
-
+from gui.ui.theme_manager import DEFAULT_THEME
+from gui.ui.theme_manager import build_dashboard_stylesheet
+from gui.ui.theme_manager import build_data_manager_stylesheet
+from gui.ui.theme_manager import get_confusion_cell_color
+from gui.ui.theme_manager import get_confusion_text_color
+from gui.ui.theme_manager import get_connection_badge_style
+from gui.ui.theme_manager import get_model_badge_style
+from gui.ui.theme_manager import get_palette
+from gui.ui.theme_manager import get_plot_palette
+from gui.ui.theme_manager import get_status_banner_style
+from gui.ui.theme_manager import normalize_theme
 
 REQUIRED_PALETTE_KEYS = {
     "bg",

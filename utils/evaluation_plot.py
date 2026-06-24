@@ -14,22 +14,18 @@ import numpy as np
 matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import (
-    auc,
-    precision_recall_fscore_support,  # type: ignore
-    roc_curve,
-)
+from sklearn.metrics import auc
+from sklearn.metrics import precision_recall_fscore_support  # type: ignore
+from sklearn.metrics import roc_curve
 from sklearn.preprocessing import label_binarize
 
 from config.architecture import architecture
-from utils.evaluation_plot_qtgraphs import (
-    EVALUATION_PLOT_BACKEND,
-    QTGRAPHS_AVAILABLE,
-    _QTGRAPHS_IMPORT_ERROR,
-    _plot_per_class_metrics_qtgraphs,
-    _plot_roc_curves_qtgraphs,
-    _qtgraphs_backend_enabled,
-)
+from utils.evaluation_plot_qtgraphs import _QTGRAPHS_IMPORT_ERROR
+from utils.evaluation_plot_qtgraphs import EVALUATION_PLOT_BACKEND
+from utils.evaluation_plot_qtgraphs import QTGRAPHS_AVAILABLE
+from utils.evaluation_plot_qtgraphs import _plot_per_class_metrics_qtgraphs
+from utils.evaluation_plot_qtgraphs import _plot_roc_curves_qtgraphs
+from utils.evaluation_plot_qtgraphs import _qtgraphs_backend_enabled
 
 logger = logging.getLogger(__name__)
 

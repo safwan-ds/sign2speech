@@ -6,16 +6,14 @@ import csv
 import json
 from pathlib import Path
 
-from utils.recording_utils import (
-    CSV_COLUMNS,
-    sanitize_gesture_label,
-    gesture_output_dir,
-    build_recording_metadata_path,
-    save_rows_to_csv,
-    save_recording_metadata,
-    load_gesture_names,
-    count_csv_samples,
-)
+from utils.recording_utils import CSV_COLUMNS
+from utils.recording_utils import build_recording_metadata_path
+from utils.recording_utils import count_csv_samples
+from utils.recording_utils import gesture_output_dir
+from utils.recording_utils import load_gesture_names
+from utils.recording_utils import sanitize_gesture_label
+from utils.recording_utils import save_recording_metadata
+from utils.recording_utils import save_rows_to_csv
 
 
 class TestSanitizeGestureLabel:

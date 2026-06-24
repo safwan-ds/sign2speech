@@ -3,10 +3,11 @@ PyTorch LSTM model architecture for Sign Language Glove gesture recognition
 Enhanced with attention mechanism, bidirectional layers, and residual connections
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Any
 
 
 class AttentionLayer(nn.Module):
@@ -15,7 +16,7 @@ class AttentionLayer(nn.Module):
     """
 
     def __init__(self, hidden_size: int):
-        super(AttentionLayer, self).__init__()
+        super().__init__()
         self.attention = nn.Linear(hidden_size, 1)
 
     def forward(self, lstm_out: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -76,7 +77,7 @@ class LSTMModel(nn.Module):
             use_attention: Use attention mechanism
             use_batch_norm: Use batch normalization
         """
-        super(LSTMModel, self).__init__()
+        super().__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -215,7 +216,7 @@ class TransformerLSTMModel(nn.Module):
         bidirectional: bool = True,
         use_cnn: bool = False,
     ):
-        super(TransformerLSTMModel, self).__init__()
+        super().__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers

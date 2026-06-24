@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from logging import LogRecord
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from queue import Queue
-from datetime import datetime
 
 from gui.utils.formatting import now_stamp
 

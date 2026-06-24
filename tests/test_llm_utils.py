@@ -8,7 +8,8 @@ import types
 import pytest
 
 import utils.llm_utils as llm_utils
-from utils.llm_utils import generate_reply, generate_turkish_reply
+from utils.llm_utils import generate_reply
+from utils.llm_utils import generate_turkish_reply
 
 
 def test_generate_reply_returns_none_when_llm_is_none() -> None:
@@ -92,7 +93,9 @@ def test_generate_reply_strips_output_prefix_when_present() -> None:
 # -- Remote callable integration tests (mocked OpenAI SDK) --------------------------
 
 from unittest.mock import MagicMock
+
 import openai
+
 
 def _make_remote_callable(
     monkeypatch: pytest.MonkeyPatch,
@@ -174,7 +177,7 @@ class TestRemoteCallable:
         monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_model", "test-model")
         monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_url", "https://x.com/v1")
         monkeypatch.setattr(llm_utils.architecture.llm, "llm_remote_api_key", "k")
-        
+
         mock_openai_class = MagicMock()
         monkeypatch.setattr("openai.OpenAI", mock_openai_class)
 

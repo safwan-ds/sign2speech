@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Make the project package importable before any gui imports.
 _project_root = Path(__file__).resolve().parent

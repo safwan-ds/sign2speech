@@ -7,22 +7,20 @@ from collections import deque
 
 import numpy as np
 import torch
-from core.inference.onnx_predictor import ONNXBackend
-from core.models.model_factory import build_model_from_checkpoint
 
 from config.architecture import architecture
 from config.config import MODELS_DIR
-from utils.data_utils import (
-    QUATERNION_FEATURE_NAMES,
-    MadgwickFilter,
-    align_sequence_to_templates,
-    normalize_value,
-    compute_velocity,
-    compute_acceleration,
-    compute_rolling_statistics,
-    load_dtw_templates,
-    resample_sequence,
-)
+from core.inference.onnx_predictor import ONNXBackend
+from core.models.model_factory import build_model_from_checkpoint
+from utils.data_utils import QUATERNION_FEATURE_NAMES
+from utils.data_utils import MadgwickFilter
+from utils.data_utils import align_sequence_to_templates
+from utils.data_utils import compute_acceleration
+from utils.data_utils import compute_rolling_statistics
+from utils.data_utils import compute_velocity
+from utils.data_utils import load_dtw_templates
+from utils.data_utils import normalize_value
+from utils.data_utils import resample_sequence
 
 try:
     PREDICTION_CLASS_THRESHOLDS = architecture.prediction.prediction_class_thresholds
@@ -173,7 +171,7 @@ class LSTMGesturePredictor:
         elif self.use_ensemble:
             # Load ensemble models
             self.ensemble_models = []
-            
+
             # Auto-detect ensemble models in the directory
             ensemble_idx = 0
             while True:
@@ -182,7 +180,7 @@ class LSTMGesturePredictor:
                 )
                 if not os.path.exists(ensemble_model_path):
                     break
-                
+
                 model, arch_params, input_size, inferred_num_classes = (
                     build_model_from_checkpoint(
                         ensemble_model_path,

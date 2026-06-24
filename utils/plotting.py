@@ -26,7 +26,7 @@ def plot_recording(filename: str, title: str = "", show: bool = True) -> bool:
         data: dict[str, list[float]] = {}
         times: list[float] = []
 
-        with open(filename, "r") as f:
+        with open(filename) as f:
             reader = csv.DictReader(f)
             for row in reader:
                 times.append(float(row["t_ms"]))

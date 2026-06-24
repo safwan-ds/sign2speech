@@ -5,7 +5,8 @@ import time
 from queue import Queue
 
 from core.pipeline.training_pipeline import TrainingPipelineResult
-from gui.services.training_service import TrainingOverrides, TrainingService
+from gui.services.training_service import TrainingOverrides
+from gui.services.training_service import TrainingService
 
 
 def _wait_until_done(service: TrainingService, timeout: float = 1.5) -> None:

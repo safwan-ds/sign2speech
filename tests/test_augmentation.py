@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from utils.augmentation import TimeSeriesAugmenter, create_augmented_dataset
+from utils.augmentation import TimeSeriesAugmenter
+from utils.augmentation import create_augmented_dataset
 
 
 class TestTimeSeriesAugmenter:

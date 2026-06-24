@@ -16,16 +16,18 @@ def test_display_upper_uses_default_upper_for_non_turkish() -> None:
 
 
 def test_now_hms_returns_time_format() -> None:
-    from gui.utils.formatting import now_hms
     import re
+
+    from gui.utils.formatting import now_hms
 
     result = now_hms()
     assert re.match(r"^\d{2}:\d{2}:\d{2}$", result)
 
 
 def test_now_stamp_returns_filename_safe_timestamp() -> None:
-    from gui.utils.formatting import now_stamp
     import re
+
+    from gui.utils.formatting import now_stamp
 
     result = now_stamp()
     assert re.match(r"^\d{8}_\d{6}$", result)

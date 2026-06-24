@@ -5,32 +5,25 @@ import sys
 import threading
 import time
 from collections import deque
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import serial
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.architecture import architecture
-from config.config import (
-    COM_PORT,
-    setup_logging,
-)
-from utils.serial_utils import (
-    ContinuousWarningBeeper,
-    FlexZeroWarningMonitor,
-    parse_sensor_data,
-)
-from core.inference.gesture_predictor import (
-    LSTMGesturePredictor,
-    MODEL_PATH,
-    ENCODER_PATH,
-)
-from core.inference.gesture_translations import (
-    load_gesture_translations,
-    translate_gestures,
-)
-from utils.llm_utils import create_llm_backend, generate_turkish_reply
+from config.config import COM_PORT
+from config.config import setup_logging
+from core.inference.gesture_predictor import ENCODER_PATH
+from core.inference.gesture_predictor import MODEL_PATH
+from core.inference.gesture_predictor import LSTMGesturePredictor
+from core.inference.gesture_translations import load_gesture_translations
+from core.inference.gesture_translations import translate_gestures
+from utils.llm_utils import create_llm_backend
+from utils.llm_utils import generate_turkish_reply
+from utils.serial_utils import ContinuousWarningBeeper
+from utils.serial_utils import FlexZeroWarningMonitor
+from utils.serial_utils import parse_sensor_data
 
 logger = logging.getLogger(__name__)
 

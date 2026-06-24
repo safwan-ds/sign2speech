@@ -72,7 +72,7 @@ def load_gesture_translations(path: str | None = None):
             if candidate.lower().endswith(".json"):
                 import json
 
-                with open(candidate, "r", encoding="utf-8") as handle:
+                with open(candidate, encoding="utf-8") as handle:
                     data = json.load(handle)
                 # Accept dict mapping or list of objects
                 if isinstance(data, dict):
@@ -89,7 +89,7 @@ def load_gesture_translations(path: str | None = None):
                 break
             else:
                 # Plain text fallback
-                with open(candidate, "r", encoding="utf-8") as handle:
+                with open(candidate, encoding="utf-8") as handle:
                     for raw_line in handle:
                         line = raw_line.strip()
                         if not line or line.startswith("#"):
@@ -108,7 +108,7 @@ def load_gesture_translations(path: str | None = None):
             continue
 
     if not found:
-        logger.warning(f"Warning: Gestures file not found at any expected location")
+        logger.warning("Warning: Gestures file not found at any expected location")
 
     return translations
 

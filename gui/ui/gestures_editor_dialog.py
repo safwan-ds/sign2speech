@@ -4,21 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QHBoxLayout,
-    QHeaderView,
-    QMessageBox,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialogButtonBox
+from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QTableWidget
+from PySide6.QtWidgets import QTableWidgetItem
+from PySide6.QtWidgets import QVBoxLayout
+from PySide6.QtWidgets import QWidget
 
 from config.architecture import architecture
-from utils.recording_utils import load_gestures, save_gestures
+from utils.recording_utils import load_gestures
+from utils.recording_utils import save_gestures
 
 
 class GesturesEditorDialog(QDialog):

@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
+from collections.abc import Mapping
 
 import serial
 import serial.tools.list_ports

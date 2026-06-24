@@ -16,8 +16,9 @@ Usage::
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
 
 import yaml
 
@@ -42,13 +43,13 @@ class HardwareConfig:
     num_flex_sensors: int = 5
     num_imu_axes: int = 6
     expected_sensor_count: int = 11
-    flex_sensor_ranges: Dict[int, List[int]] = field(
+    flex_sensor_ranges: dict[int, list[int]] = field(
         default_factory=lambda: {i: [25, 300] for i in range(5)}
     )
-    flex_sensor_calibration: Dict[int, List[int]] = field(
+    flex_sensor_calibration: dict[int, list[int]] = field(
         default_factory=lambda: {0: [28, 224], 1: [56, 293], 2: [39, 240], 3: [53, 239], 4: [44, 261]}
     )
-    flex_sensor_default_range: List[int] = field(default_factory=lambda: [0, 1023])
+    flex_sensor_default_range: list[int] = field(default_factory=lambda: [0, 1023])
     min_accel_value: int = -32768
     max_accel_value: int = 32767
     min_gyro_value: int = -32768
@@ -180,7 +181,7 @@ class AugmentationConfig:
     magnitude_warp_sigma: float = 0.2
     magnitude_warp_knot: int = 4
     noise_level: float = 0.01
-    scale_range: List[float] = field(default_factory=lambda: [0.9, 1.1])
+    scale_range: list[float] = field(default_factory=lambda: [0.9, 1.1])
     time_shift_range: float = 0.1
     rotation_max_angle: int = 10
 
@@ -202,7 +203,7 @@ class PredictionConfig:
     prediction_interval: float = 0.08
     prediction_motion_threshold: int = 1000
     confidence_threshold: float = 0.74
-    prediction_class_thresholds: Dict[str, float] = field(
+    prediction_class_thresholds: dict[str, float] = field(
         default_factory=lambda: {"DEFAULT": 0.74}
     )
     prediction_consensus_frames: int = 5
@@ -311,7 +312,7 @@ class GUIConfig:
     gestures_editor_dialog_width: int = 600
     gestures_editor_dialog_height: int = 420
     default_ui_language: str = "tr"
-    supported_ui_languages: List[str] = field(default_factory=lambda: ["tr", "en"])
+    supported_ui_languages: list[str] = field(default_factory=lambda: ["tr", "en"])
 
     def __post_init__(self) -> None:
         if self.gui_min_width <= 0:
@@ -327,8 +328,8 @@ class EvaluationConfig:
     """Evaluation / metrics plot constants."""
 
     evaluation_dpi: int = 300
-    confusion_matrix_figsize: List[int] = field(default_factory=lambda: [10, 8])
-    roc_curve_figsize: List[int] = field(default_factory=lambda: [10, 8])
+    confusion_matrix_figsize: list[int] = field(default_factory=lambda: [10, 8])
+    roc_curve_figsize: list[int] = field(default_factory=lambda: [10, 8])
     evaluation_class_weight_epsilon: float = 0.000001
 
     def __post_init__(self) -> None:
@@ -375,7 +376,7 @@ class ArchitectureConfig:
 
 
 # ── Section-name → dataclass-type mapping ───────────────────────────────────
-_SECTION_MAP: Dict[str, Any] = {
+_SECTION_MAP: dict[str, Any] = {
     "hardware": HardwareConfig,
     "motion_detection": MotionDetectionConfig,
     "model": ModelConfig,
@@ -396,7 +397,7 @@ _SECTION_MAP: Dict[str, Any] = {
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def load_architecture(yaml_path: Optional[str] = None) -> ArchitectureConfig:
+def load_architecture(yaml_path: str | None = None) -> ArchitectureConfig:
     """Parse *yaml_path* (default: ``config/architecture.yaml``) and return a
     validated :class:`ArchitectureConfig` instance.
 
@@ -413,7 +414,7 @@ def load_architecture(yaml_path: Optional[str] = None) -> ArchitectureConfig:
             f"Ensure config/architecture.yaml exists."
         )
 
-    with open(yaml_path, "r", encoding="utf-8") as fh:
+    with open(yaml_path, encoding="utf-8") as fh:
         raw: dict = yaml.safe_load(fh)
 
     if not isinstance(raw, dict):
@@ -423,7 +424,7 @@ def load_architecture(yaml_path: Optional[str] = None) -> ArchitectureConfig:
         )
 
     # Build each section from the YAML dict (or fall back to defaults)
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     for section_name, section_cls in _SECTION_MAP.items():
         if section_name in raw:
             section_data = raw[section_name]

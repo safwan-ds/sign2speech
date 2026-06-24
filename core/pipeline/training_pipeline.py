@@ -5,15 +5,15 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
-from typing import Callable, Literal
+from typing import Literal
 
 from config.architecture import architecture
-from config.config import (
-    MODELS_DIR,
-    setup_logging,
-)
+from config.config import MODELS_DIR
+from config.config import setup_logging
 
 logger = logging.getLogger(__name__)
 

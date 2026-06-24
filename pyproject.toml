@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "torchviz"]
+dev = ["pytest>=8,<9", "torchviz", "ruff>=0.11,<1"]
 optimization = ["fastdtw>=0.3,<1", "onnx>=1.16,<2", "onnxruntime>=1.20,<2"]
 [project.scripts]
 sign-glove-gui = "main:main"
@@ -42,3 +42,32 @@ include = ["core*", "gui*", "scripts*", "utils*", "config*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = ["data/", "models/", "graphify-out/", ".git/"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line-too-long (handled by formatter)
+    "B008",  # do-not-perform-function-calls-in-argument-defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "gui", "utils", "scripts", "config", "tests"]
+force-single-line = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
