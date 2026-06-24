@@ -44,6 +44,15 @@ def synthetic_model_checkpoint(tmp_path):
         },
     }
     torch.save(checkpoint, os.path.join(model_dir, "model.pth"))
+
+    # Also save encoder.npy and normalization.npz alongside the model
+    # so LSTMGesturePredictor finds them via its model_dir-relative lookup.
+    classes = np.array(["REST", "A", "B", "C", "D"], dtype=object)
+    np.save(os.path.join(model_dir, "encoder.npy"), classes)
+    np.savez(os.path.join(model_dir, "normalization.npz"),
+             mean=np.zeros(INPUT_SIZE, dtype=np.float32),
+             std=np.ones(INPUT_SIZE, dtype=np.float32))
+
     return model_dir
 
 
