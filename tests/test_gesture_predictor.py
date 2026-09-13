@@ -7,9 +7,9 @@ import os
 import pytest
 import torch
 
+from core.inference.gesture_predictor import LSTMGesturePredictor
 from core.inference.gesture_predictor import _canonical_sensor_name
 from core.inference.gesture_predictor import _normalize_class_thresholds
-from core.inference.gesture_predictor import LSTMGesturePredictor
 
 
 class TestCanonicalSensorName:

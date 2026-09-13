@@ -64,10 +64,12 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
         if torch.cuda.is_available():
             torch.cuda.manual_seed(ensemble_seed)
 
-        def wrapped_callback(epoch, total, t_loss, t_acc, v_loss, v_acc, lr):
+        def wrapped_callback(
+            epoch, total, t_loss, t_acc, v_loss, v_acc, lr, current_ensemble_idx=ensemble_idx
+        ):
             if epoch_callback:
                 # Offset epoch to show global progress across the whole ensemble
-                global_epoch = ensemble_idx * architecture.training.epochs + epoch
+                global_epoch = current_ensemble_idx * architecture.training.epochs + epoch
                 epoch_callback(
                     global_epoch,
                     total_ensemble_epochs,
@@ -115,9 +117,7 @@ def train_ensemble_models(X, y, test_X, test_y, epoch_callback=None, cancel_even
         )
 
         all_accuracies.append(val_accuracy)
-        ensemble_models.append(
-            (model, label_encoder, mean, std, val_accuracy, test_accuracy)
-        )
+        ensemble_models.append((model, label_encoder, mean, std, val_accuracy, test_accuracy))
 
         # Save individual ensemble model
         metadata = {

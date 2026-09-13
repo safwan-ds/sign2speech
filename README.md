@@ -8,11 +8,11 @@ data. Leverages deep learning (LSTM with attention) and optional LLM refinement 
 - **Real-time Gesture Recognition**: 11+ gestures (REST, hello, goodbye, numbers, etc.) via LSTM-based inference
 - **Smart Glove Hardware**: five flex sensors + IMU (accelerometer/gyroscope) data streaming over serial
 - **Advanced ML Pipeline**:
-  - LSTM with bidirectional, attention, and batch normalization layers
-  - Data augmentation (time warping, magnitude warping, noise injection)
-  - Weighted loss and label smoothing for imbalanced classes
-  - Cosine annealing and learning rate plateau scheduling
-  - Ensemble training support
+    - LSTM with bidirectional, attention, and batch normalization layers
+    - Data augmentation (time warping, magnitude warping, noise injection)
+    - Weighted loss and label smoothing for imbalanced classes
+    - Cosine annealing and learning rate plateau scheduling
+    - Ensemble training support
 - **Production GUI (PySide6)**: Non-blocking threaded pipeline with real-time prediction cards, confidence bars, and
   sentence assembly
 - **QtGraphs Trace Previews**: Dataset manager trace panels use PySide6 QtGraphs with automatic matplotlib fallback
@@ -28,75 +28,54 @@ data. Leverages deep learning (LSTM with attention) and optional LLM refinement 
 ```text
 sign2speech/
 ├── core/                    # ML logic (models, inference, training)
-├── gui/                    # UI services and components
-├── scripts/                # Utility scripts
-├── data/                   # Raw and processed datasets
-├── models/                 # Trained weights
-├── utils/                  # Shared helpers
-├── config/                 # System configuration
-├── tests/                  # Pytest suite
-├── docs/                   # Documentation
-├── main.py                 # Primary GUI entry point
-├── data_manager.py         # Dataset manager entry point
-├── pyproject.toml          # Build configuration
-└── requirements.txt        # Frozen dependencies
+├── gui/                     # UI services and components
+├── scripts/                 # Utility scripts
+├── data/                    # Raw and processed datasets
+├── models/                  # Trained weights
+├── utils/                   # Shared helpers
+├── config/                  # System configuration
+├── tests/                   # Pytest suite
+├── docs/                    # Documentation
+├── main.py                  # Primary GUI entry point
+├── data_manager.py          # Dataset manager entry point
+├── pyproject.toml           # Build & dependency configuration
+└── uv.lock                  # Deterministic lockfile
 ```
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.11+
-- Virtual environment (venv, conda, etc.)
+- Python 3.11 or 3.12
+- [uv](https://github.com/astral-sh/uv) (recommended package & project manager)
 - Smart glove hardware (or recorded data for training)
 
 ### Installation
-
-**Requirements:** Python 3.11 or 3.12
 
 ```bash
 # Clone repository
 cd sign2speech
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+# Install dependencies and sync virtual environment (creates .venv automatically)
+uv sync
+
+# With optional optimization packages (fastdtw, onnx, onnxruntime):
+uv sync --all-extras
 ```
 
-**GPU Support (CUDA 12.6, recommended):**
-
-```bash
-pip install -e . --extra-index-url https://download.pytorch.org/whl/cu126
-```
-
-**CPU-only (fallback):**
-
-```bash
-pip install -e .
-```
-
-**Development (includes pytest, torchviz):**
-
-```bash
-pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cu126
-```
-
-**Reproducible install (from lock file):**
-
-```bash
-pip install -r requirements.txt
-```
+> [!NOTE]
+> PyTorch CUDA 12.6 wheels are automatically configured via `[tool.uv.sources]` in `pyproject.toml`.
 
 ### Running the GUI
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 ### Running the Dataset Manager GUI
 
 ```bash
-python data_manager.py
+uv run data_manager.py
 ```
 
 This manager GUI is focused on data lifecycle tasks:
@@ -106,9 +85,9 @@ This manager GUI is focused on data lifecycle tasks:
 3. Train a new model (default or advanced runtime overrides)
 4. Review captures with trace plots and quarantine invalid samples
 
-Process/Train tabs run internal background services directly (no script subprocess
-or log-regex parsing); `scripts/process_data.py` and `scripts/train_model.py`
-remain available as deprecated CLI wrappers.
+Process/Train tabs run internal background services directly (no script subprocess or log-regex parsing);
+`scripts/process_data.py` and `scripts/train_model.py`
+remain available as CLI wrappers.
 
 **Keyboard Shortcuts:**
 
@@ -125,7 +104,7 @@ remain available as deprecated CLI wrappers.
 ### Training a Model
 
 ```bash
-python scripts/train_model.py
+uv run python scripts/train_model.py
 ```
 
 This will:
@@ -137,7 +116,7 @@ This will:
 ### Processing Raw Data
 
 ```bash
-python scripts/process_data.py
+uv run python scripts/process_data.py
 ```
 
 Normalizes flex sensor and IMU data into fixed-length sequences ready for training.
@@ -145,7 +124,7 @@ Normalizes flex sensor and IMU data into fixed-length sequences ready for traini
 ### Making Predictions
 
 ```bash
-python scripts/predict.py
+uv run python scripts/predict.py
 ```
 
 Batch prediction on test data with confidence scores and confusion matrix.
@@ -231,12 +210,12 @@ pipeline.
 
 ## Testing
 
-Run pytest from the project root:
+Run pytest with `uv`:
 
 ```bash
-pytest tests/
-pytest tests/test_data_utils.py -v              # Specific test file
-pytest tests/ -k "augmentation" --tb=short      # Filter tests
+uv run pytest tests/
+uv run pytest tests/test_data_utils.py -v              # Specific test file
+uv run pytest tests/ -k "augmentation" --tb=short      # Filter tests
 ```
 
 ## Architecture
@@ -272,10 +251,11 @@ Serial Stream (glove hardware)
 - **Qt timers + queue polling**: Responsive UI updates
 - **Log streaming**: Real-time log viewer with file rotation
 
-## 🔧 Development Workflow
+## Development Workflow
 
 1. **Testing**: Write tests before committing to `main`
-2. **Config changes**: Update `config.py` and `.env.example` together
+2. **Dependencies**: Use `uv add <package>` or `uv add --dev <package>`
+3. **Config changes**: Update `config.py` and `.env.example` together
 
 ## License
 

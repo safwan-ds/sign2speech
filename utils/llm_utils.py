@@ -25,7 +25,10 @@ def create_llm_backend() -> tuple[object | None, dict[str, str]]:
 
     backend = architecture.llm.llm_backend.strip().lower()
     if backend not in {"local", "remote"}:
-        logger.warning("Unknown architecture.llm.llm_backend=%r; falling back to local", architecture.llm.llm_backend)
+        logger.warning(
+            "Unknown architecture.llm.llm_backend=%r; falling back to local",
+            architecture.llm.llm_backend,
+        )
         backend = "local"
 
     if backend == "remote":
@@ -50,7 +53,7 @@ def _make_remote_llm() -> tuple[object | None, dict[str, str]]:
     try:
         from openai import OpenAI
     except ImportError:
-        logger.error("OpenAI SDK is not installed. Install it with: pip install openai")
+        logger.error("OpenAI SDK is not installed. Install it with: uv add openai")
         return None, {"type": "remote", "status": "unavailable"}
 
     client = OpenAI(
@@ -71,7 +74,7 @@ def _make_remote_llm() -> tuple[object | None, dict[str, str]]:
                 reasoning_effort="high",
                 extra_body={"thinking": {"type": "enabled"}},
                 temperature=kwargs.get("temperature", architecture.llm.qwen_inference_temperature),
-                max_tokens=kwargs.get("max_tokens", architecture.llm.llm_remote_max_tokens)
+                max_tokens=kwargs.get("max_tokens", architecture.llm.llm_remote_max_tokens),
             )
             content = response.choices[0].message.content
             return {"choices": [{"text": content}]}
@@ -96,10 +99,7 @@ def load_qwen_model():
     try:
         from llama_cpp import Llama
     except ImportError:
-        logger.error(
-            "llama-cpp-python is not installed. "
-            "Install it with: pip install llama-cpp-python"
-        )
+        logger.error("llama-cpp-python is not installed. Install it with: uv add llama-cpp-python")
         return None
     return Llama(
         model_path=QWEN_MODEL_PATH,
@@ -174,7 +174,18 @@ KESİN KURALLAR:
 4. EKLERİ DOĞRU KULLAN. İsmin hallerini (-e, -de, -den) ve iyelik eklerini (-ım, -in, -i) doğru uygula.
 5. SADECE CÜMLEYİ YAZ. Açıklama, yorum veya ek metin yazma."""
 
-LOCAL_QWEN_LANGUAGE_CHECK = {"I ", "We ", "You ", "He ", "She ", "They ", "It ", "The ", "A ", "An "}
+LOCAL_QWEN_LANGUAGE_CHECK = {
+    "I ",
+    "We ",
+    "You ",
+    "He ",
+    "She ",
+    "They ",
+    "It ",
+    "The ",
+    "A ",
+    "An ",
+}
 
 # Compact version for remote API calls (no QWEN tokens, fewer words).
 REMOTE_SYSTEM_PROMPT = (
@@ -206,9 +217,8 @@ def generate_reply(
         if context:
             compact_context = [item.strip() for item in context if item.strip()]
             if compact_context:
-                context_lines = (
-                    "\n\nÖNCEKİ ÇIKTILAR:\n"
-                    + "\n".join(f"- {item}" for item in compact_context[-2:])
+                context_lines = "\n\nÖNCEKİ ÇIKTILAR:\n" + "\n".join(
+                    f"- {item}" for item in compact_context[-2:]
                 )
         system_prompt = REMOTE_SYSTEM_PROMPT + context_lines
         prompt = f"Input: {gesture_text}\nOutput:"
@@ -230,9 +240,8 @@ def generate_reply(
     if context:
         compact_context = [item.strip() for item in context if item.strip()]
         if compact_context:
-            context_lines = (
-                "\n\nÖNCEKİ ÇIKTILAR:\n"
-                + "\n".join(f"- {item}" for item in compact_context[-2:])
+            context_lines = "\n\nÖNCEKİ ÇIKTILAR:\n" + "\n".join(
+                f"- {item}" for item in compact_context[-2:]
             )
 
     system_prompt = f"{FEW_SHOT_MAPPINGS}\n\n{QWEN_SYSTEM_PROMPT}{context_lines}"
@@ -256,12 +265,9 @@ def generate_reply(
             if text.startswith("Output:"):
                 text = text.replace("Output:", "").strip()
             # Reject English responses from QWEN
-            if text:
-                if any(text.startswith(eng) for eng in LOCAL_QWEN_LANGUAGE_CHECK):
-                    logger.warning(
-                        "QWEN output classified as English, discarding: %r", text[:60]
-                    )
-                    return None
+            if text and any(text.startswith(eng) for eng in LOCAL_QWEN_LANGUAGE_CHECK):
+                logger.warning("QWEN output classified as English, discarding: %r", text[:60])
+                return None
             return text if text else None
         return None
     except Exception as e:
